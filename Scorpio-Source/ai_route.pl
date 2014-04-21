@@ -19,6 +19,8 @@ sub ai_route {
 	$args{'npcData'}{'ID'} = $ID;
 	$args{'npcData'}{'dist'} = $dist;
 
+#	$args{'ai_start_time'} = time;
+
 	undef %{$args{'returnHash'}};
 	unshift @ai_seq, "route";
 	unshift @ai_seq_args, \%args;
