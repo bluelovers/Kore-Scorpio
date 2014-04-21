@@ -1,0 +1,15 @@
+#--------------------------
+
+version 5.11.1.2
+update 01/11/05 - 11:03:23
+regkey 0f8243594fd85969fc37ec85bee96346
+chkkey my9sfe4qQFOkw
+MD5 b6960abd5d906b2c8378436bbb4a0031
+
+old_version 5.11.1.1
+old_update 01/11/05 - 09:42:17
+old_regkey b46aca5731e67cb059e1451e94333954
+old_chkkey x2eZCw3wRYLSk
+old_MD5 060c13fc4c84464ea7e5fab53bceb52f
+
+#--------------------------
