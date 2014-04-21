@@ -1245,6 +1245,36 @@ $i, $config{"master_name_$i"}
 
 #			scUpdate("config");
 		}
+	
+		if (!$config{'storageAuto_password'}) {
+			print "½Ð¿é¤J­Ü®w±K½X:\n";
+#			setColor($FG_BLACK);
+
+			$msg = input_readLine();
+			
+			getString(\$msg, 1);
+			
+			undef @{$sc_v{'ai'}{'temp'}{'key'}};
+					
+			@{$sc_v{'ai'}{'temp'}{'key'}} = split /[, ]+/, $config{storageAuto_encryptKey};
+
+			if (!@{$sc_v{'ai'}{'temp'}{'key'}}) {
+				@{$sc_v{'ai'}{'temp'}{'key'}} = ('0x050B6F79', '0x0202C179', '0x00E20120', '0x04FA43E3', '0x0179B6C8', '0x05973DF2', '0x07D8D6B', '0x08CB9ED9');
+			}
+			
+			my $crypton = new Utils::Crypton(pack("V*", @{$sc_v{'ai'}{'temp'}{'key'}}), 32);
+			$msg = sprintf("%d%08d", length($msg), $msg);
+			$sc_v{'ai'}{'temp'}{'ciphertextBlock'} = $crypton->encrypt(pack("V*", $msg, 0, 0, 0));
+			
+			$config{'storageAuto_password'} = getHex($sc_v{'ai'}{'temp'}{'ciphertextBlock'}, 0);
+			
+			undef $sc_v{'ai'}{'temp'}{'ciphertextBlock'};
+			undef $sc_v{'ai'}{'temp'}{'input'};
+			undef @{$sc_v{'ai'}{'temp'}{'key'}};
+			undef $crypton;
+
+#			setColor($sc_v{'Console'}{'original'});
+		}
 
 		scUpdate("config") if ($msg ne "");
 
