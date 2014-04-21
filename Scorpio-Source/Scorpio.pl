@@ -66,7 +66,7 @@ require 'Scorpio_version.pl';
 	addVersionText("","","");
 	addVersionText("","","");
 
-	addVersionText("Scorpio","Bluelovers。風","",1);
+	addVersionText("Scorpio","Bluelovers。風","http://bluelovers.idv.st",1);
 
 	getVersionText();
 
@@ -158,6 +158,7 @@ require 'Scorpio_version.pl';
 	addFixerValue('config', 'autoResurrect_dist', 5);
 	addFixerValue('config', 'autoResurrect_retry', 2);
 #	addFixerValue('config', 'dcOnDualLogin_protect', 1, 2);
+	addFixerValue('config', 'dcOnDualLogin_protect', 1);
 #	addFixerValue('config', 'teleportAuto_search_portal', 150);
 #	addFixerValue('config', 'teleportAuto_search_portal_inCity', 1);
 	addFixerValue('config', 'autoRoute_npcChoice', 1);
@@ -168,7 +169,7 @@ require 'Scorpio_version.pl';
 	addFixerValue('config', 'password_noChoice', 0);
 	addFixerValue('config', 'attackAuto_unLock', 0, 2);
 	addFixerValue('config', 'parseNpcAuto', 0, 2);
-	addFixerValue('config', '');
+	addFixerValue('config', 'updateNPC', 2, 7);
 	addFixerValue('config', '');
 	addFixerValue('config', '');
 	addFixerValue('config', '');
@@ -206,6 +207,7 @@ require 'Scorpio_version.pl';
 #		ai_event_checkUser_free(1);
 #
 #		addFixerValue('config', 'attackBerserk', 3, 4);
+		addFixerValue('config', 'parseNpcAuto', 0);
 	}
 
 	@{$sc_v{'valBolck'}} = (
@@ -477,6 +479,10 @@ if ($sc_v{'Scorpio'}{'checkVer'}) {
 
 	解除強制啟動相同帳號登入保護模式
 
+	updateNPC 2
+	\# 當同座標且同名稱之NPC的編號有更動時，自動更新tables/npcs.txt中該NPC之編號
+	\# (0=關、1=開、2=新型更新方式-修正舊有BUG)
+
 EOM
 ;
 
@@ -737,7 +743,7 @@ EOM
 			sleep (2);
 		}
 
-		unless (-e "gemini.txt") {
+		unless (-e "gemini.txt" || 1) {
 			$spend_s = time;
 
 			print <<"EOM";
@@ -920,7 +926,7 @@ addParseFiles("$sc_v{'path'}{'tables'}/jobs.txt", \%jobs_lut, \&parseDataFile2, 
 addParseFiles("$sc_v{'path'}{'tables'}/maps.txt", \%maps_lut, \&parseROLUT, '地圖名稱清單');
 addParseFiles("$sc_v{'path'}{'tables'}/monsters.txt", \%monsters_lut, \&parseDataFile2, '怪物名稱清單');
 addParseFiles("$sc_v{'path'}{'tables'}/npcs.txt", \%npcs_lut, \&parseNPCs, ' NPC 清單');
-addParseFiles("$sc_v{'path'}{'tables'}/portals.txt", \%portals_lut, \&parsePortals, '傳點設定檔包含NPC傳點');
+addParseFiles("$sc_v{'path'}{'tables'}/portals.txt", \%portals_lut, \&parsePortals, '傳點設定檔包含NPC傳點', 0, "$sc_v{'path'}{'tables'}/portals_*.txt");
 addParseFiles("$sc_v{'path'}{'tables'}/portalsLOS.txt", \%portals_los, \&parsePortalsLOS, '已編譯之傳點路徑');
 addParseFiles("$sc_v{'path'}{'tables'}/sex.txt", \%sex_lut, \&parseDataFile2, '性別清單');
 addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_lut, \&parseSkillsLUT, '技能清單');
