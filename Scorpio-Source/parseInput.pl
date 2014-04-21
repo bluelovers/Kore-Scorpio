@@ -1384,11 +1384,9 @@ $i, $players{$playersID[$i]}{'lv'}, $job_string, $sex_lut{$players{$playersID[$i
 		$job_name_string = getName("jobs_lut", $chars[$config{'char'}]{'jobID'})." $sex_lut{$chars[$config{'char'}]{'sex'}}";
 		$zeny_string = ($chars[$config{'char'}]{'zenny'}) ? toZeny($chars[$config{'char'}]{'zenny'}) : 0;
 
-		$id = unpack("L1", $accountID);
-
 		my $t_exp_line = "----------------------------------------------";
 
-		print subStrLine($t_exp_line, "Status ( ID: $id )", -1)
+		print subStrLine($t_exp_line, "Status ( AID: ".getID($accountID)." CID: ".getID($sc_v{'input'}{'charID'})." )", -1)
 		.swrite(
 		"@<<<<<<<<<<<<<<<<<<<<<<< HP: @>>>>/@<<<<(@>>%)"
 		,[$chars[$config{'char'}]{'name'}, $chars[$config{'char'}]{'hp'}, $chars[$config{'char'}]{'hp_max'}, int(percent_hp(\%{$chars[$config{'char'}]}))]
@@ -2306,7 +2304,9 @@ $i, $items_lut{$makeID[$i]}
 			print $tmpVal{'value'};
 			undef $tmpVal{'value'};
 
-			$tmpVal{'format'} = " @>>> @<<<<<<<<<<<<<<<<<<<<<<<<<<<< x@>>>>>>";
+			$tmpVal{'lenNum'} = 5;
+
+			$tmpVal{'format'} = " @>>>> @<<<<<<<<<<<<<<<<<<<<<<<<<<< x@>>>>>>";
 
 			@defeatKey = sort sortNum keys(%{$record{"storageGet"}});
 
@@ -2314,7 +2314,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Storage Get");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("item", $_);
 					$defeatMonsterNum = $record{"storageGet"}{$_};
 
@@ -2331,7 +2331,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Steal Report");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("mon", $_);
 					$defeatMonsterNum = $record{"steal"}{$_};
 
@@ -2347,7 +2347,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Not Take");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("item", $_);
 					$defeatMonsterNum = $record{"takeNot"}{$_};
 
@@ -2363,7 +2363,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Auto Drop");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("item", $_);
 					$defeatMonsterNum = $record{"Auto-Drop"}{$_};
 
@@ -2380,7 +2380,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Mon Report");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("mon", $_);
 					$defeatMonsterNum = $record{"monsters"}{$_};
 
@@ -2397,7 +2397,7 @@ $i, $items_lut{$makeID[$i]}
 				$tmpVal{'value'} .= subStrLine($t_exp_line,"Rare Item");
 
 				foreach (@defeatKey) {
-					$defeatMonsterID = lenNum($_, 4);
+					$defeatMonsterID = lenNum($_, $tmpVal{'lenNum'});
 					$defeatMonsterName = getName("item", $_);
 					$defeatMonsterNum = $record{"item"}{$_};
 
@@ -2425,6 +2425,7 @@ $i, $items_lut{$makeID[$i]}
 		} elsif (switchInput($params[1], "reset", "cls")) {
 			undef $sc_v{'exp'}{'base'};
 			undef $sc_v{'exp'}{'job'};
+			undef $sc_v{'exp'}{'guild'};
 
 			undef %record;
 
@@ -3174,10 +3175,12 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 
 			$text .= " No    Name.\n";
 
+			$text .= swrite("@>> @> @<<<<<< @<<<<<< @<<<<<<<", ["No", "", "AID", "CID", "Name"]);
+
 			for (my $i=0; $i<@{$sc_v{'friend'}{'member'}}; $i++) {
 				$c = $charID_lut{$sc_v{'friend'}{'member'}[$i]{'AID'}}{'online'}?"¡¸":"";
 
-				$text .= swrite2("@>> @>", [$i, $c])." $sc_v{'friend'}{'member'}[$i]{'name'}\n";
+				$text .= swrite2("@>> @> @>>>>>> @>>>>>>", [$i, $c, getID($sc_v{'friend'}{'member'}[$i]{'AID'}), getID($sc_v{'friend'}{'member'}[$i]{'CID'})])." $sc_v{'friend'}{'member'}[$i]{'name'}\n";
 
 			}
 
@@ -3215,7 +3218,7 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 
 #		$text .= " Type    Name.\n";
 
-		$text .= "Date: ".getFormattedDate(int(time))."\n";
+		$text .= "$sc_v{'parseMsg'}{'server_name'}\nDate: ".getFormattedDate(int(time))."\n";
 
 		foreach $mvpKey (keys %{$record{'mvp'}}) {
 
@@ -3340,7 +3343,22 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 #			, $tmpVal{'line'}, ["level: $sc_v{'sense'}{'level'}", "size: $sc_v{'sense'}{'size'}"]
 #
 #		);
-
+#	} elsif (switchInput($switch, "test")) {
+##		print "¶Ç°e±K½X : $inputparam\n";
+##		print "¶Ç°e±K½X : ".getHex(pack("L1", $params[1]))." - ".getHex(pack("L1", $params[2]))."\n";
+##		print "¶Ç°e±K½X : ".getHexEx($params[1])." - ".getHexEx($params[2])."\n";
+##		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . pack("C*", $params[1]) . pack("C*", $params[2]);
+##		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . toHex($inputparam) . toHex('EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8');
+##		encrypt(\$remote_socket, $newmsg);
+#
+#		my $newmsg = pack("C*", 0x3B, 0x02)
+#			. pack("C*", 0x02, 0x00)
+#			. toHex('A6 98 AE 8A 3E 9D B7 92 4F FB AC A4 67 01 C5 4F')
+#			. toHex('50 FC 2E BC FB A1 CA 9C F7 AB 45 AA F9 D8 0E 54')
+#		;
+#		encrypt(\$remote_socket, $newmsg);
+#
+#		dumpData($newmsg, 1);
 	} else {
 		print "¿ù»~ªº«ü¥O : $switch \n";
 	}
