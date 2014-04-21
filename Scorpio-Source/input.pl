@@ -198,6 +198,154 @@ sub checkConnection {
 		return 0;
 	}
 
+	if (
+		$config{'kore_sleepTime'}
+		&& (
+			$remote_socket && $remote_socket->connected()
+			|| $sc_v{'input'}{'conState'} > 0
+		)
+#		&& $timeout_ex{'master'}{'timeout'} > 0
+
+		&& checkTimeOut("ai_kore_sleepTime")
+	) {
+#		my $idx = 0;
+
+		if ($sc_v{'input'}{'kore_sleepTime'}{'found'} && $timeout_ex{'master'}{'timeout'} > 0) {
+			my @array;
+
+			splitUseArray(\@array, $config{'waitRecon'}, ",");
+
+			$array[0] = 10 if ($array[0] < 10);
+			$array[1] = 10 if ($array[1] < 10);
+
+			$sc_v{'input'}{'kore_sleepTime'}{'rand'} = getRand($array[0], $array[1]);
+
+			printC(
+					"\n◆啟動 kore_sleepTime".(($config{"kore_sleepTime_$sc_v{'input'}{'kore_sleepTime'}{'index'}"} ne "")?" - ".$config{"kore_sleepTime_$sc_v{'input'}{'kore_sleepTime'}{'index'}"}:"")
+				.	"\n\n\t現在時間: ".getFormattedDate(int(time))
+				.	"\n\t休眠時間: ".$config{"kore_sleepTime_$sc_v{'input'}{'kore_sleepTime'}{'index'}_start"}." -> ".$config{"kore_sleepTime_$sc_v{'input'}{'kore_sleepTime'}{'index'}_stop"}
+				.	"\n\t進入睡眠: $timeout_ex{'master'}{'timeout'} + $sc_v{'input'}{'kore_sleepTime'}{'rand'} 秒\n"
+				, "s"
+				, 1
+			);
+
+			$timeout_ex{'master'}{'timeout'} += $sc_v{'input'}{'kore_sleepTime'}{'rand'};
+
+			undef %{$sc_v{'input'}{'kore_sleepTime'}};
+
+			sleep($timeout_ex{'master'}{'timeout'});
+
+#			undef $sc_v{'input'}{'conState_stop'};
+#			undef %{$sc_v{'input'}{'kore_sleepTime'}};
+
+		} elsif ($config{"kore_sleepTime_0_start"} eq "" || $config{"kore_sleepTime_0_stop"} eq "") {
+			scModify('config', 'kore_sleepTime', 0, 2);
+
+#			undef $sc_v{'input'}{'conState_stop'};
+			undef %{$sc_v{'input'}{'kore_sleepTime'}};
+		} else {
+			my @localtime = localtime time;
+			$localtime[4] = $localtime[4] + 1;
+
+			undef %{$sc_v{'input'}{'kore_sleepTime'}};
+
+			my $idx = 0;
+
+			my ($s_hr,$s_min,$s_sec);
+			my ($e_hr,$e_min,$e_sec);
+
+			while (1) {
+				last if ($config{"kore_sleepTime_${idx}_start"} eq "" || $config{"kore_sleepTime_${idx}_stop"} eq "");
+
+				($s_hr,$s_min,$s_sec) = $config{"kore_sleepTime_${idx}_start"}=~ /(\d+):(\d+):(\d+)/;
+				($e_hr,$e_min,$e_sec) = $config{"kore_sleepTime_${idx}_stop"}=~ /(\d+):(\d+):(\d+)/;
+
+#				print $config{"kore_sleepTime_${idx}_start"}."\n";
+#				print $config{"kore_sleepTime_${idx}_stop"}."\n";
+#
+#				print "$s_hr <= $localtime[2] : ".($s_hr <= $localtime[2])."\n";
+#				print "$s_min <= $localtime[1] : ".($s_min <= $localtime[1])."\n";
+#				print "$s_sec <= $localtime[0] : ".($s_sec <= $localtime[0])."\n";
+#
+#				print "$e_hr >= $localtime[2] : ".($e_hr >= $localtime[2])."\n";
+#				print "$e_min <= $localtime[1] : ".($e_min <= $localtime[1])."\n";
+#				print "$e_sec <= $localtime[0] : ".($e_sec <= $localtime[0])."\n";
+
+				if (
+					(
+						$config{"kore_sleepTime_${idx}_day"} eq ""
+						|| $config{"kore_sleepTime_${idx}_day"} == $localtime[6]
+					)
+#					&& $s_hr <= $localtime[2]
+#					&& $s_min <= $localtime[1]
+#					&& $s_sec <= $localtime[0]
+
+#					&& $e_hr >= $localtime[2]
+#					&& $e_min <= $localtime[1]
+#					&& $e_sec <= $localtime[0]
+
+					&& (
+						$localtime[2] > $s_hr
+						|| (
+							$localtime[2] == $s_hr
+							&& (
+								$localtime[1] > $s_min
+								|| (
+									$localtime[1] == $s_min
+									&& $localtime[0] >= $s_sec
+								)
+							)
+						)
+					) && (
+						$localtime[2] < $e_hr
+						|| (
+							$localtime[2] == $e_hr
+							&& (
+								$localtime[1] < $e_min
+								|| (
+									$localtime[1] == $e_min
+									&& $localtime[0] < $e_sec
+								)
+							)
+						)
+					)
+				) {
+					my $halt_sec = 0;
+					my $hr	= $e_hr - $localtime[2];
+					my $min	= $e_min - $localtime[1];
+					my $sec	= $e_sec - $localtime[0];
+
+					if ($hr < 0) { $hr = $hr + 24;}
+					my $reconnect_time = $hr * 3600 + $min * 60 + $sec;
+
+					$sc_v{'input'}{'conState'} = 1;
+					undef $sc_v{'input'}{'conState_tries'};
+
+					undef @ai_seq;
+					undef @ai_seq_args;
+
+#					print "\nwaiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n\n";
+#					sysLog("a", "waiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n");
+					$timeout_ex{'master'}{'time'} = time;
+					$timeout_ex{'master'}{'timeout'} = $reconnect_time;
+					killConnection(\$remote_socket);
+
+					timeOutStart(-1, "ai_kore_sleepTime");
+
+					$sc_v{'input'}{'kore_sleepTime'}{'index'} = $idx;
+					$sc_v{'input'}{'kore_sleepTime'}{'found'} = 1;
+
+					last;
+				} else {
+					timeOutStart("ai_kore_sleepTime");
+#					print "123";
+				}
+
+				$idx++;
+			}
+		}
+	}
+
 	if ($sc_v{'input'}{'conState'} == 1 && !($remote_socket && $remote_socket->connected()) && timeOut(\%{$timeout_ex{'master'}}) && !$sc_v{'input'}{'conState_tries'}) {
 		my (@array, $msg);
 		splitUseArray(\@array, $config{'waitRecon'}, ",");
@@ -289,7 +437,6 @@ sub checkConnection {
 
 	} elsif ($sc_v{'input'}{'conState'} == 1 && checkTimeOut('master') && timeOut(\%{$timeout_ex{'master'}})) {
 		relogWait("連線主伺服器逾時, 重新連線到主伺服器...", 1);
-
 	} elsif ($sc_v{'input'}{'conState'} == 2 && !($remote_socket && $remote_socket->connected()) && ($config{'server'} ne "" || $config{'charServer_host'}) && !$sc_v{'input'}{'conState_tries'}) {
 		print "連線到登入伺服器...\n";
 		$sc_v{'input'}{'conState_tries'}++;
@@ -369,6 +516,67 @@ sub checkConnection {
 		sysLog("im", "重要", "重要訊息: 自動登出時間已到, 立即登出！");
 		$quit = 1;
 		quit(1, 1);
+	} elsif (
+		$config{'kore_sleepTime'}
+		&& (
+			$remote_socket && $remote_socket->connected()
+			|| $sc_v{'input'}{'conState'} > 0
+		)
+		&& 0
+	) {
+		my $idx = 0;
+
+		if ($config{"kore_sleepTime_${idx}_start"} eq "" || $config{"kore_sleepTime_${idx}_stop"} eq "") {
+			scModify('config', 'kore_sleepTime', 0, 2);
+		} else {
+			my @localtime = localtime time;
+			$localtime[4] = $localtime[4] + 1;
+
+			my ($s_hr,$s_min,$s_sec);
+			my ($e_hr,$e_min,$e_sec);
+
+			while (1) {
+				($s_hr,$s_min,$s_sec) = $config{"kore_sleepTime_${idx}_start"}=~ /(\d+):(\d+):(\d+)/;
+				($e_hr,$e_min,$e_sec) = $config{"kore_sleepTime_${idx}_stop"}=~ /(\d+):(\d+):(\d+)/;
+
+				if (
+					(
+						$config{"kore_sleepTime_${idx}_day"} eq ""
+						|| $config{"kore_sleepTime_${idx}_day"} == $localtime[6]
+					)
+					&& $s_hr >= $localtime[2]
+					&& $s_min >= $localtime[1]
+					&& $s_sec >= $localtime[0]
+					&& $e_hr <= $localtime[2]
+					&& $e_min <= $localtime[1]
+					&& $e_sec <= $localtime[0]
+				) {
+					my $halt_sec = 0;
+					my $hr	= $e_hr - $s_hr;
+					my $min	= $e_min - $s_min;
+					my $sec	= $e_sec - $s_sec;
+
+					if ($hr<0) { $hr = $hr + 24;}
+					my $reconnect_time = $hr * 3600 + $min * 60 + $sec;
+
+					$sc_v{'input'}{'conState'} = 1;
+					undef $sc_v{'input'}{'conState_tries'};
+
+					undef @ai_seq;
+					undef @ai_seq_args;
+
+					print "\nwaiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n\n";
+					sysLog("a", "waiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n");
+					$timeout_ex{'master'}{'time'} = time;
+					$timeout_ex{'master'}{'timeout'} = $reconnect_time;
+					killConnection(\$remote_socket);
+
+					last;
+				}
+
+				$idx++;
+			}
+		}
 	}
 #Karasu End
 }
