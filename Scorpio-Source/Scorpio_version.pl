@@ -1,13 +1,13 @@
 # Scorpio version config //
 
-$sc_v{'Scorpio'}{'version'}	= "5.5.30.3";
-$sc_v{'Scorpio'}{'update'}	= "30/05/05 - 04:08:11";
-$sc_v{'Scorpio'}{'regkey'}	= "bdfc522f2ccaf431b357287933db6085";
+$sc_v{'Scorpio'}{'version'}	= "5.7.22.3";
+$sc_v{'Scorpio'}{'update'}	= "22/07/05 - 13:42:58";
+$sc_v{'Scorpio'}{'regkey'}	= "bcd670e9f6488e7e5f00fef29ba1a589";
 
 $sc_v{'Scorpio'}{'checkVer'}	= 0;
 
 $sc_v{'Scorpio'}{'checkUser'}	= 0;
-$sc_v{'Scorpio'}{'checkGuild'}	= '雙魚&雙子,☆妖靈魅影☆♀Scorpio,☆妖靈魅影☆,♀大無限ㄐㄐ團♂,*自由因子*,☆大無限喵喵團☆,♀☆初心者領域︿︿★♂,愛與夢飛翔I,↖~私人海灘~↘';
+$sc_v{'Scorpio'}{'checkGuild'}	= '雙魚&雙子,☆妖靈魅影☆♀Scorpio,☆妖靈魅影☆,☆大無限喵喵團☆,↖~私人海灘~↘';
 
 
 # // Scorpio version config
