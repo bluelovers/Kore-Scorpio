@@ -15,17 +15,26 @@ sub parseSendMsg {
 	# If the player tries to manually do something in the RO client, disable AI for a small period
 	# of time using ai_clientSuspend().
 
-	if ($switch eq "0066") {
+	if ($switch eq "0064") {#systeman
+		if ($option{'X-Kore_version'}) {
+			scModify('config', 'version', unpack("L*", substr($msg, 2, 4)), 1);
+		}
+		if ($config{'X-Kore_master_version'}) {
+			scModify('config', "master_version_".$config{'master'}, unpack("C*", substr($msg, 54, 1)), 1);
+		}
+	} elsif ($switch eq "0066") {
 		# Login character selected
 #		configModify("char", unpack("C*",substr($msg, 2, 1)));
 
 		scModify('config', 'char', unpack("C*",substr($msg, 2, 1)), 1);
 
-		initConnectVars();
+#		initConnectVars();
 
 #		timeOutStart('gamelogin');
 
 	} elsif ($switch eq "0072") {
+		initConnectVars();
+
 		# Map login
 		if ($config{'sex'} ne "") {
 			$sendMsg = substr($sendMsg, 0, 18) . pack("C", $config{'sex'});
@@ -47,7 +56,8 @@ sub parseSendMsg {
 #		$timeout{'welcomeText'}{'time'} = time;
 		print "Map loaded\n";
 
-		timeOutStart(-1, 'ai');
+		timeOutStart('ai');
+		ai_clientSuspend(0, 1);#systeman wait for charater info;
 
 #		timeOutStart(
 #			'play',
@@ -103,8 +113,8 @@ sub parseSendMsg {
 			undef $sendMsg;
 		}
 
-#	} elsif ($switch eq "0096") {
-#		# Private message
+	} elsif ($switch eq "0096") {
+		# Private message
 		$length = unpack("S",substr($msg,2,2));
 		($user) = substr($msg, 4, 24) =~ /([\s\S]*?)\000/;
 		$chat = substr($msg, 28, $length - 29);
@@ -121,6 +131,13 @@ sub parseSendMsg {
 #			$lastpm{'user'} = $user;
 #			push @lastpm, {%lastpm};
 		}
+	} elsif ($switch eq "009B") {
+		$body = unpack("C1",substr($msg, 4, 1));
+		$head = unpack("C1",substr($msg, 2, 1));
+
+		$chars[$config{'char'}]{'look'}{'head'} = $head;
+		$chars[$config{'char'}]{'look'}{'body'} = $body;
+		print "You look at $chars[$config{'char'}]{'look'}{'body'}, $chars[$config{'char'}]{'look'}{'head'}\n" if ($config{'debug'} >= 2);
 	} elsif ($switch eq "009F") {
 		# Take
 		aiRemove("clientSuspend");
@@ -135,6 +152,54 @@ sub parseSendMsg {
 		# Trying to exit
 		aiRemove("clientSuspend");
 		ai_clientSuspend($switch, 10);
+	} elsif ($switch eq "01DD") {#systeman
+		if ($option{'X-Kore_version'}) {
+			scModify('config', "version", unpack("L*", substr($msg, 2, 4)), 1);
+		}
+		if ($option{'X-Kore_master_version'}) {
+			scModify('config', "master_version_".$config{'master'}, unpack("C*", substr($msg, 46, 1)), 1);
+		}
+	} elsif ($switch eq "01FA") {#systeman
+		if ($option{'X-Kore_version'}) {
+			scModify('config', "version", unpack("L*", substr($msg, 2, 4)), 1);
+		}
+		if ($option{'X-Kore_master_version'}) {
+			scModify('config', "master_version_".$config{'master'}, unpack("S*", substr($msg, 46, 2)), 1);
+		}
+	} elsif ($switch eq "023B") {
+#		print "[023B] length: ".length($msg)."\n";
+#		print "[023B] ".getHex(substr($msg,2,2))."\n";
+#		print "[023B] ".getID(substr($msg,4,16))." - ".getHex(substr($msg,4,16))."\n";
+#		print "[023B] ".getID(substr($msg,20,16))." - ".getHex(substr($msg,20,16))."\n";
+
+#		print "[023B] ".unpack("L1",substr($msg, 2, 4))."\n";
+#		print "[023B] ".unpack("L1",substr($msg, 6, 28))."\n";
+#		print "[023B] ".unpack("L1",substr($msg, 2, 34))."\n";
+#
+#		($name) = substr($msg, 6, 28) =~ /([\s\S]*?)\000/;
+#		($name2) = substr($msg, 2, 34) =~ /([\s\S]*?)\000/;
+#
+#		print "[023B] $name = $name2\n";
+#		dumpData($sendMsg,0);
+#		print "lastswitch: $lastswitch\n";
+#		print "lastswitchSendMsg: $sc_v{'input'}{'sendMsg'}{'lastSwitch'}\n";
+		printC("密碼金鑰: ".getHex(substr($msg,4,16))."\n", "s");
+#	} elsif ($switch eq "023D") {
+#		print "[$switch] length: ".length($msg)."\n";
+#		print "[$switch] ".getHex(substr($msg,2,2))."\n";
+#		print "[$switch] ".getID(substr($msg,4,16))." - ".getHex(substr($msg,4,16))."\n";
+#		print "[$switch] ".getID(substr($msg,20,16))." - ".getHex(substr($msg,20,16))."\n";
+#
+##		print "[023B] ".unpack("L1",substr($msg, 2, 4))."\n";
+##		print "[023B] ".unpack("L1",substr($msg, 6, 28))."\n";
+##		print "[023B] ".unpack("L1",substr($msg, 2, 34))."\n";
+##
+##		($name) = substr($msg, 6, 28) =~ /([\s\S]*?)\000/;
+##		($name2) = substr($msg, 2, 34) =~ /([\s\S]*?)\000/;
+#
+#		print "[$switch] $name = $name2\n";
+#		dumpData($sendMsg,1);
+##		print "倉庫密碼: ".getHex(substr($msg,4,16))."\n";
 	}
 	if ($config{'debug_sendPacket'}) {
 		if (!defined($spackets{$switch}) && $sendMsg ne "" ) {
@@ -143,7 +208,14 @@ sub parseSendMsg {
 	}
 	if ($sendMsg ne "") {
 		sendToServerByInject(\$remote_socket, $sendMsg);
+
+		$sc_v{'input'}{'sendMsg'}{'lastSwitch'} = $switch;
+		$sc_v{'input'}{'sendMsg'}{'lastTime'} = time;
 	}
+
+#	$sc_v{'input'}{'sendMsg'}{'lastSwitch'} = $switch;
+##	$sc_v{'input'}{'sendMsg'}{'lastMsgLength'} = $switch;
+#	$sc_v{'input'}{'sendMsg'}{'lastTime'} = time;
 }
 
 sub sendSyncInject {
@@ -167,17 +239,98 @@ sub injectMessage {
 	my $message = shift;
 	my $name = "X";
 	my $msg .= $name . " : " . $message . chr(0);
-	encrypt(\$msg, $msg, 1);
+	encrypt_mk(\$msg, $msg);
 	$msg = pack("C*",0x09, 0x01) . pack("S*", length($name) + length($message) + 12) . pack("C*",0,0,0,0) . $msg;
-	encrypt(\$msg, $msg, 1);
+	encrypt_mk(\$msg, $msg);
 	sendToClientByInject(\$remote_socket, $msg);
 }
 
 sub injectAdminMessage {
 	my $message = shift;
 	$msg = pack("C*",0x9A, 0x00) . pack("S*", length($message)+5) . $message .chr(0);
-	encrypt(\$msg, $msg, 1);
+	encrypt_mk(\$msg, $msg);
 	sendToClientByInject(\$remote_socket, $msg);
+}
+
+sub encrypt_mk {
+	my $r_msg = shift;
+	my $themsg = shift;
+	my $type = shift;
+	my $state = shift;
+	my @mask;
+	my $newmsg;
+	my ($i, $in, $out, $temp, $encryptVal);
+	if ($type == 1 && $state >=5 ) {
+		$out = 0;
+		undef $newmsg;
+		for ($i = 0; $i < 13;$i++) {
+			$mask[$i] = 0;
+		}
+		{
+			use integer;
+			$temp = ($encryptVal * $encryptVal * 1391);
+		}
+		$temp = ~(~($temp));
+		$temp = $temp % 13;
+		$mask[$temp] = 1;
+		{
+			use integer;
+			$temp = $encryptVal * 1397;
+		}
+		$temp = ~(~($temp));
+		$temp = $temp % 13;
+		$mask[$temp] = 1;
+		for($in = 0; $in < length($themsg); $in++) {
+			if ($mask[$out % 13]) {
+				$newmsg .= pack("C1", int(rand() * 255) & 0xFF);
+				$out++;
+			}
+			$newmsg .= substr($themsg, $in, 1);
+			$out++;
+		}
+		$out += 4;
+		$newmsg = pack("S2", $out, $encryptVal) . $newmsg;
+		while ((length($newmsg) - 4) % 8 != 0) {
+			$newmsg .= pack("C1", (rand() * 255) & 0xFF);
+		}
+	} elsif ($type >= 2 && $state >=5) {
+		$out = 0;
+		undef $newmsg;
+		for ($i = 0; $i < 17;$i++) {
+			$mask[$i] = 0;
+		}
+		{
+			use integer;
+			$temp = ($encryptVal * $encryptVal * 34953);
+		}
+		$temp = ~(~($temp));
+		$temp = $temp % 17;
+		$mask[$temp] = 1;
+		{
+			use integer;
+			$temp = $encryptVal * 2341;
+		}
+		$temp = ~(~($temp));
+		$temp = $temp % 17;
+		$mask[$temp] = 1;
+		for($in = 0; $in < length($themsg); $in++) {
+			if ($mask[$out % 17]) {
+				$newmsg .= pack("C1", int(rand() * 255) & 0xFF);
+				$out++;
+			}
+			$newmsg .= substr($themsg, $in, 1);
+			$out++;
+		}
+		$out += 4;
+		$newmsg = pack("S2", $out, $encryptVal) . $newmsg;
+		while ((length($newmsg) - 4) % 8 != 0) {
+			$newmsg .= pack("C1", (rand() * 255) & 0xFF);
+		}
+	} else {
+		$newmsg = $themsg;
+	}
+
+	$$r_msg = $newmsg;
 }
 
 #######################################
@@ -339,8 +492,6 @@ sub encrypt {
 	} else {
 		$newmsg = $themsg;
 	}
-
-	return if ($mode);
 
 	if ($option{'X-Kore'}) {
 		sendToServerByInject(\$remote_socket, $newmsg);
@@ -538,6 +689,7 @@ sub sendChat {
 		print "你處在禁止聊天和使用技能的狀態下！\n";
 		return;
 	}
+
 	my $msg = pack("C*",0x8C, 0x00) . pack("S*", length($chars[$config{'char'}]{'name'}) + length($message) + 8) .
 			$chars[$config{'char'}]{'name'} . " : " . $message . chr(0);
 	encrypt($r_socket, $msg);
@@ -845,7 +997,14 @@ sub sendMove {
 	my $r_socket = shift;
 	my $x = shift;
 	my $y = shift;
-	my $msg = pack("C*", 0x85, 0x00) . getCoordString($x, $y);
+	my $msg;
+
+	if ($config{'serverType'}) {
+		$msg = pack("C*", 0xbc, 0x00) . getCoordString($x, $y) . chr(173);
+	} else {
+		$msg = pack("C*", 0x85, 0x00) . getCoordString($x, $y);
+	}
+
 	encrypt($r_socket, $msg);
 	print "Sent move to: $x, $y\n" if ($config{'debug'} >= 2);
 }
@@ -952,7 +1111,15 @@ sub sendSell {
 
 sub sendSit {
 	my $r_socket = shift;
-	my $msg = pack("C*", 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02);
+#	my $msg = pack("C*", 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02);
+	my $msg;
+
+	if ($config{'serverType'}) {
+		$msg = pack("C*", 0x89, 0x00, 0x9c, 0x22, 0xfa, 0x83, 0x02);
+	} else {
+		$msg = pack("C*", 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02);
+	}
+
 	encrypt($r_socket, $msg);
 	print "Sitting\n" if ($config{'debug'} >= 2);
 }
@@ -1016,7 +1183,15 @@ sub sendStorageGet {
 
 sub sendStand {
 	my $r_socket = shift;
-	my $msg = pack("C*", 0x89,0x00, 0x00, 0x00, 0x00, 0x00, 0x03);
+#	my $msg = pack("C*", 0x89,0x00, 0x00, 0x00, 0x00, 0x00, 0x03);
+	my $msg;
+
+	if ($config{'serverType'}) {
+		$msg = pack("C*", 0x89, 0x00, 0x9c, 0x22, 0xfa, 0x83, 0x03);
+	} else {
+		$msg = pack("C*", 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03);
+	}
+
 	encrypt($r_socket, $msg);
 	print "Standing\n" if ($config{'debug'} >= 2);
 }
@@ -1486,6 +1661,19 @@ sub sendWarpPortal {
 	my $msg = pack("C*", 0x1B, 0x01, 0x1B, 0x00) . $location;
 	encrypt($r_socket, $msg);
 	print "Sent Warp Portal: $location\n" if ($config{'debug'} >= 2);
+}
+
+#--------------------------------------------
+
+sub sendMapLoginPK {
+	my $r_socket = shift;
+	my $accountID = shift;
+	my $sessionID = shift;
+	my $sex = shift;
+	my $msg = pack("C*", 0x72,0,0) . $accountID .
+	pack("C*", 0x00, 0x2C, 0xFC, 0x2B, 0x8B, 0x01, 0x00, 0x60, 0x00, 0xFF, 0xFF, 0xFF, 0xFF) .
+		$sessionID . pack("L1", getTickCount()) . pack("C*",$sex);
+	encrypt($r_socket, $msg);
 }
 
 1;
