@@ -33,6 +33,7 @@ require 'scFunctions.pl';
 require 'sc_event.pl';
 require 'ai_funs.pl';
 require 'ai_route.pl';
+require 'ai_npc.pl';
 
 #require 'mod_route.pl';
 
@@ -166,7 +167,7 @@ require 'Scorpio_version.pl';
 	addFixerValue('config', 'route_NPC_distance', 2);
 	addFixerValue('config', 'password_noChoice', 0);
 	addFixerValue('config', 'attackAuto_unLock', 0, 2);
-	addFixerValue('config', '');
+	addFixerValue('config', 'parseNpcAuto', 0, 2);
 	addFixerValue('config', '');
 	addFixerValue('config', '');
 	addFixerValue('config', '');
@@ -202,7 +203,9 @@ require 'Scorpio_version.pl';
 
 		$sc_v{'Scorpio'}{'checkUser'} = 2;
 	} else {
-		ai_event_checkUser_free(1);
+#		ai_event_checkUser_free(1);
+#
+#		addFixerValue('config', 'attackBerserk', 3, 4);
 	}
 
 	@{$sc_v{'valBolck'}} = (
@@ -416,7 +419,7 @@ undef @{$sc_v{'parseFiles'}};
 
 our ($quit);
 
-addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2);
+addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2, "", 0, "$sc_v{'path'}{'control'}/plus_*.txt");
 addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
 load(\@{$sc_v{'parseFiles'}}, 0, 1);
 
