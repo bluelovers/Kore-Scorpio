@@ -1095,7 +1095,8 @@ $i, $monsters{$monstersID[$i]}{'lv'}, $monsters{$monstersID[$i]}{'name'}, $dmgTo
 			$~ = "PARTYUSERS";
 			$share_string = ($chars[$config{'char'}]{'party'}{'share'}) ? "均等分配" : "各自取得";
 			print "---------------------------------- 隊伍資訊 ----------------------------------\n";
-			print "隊伍名稱: $chars[$config{'char'}]{'party'}{'name'}($share_string)\n";
+			print "隊伍名稱: $chars[$config{'char'}]{'party'}{'name'} ($share_string)\n";
+			print "物品分享: ".($chars[$config{'char'}]{'party'}{'param'}[0]?"On":"Off")." - 物品分配: ".($chars[$config{'char'}]{'party'}{'param'}[1]?"On":"Off")."\n" if (@{$chars[$config{'char'}]{'party'}{'param'}});
 			print "#   隊長  線上 名稱                    所在地圖     座   標                   \n";
 
 			my ($i, $admin_string, $online_string, $name_string, $map_string, $coord_string, $hp_string);
@@ -3170,7 +3171,7 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 				($tmpVal{'pos'}{'x'}, $tmpVal{'pos'}{'y'}) = posToRand(\%{$chars[$config{'char'}]{'pos_to'}}, $tmpVal{'dist'}, 1, 3);
 #				sendSkillUseLoc(\$remote_socket, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'ID'}, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, $tmpVal{'pos'}{'x'}, $tmpVal{'pos'}{'y'});
 
-				ai_skillUse($chars[$config{'char'}]{'skills'}{'AL_WARP'}{'ID'}, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, 2, 0, $tmpVal{'pos'}{'x'}, $tmpVal{'pos'}{'y'});
+				ai_skillUse($chars[$config{'char'}]{'skills'}{'AL_WARP'}{'ID'}, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, 2, 1, $tmpVal{'pos'}{'x'}, $tmpVal{'pos'}{'y'});
 
 #				print "[3] $tmpVal{'pos'}{'x'}, $tmpVal{'pos'}{'y'}\n";
 
@@ -3178,16 +3179,19 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 				$sc_v{'ai'}{'warpTo'}{'y'} = $tmpVal{'pos'}{'y'};
 
 				if ($params[2]){
-					sleep(0.5);
+#					sleep(0.5);
 					$params[2]-- if (isNum($params[2]) && $params[2] > 0);
-					parseInput("warp $params[2]");
+#					parseInput("warp $params[2]");
+					
+					$sc_v{'ai'}{'warpTo'}{'map'} = $params[2];
+					$sc_v{'ai'}{'warpTo'}{'stop'} = 1;
 				}
 			} elsif ($params[1] eq "no") {
 				$warp{'use'} = 0;
 			} elsif (switchInput($params[1], "at") && isNum($params[2]) && isNum($params[3])) {
 #				ai_skillUse(27, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, 2, 0, 0, $params[2], $params[3]);
 
-				ai_skillUse($chars[$config{'char'}]{'skills'}{'AL_WARP'}{'ID'}, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, 2, 0, $params[2], $params[3]);
+				ai_skillUse($chars[$config{'char'}]{'skills'}{'AL_WARP'}{'ID'}, $chars[$config{'char'}]{'skills'}{'AL_WARP'}{'lv'}, 2, 1, $params[2], $params[3]);
 
 				$sc_v{'ai'}{'warpTo'}{'x'} = $params[2];
 				$sc_v{'ai'}{'warpTo'}{'y'} = $params[3];
@@ -3212,8 +3216,12 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 				} else {
 					$params[1] = lc $params[1];
 					my $tmp = binFind(\@{$warp{'memo'}}, $params[1]);
-					if ($tmp){
-						print "sendWarpPortal : ".getMapName($params[1], 1)."\n";
+					
+#					print "@{$warp{'memo'}} = $tmp\n";
+					
+					if ($tmp ne ""){
+#						print "sendWarpPortal : ".getMapName($params[1], 1)."\n";
+						printC("[Warp] Warp Portal to ".getMapName($params[1], 1).".\n", "warp");
 						sendWarpPortal(\$remote_socket, $warp{'memo'}[$tmp].".gat");
 
 						$sc_v{'ai'}{'warpTo'}{'open'} = 1;
@@ -3460,6 +3468,12 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 
 			print subStrLine();
 		}
+#	} elsif ($switch eq "sys") {
+#		
+#		print "NUMBER_OF_PROCESSORS : $ENV{NUMBER_OF_PROCESSORS}\n";
+#		
+#		my ($a, $b) = times; 
+#		print qq*系統負荷 : ( $a usr \+ $b sys \= * . ($a + $b) . qq* CPU)\n*; 
 	} else {
 		print "錯誤的指令 : $switch \n";
 	}
