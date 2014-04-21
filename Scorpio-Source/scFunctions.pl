@@ -112,7 +112,7 @@ sub ai_takenBy {
 
 		$monsters{$targetID}{'takenBy'} = $ID;
 
-		sysLog("ii", "怪物", "重要物品: $items{$targetID}{'name'} ($items{$targetID}{'binID'}) x $items{$targetID}{'amount'} 可能被 $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) 吃掉了！", 1);
+		sysLog("ii", "怪物", "重要物品: $items{$targetID}{'name'} ($items{$targetID}{'binID'}) x $items{$targetID}{'amount'} 可能被 $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) 吃掉了！ - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$items{$ID}{'pos'}}), 1);
 
 #		for ($ai_index=0; $ai_index<@ai_seq; $ai_index++) {
 #			if (
@@ -151,7 +151,7 @@ sub ai_takenBy {
 #			aiRemove("attack");
 
 #			ai_setSuspend(0);
-			attack($ID, 1);
+			attack($ID, 1, 1);
 #			ai_setSuspend(0);
 			timeOutStart(-1, 'ai_attack_auto');
 #		}
@@ -172,6 +172,15 @@ sub ai_stopByTele {
 			$targetDisplay = "$items_old{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items_old{$ai_seq_args[$ai_index]{'ID'}}{'binID'})";
 		} else {
 			$targetDisplay = "$items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'})";
+
+			$ai_v{'temp'}{'dist'} = distance(\%{$items{$ai_seq_args[$ai_index]{'ID'}}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}});
+
+			if (
+				$config{'itemsGreedyMode'}
+				&& $ai_v{'temp'}{'dist'} <= $config{'itemsTakeDist'}
+			) {
+				sendTake(\$remote_socket, $ai_seq_args[$ai_index]{'ID'});
+			}
 		}
 
 		sysLog("ii", "順移", "撿取物品失敗: $targetDisplay 原因: 你施展瞬間移動了", 1);
@@ -203,7 +212,22 @@ sub ai_getTempVariable {
 	$ai_v{'temp'}{'onHit'}		= $sc_v{'ai'}{'onHit'} or ai_getMonstersHitMe();
 	$ai_v{'temp'}{'inAttack'}	= ($ai_v{'temp'}{'ai_attack_index'} ne "")?1:0;
 	$ai_v{'temp'}{'getAggressives'}	= ai_getAggressives();
-	$ai_v{'temp'}{'getAggressives'}	= $ai_v{'temp'}{'getAggressives'}?$ai_v{'temp'}{'getAggressives'}:$ai_v{'temp'}{'onHit'};
+#	$ai_v{'temp'}{'getAggressives'}	= (
+#		$ai_v{'temp'}{'getAggressives'}?
+#			$ai_v{'temp'}{'getAggressives'}
+#			:($option{'AI_getAggressives_error'}?$ai_v{'temp'}{'onHit'}:($ai_v{'temp'}{'onHit'}?1:0))
+#	);
+
+	if (!$ai_v{'temp'}{'getAggressives'}) {
+		if ($option{'AI_getAggressives_error'}) {
+			$ai_v{'temp'}{'getAggressives'} = $ai_v{'temp'}{'onHit'};
+		} else {
+			$ai_v{'temp'}{'getAggressives'} = $ai_v{'temp'}{'onHit'}?1:0;
+		}
+	}
+
+	$ai_v{'temp'}{'useSkill_notParam2'} = ($config{'useSkill_notParam2'} && existsInList2($config{'useSkill_notParam2'}, $chars[$config{'char'}]{'param2'}, "and"))?1:0;
+
 }
 
 sub existsInList_sc {
@@ -302,8 +326,11 @@ sub ai_checkToUseSkill {
 #			%{$t_hash} = %{$$r_hash2};
 #		}
 
+		undef $sc_v{'ai'}{'temp'}{'name_lc'};
+		$sc_v{'ai'}{'temp'}{'name_lc'} = lcCht($config{"${key}_${i}"});
+
 		if (
-			!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"${key}_${i}"})}}{'lv'}
+			!$chars[$config{'char'}]{'skills'}{$skills_rlut{$sc_v{'ai'}{'temp'}{'name_lc'}}}{'lv'}
 			&& (
 				$config{"${key}_${i}_smartEquip"} eq ""
 				|| ($config{"${key}_${i}_smartEquip"} ne "" && findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"${key}_${i}_smartEquip"}) eq "")
@@ -349,6 +376,35 @@ sub ai_checkToUseSkill {
 			}
 		}
 
+		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItem_0"}) {
+			undef @array;
+			undef $ai_v{'temp'}{'index'};
+			undef $ai_v{'temp'}{'invIndex'};
+
+			$ai_v{'temp'}{'index'} = 0;
+
+			while (1) {
+				last if (!$config{"${key}_${i}_checkItem_$ai_v{'temp'}{'index'}"});
+
+				splitUseArray(\@array, $config{"${key}_${i}_checkItem_$ai_v{'temp'}{'index'}"}, ",");
+
+				$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+				if (
+					$ai_v{'temp'}{'invIndex'} eq ""
+					|| (
+						$array[1] ne ""
+						&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $array[1]
+					)
+				) {
+					$ai_v{'temp'}{'found'} = 1;
+					last;
+				}
+
+				$ai_v{'temp'}{'index'}++;
+			}
+		}
+
 		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItemEx"}) {
 			undef @array;
 			undef $ai_v{'temp'}{'foundEx'};
@@ -364,6 +420,47 @@ sub ai_checkToUseSkill {
 			$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
 		}
 
+		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItemNot"}) {
+			undef @array;
+			splitUseArray(\@array, $config{"${key}_${i}_checkItemNot"}, ",");
+			foreach (@array) {
+				next if (!$_);
+				if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+					$ai_v{'temp'}{'found'} = 1;
+					last;
+				}
+			}
+		}
+
+		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItemNot_0"}) {
+			undef @array;
+			undef $ai_v{'temp'}{'index'};
+			undef $ai_v{'temp'}{'invIndex'};
+
+			$ai_v{'temp'}{'index'} = 0;
+
+			while (1) {
+				last if (!$config{"${key}_${i}_checkItemNot_$ai_v{'temp'}{'index'}"});
+
+				splitUseArray(\@array, $config{"${key}_${i}_checkItemNot_$ai_v{'temp'}{'index'}"}, ",");
+
+				$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+				if (
+					$ai_v{'temp'}{'invIndex'} ne ""
+					&& (
+						$array[1] eq ""
+						|| $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} >= $array[1]
+					)
+				) {
+					$ai_v{'temp'}{'found'} = 1;
+					last;
+				}
+
+				$ai_v{'temp'}{'index'}++;
+			}
+		}
+
 		# Judge equipped type
 		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkEquipped"} ne "") {
 			undef $ai_v{'temp'}{'invIndex'};
@@ -372,21 +469,41 @@ sub ai_checkToUseSkill {
 		}
 
 		if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_spells"} ne "") {
+			undef %{$sc_v{'ai'}{'temp'}{'pos'}};
+			undef $sc_v{'ai'}{'temp'}{'distance'};
+
 			foreach (@spellsID) {
 				next if ($_ eq "" || $spells{$_}{'type'} eq "");
 
-				undef $s_cDist;
+#				undef $s_cDist;
 
-				$s_cDist = distance(\%{$r_hash2{'pos_to'}}, \%{$spells{$_}{'pos'}});
+				undef %{$sc_v{'ai'}{'temp'}{'pos'}};
+				undef $sc_v{'ai'}{'temp'}{'distance'};
+
+				$sc_v{'ai'}{'temp'}{'pos'}{'x'} = $$r_hash2{'pos_to'}{'x'};
+				$sc_v{'ai'}{'temp'}{'pos'}{'y'} = $$r_hash2{'pos_to'}{'y'};
+
+#				$s_cDist = distance(\%{$r_hash2{'pos_to'}}, \%{$spells{$_}{'pos'}});
+#				$s_cDist = distance(\%{$spells{$_}{'pos'}}, \%{$r_hash2{'pos_to'}}, 0, 1);
+				$sc_v{'ai'}{'temp'}{'distance'} = distance(\%{$spells{$_}{'pos'}}, \%{$sc_v{'ai'}{'temp'}{'pos'}}, 0, 1);
+
+#				print "distance $sc_v{'ai'}{'temp'}{'distance'}\n" if (existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}));
 
 				if (
 #					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}, "noand")
 #					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} <= $s_cDist)
-					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}, "and")
+#					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}, "and")
+					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'})
 #					&& (!$config{"${key}_${i}_spells_dist"} || $s_cDist <= $config{"${key}_${i}_spells_dist"})
-					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} <= $s_cDist)
+#					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} <= $s_cDist)
+					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} >= $sc_v{'ai'}{'temp'}{'distance'})
 				) {
 					$ai_v{'temp'}{'found'} = 1;
+
+#					print "${key}_${i}_spells\n";
+#					print "$$r_hash2{'name'} ".getFormattedCoords($$r_hash2{'pos_to'}{'x'}, $$r_hash2{'pos_to'}{'y'})."\n";
+#					print getMsgStrings('011F', $spells{$_}{'type'}, 0, 1)." ".getFormattedCoords($spells{$_}{'pos'}{'x'}, $spells{$_}{'pos'}{'y'})."\n";
+#					print getMsgStrings('011F', $spells{$_}{'type'}, 0, 1)." - Dist: $sc_v{'ai'}{'temp'}{'distance'} - (".$config{"${key}_${i}_spells_dist"}.")\n";
 
 					last;
 				}
@@ -394,7 +511,7 @@ sub ai_checkToUseSkill {
 		}
 
 #		if (
-#			!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"${key}_${i}"})}}{'lv'}
+#			!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"${key}_${i}"})}}{'lv'}
 #			&& (
 #				$config{"${key}_${i}_smartEquip"} eq ""
 #				|| ($config{"${key}_${i}_smartEquip"} ne "" && findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"${key}_${i}_smartEquip"}) eq "")
@@ -649,14 +766,15 @@ sub fixingName {
 }
 
 sub subStrLine {
-	my ($text, $msg, $idx, $c, $t) = @_;
+	my ($text, $msg, $idx, $c, $t, $n) = @_;
 	my $len = length($msg);
 
 	$c = " " if (!$c);
 	$t = "-" if (!$t);
 
 	if (!$text || $text eq "max"){
-		$text = "-" x (80 - 1);
+#		$text = "-" x (80 - 1);
+		$text = "-" x ($config{'message_length_max'} - 1);
 	} else {
 		$text = $t x length($text);
 	}
@@ -667,7 +785,9 @@ sub subStrLine {
 
 	substr($text, $idx, $len + length($c)*2) = $c.$msg.$c if ($len);
 
-	return $text ."\n";
+	$text .= "\n" if (!$n);
+
+	return $text;
 }
 
 sub getMsgStrings {
@@ -702,6 +822,7 @@ sub getMsgStrings {
 sub checkTimeOut {
 	my $name = shift;
 	my $lock = shift;
+	my $val = 0;
 
 #	if (
 #		!exists($timeout{"$name"})
@@ -722,7 +843,11 @@ sub checkTimeOut {
 		setTimeOutLock($name, 1)
 	}
 
-	return timeOut(\%{$timeout{$name}});
+	$val = timeOut(\%{$timeout{$name}});
+
+#	print "checkTimeOut $name = $val\n";
+
+	return $val;
 }
 
 sub setTimeOutLock {
@@ -768,7 +893,7 @@ sub timeOutStart {
 
 		$timeout{$name[$i]}{'lock'}	= $mode;
 		$timeout{$name[$i]}{'time'}	= time;
-		$timeout{$name[$i]}{'time'} -= $timeout{$name[$i]}{'timeout'} if ($mode2);
+		$timeout{$name[$i]}{'time'} -= $timeout{$name[$i]}{'timeout'} + 1 if ($mode2);
 	}
 }
 
@@ -850,6 +975,9 @@ sub printC {
 	my $message	= shift;
 	my $channel	= shift;
 	my $xmode	= shift;
+
+	return 0 if (!$option{'kore_displayMode'} && !$xmode);
+
 	my $color;
 
 	if (switchInput($channel, "c1", "exp", "c", "WHITE", "version")) {
@@ -862,7 +990,7 @@ sub printC {
 		$color = ($FG_MAGENTA);
 	} elsif (switchInput($channel, "e", "CYAN")) {
 		$color = ($FG_CYAN);
-	} elsif (switchInput($channel, "g", "gm", "warp", "LIGHTCYAN", "sh", "0188", "make")) {
+	} elsif (switchInput($channel, "g", "gm", "warp", "LIGHTCYAN", "sh", "0188", "make", "g_m")) {
 		$color = ($FG_LIGHTCYAN);
 	} elsif (switchInput($channel, "p", "LIGHTBLUE")) {
 		$color = ($FG_LIGHTBLUE);
@@ -911,8 +1039,10 @@ sub parseSkill {
 #		$targetDisplay = "座標: ".getFormattedCoords($coords{'x'}, $coords{'y'});
 #	}
 
-	my ($sourceDisplay, $castBy) = ai_getCaseID($sourceID);
-	my ($targetDisplay, $castOn, $dist) = ai_getCaseID($targetID, $sourceID, @coords);
+	my $temp_false;
+
+	my ($sourceDisplay, $castBy, $temp_false, ${castBy_name}, ${castBy_guildID}) = ai_getCaseID($sourceID);
+	my ($targetDisplay, $castOn, $dist, $castOn_name, $castOn_guildID) = ai_getCaseID($targetID, $sourceID, @coords);
 
 #	if ($targetID eq "floor" || $coords{'x'} != 0 || $coords{'y'} != 0) {
 #		$targetID = "floor";
@@ -993,7 +1123,7 @@ sub parseSkill {
 			$display_ex = " $display_ex → ".posToCoordinate(\%coords, 1) if ($display_ex);
 
 			if ($castBy == 1) {
-				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 				undef $chars[$config{'char'}]{'time_cast'};
 				undef $ai_v{'temp'}{'castWait'};
 
@@ -1051,7 +1181,7 @@ sub parseSkill {
 				$chars[$config{'char'}]{'last_skill_used'} = $skillID;
 				$chars[$config{'char'}]{'last_skill_target'} = $targetID;
 
-				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 				undef $chars[$config{'char'}]{'time_cast'};
 				undef $ai_v{'temp'}{'castWait'};
 
@@ -1128,7 +1258,7 @@ sub parseSkill {
 
 	} elsif (switchInput($switch, "0117")) {
 		if ($castBy == 1) {
-			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 			undef $chars[$config{'char'}]{'time_cast'};
 			undef $ai_v{'temp'}{'castWait'};
 
@@ -1141,7 +1271,8 @@ sub parseSkill {
 		}
 		$wait = ($wait == 65535) ? "" : "(Lv $wait) ";
 #		$display = "★$sourceDisplay施展 $skillName $wait → $targetDisplay Ex: $exception";
-		$display = "★$sourceDisplay施展 $skillName $wait → $targetDisplay";
+		$display = "★$sourceDisplay施展 $skillName $wait → $targetDisplay - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%coords);
+#		$display = "★$sourceDisplay施展 $skillName $wait → $targetDisplay";
 	} elsif (switchInput($switch, "011A")) {
 		if ($castOn == 2) {
 			if ($castBy == 1) {
@@ -1154,7 +1285,7 @@ sub parseSkill {
 			$chars[$config{'char'}]{'last_skill_used'} = $skillID;
 			$chars[$config{'char'}]{'last_skill_target'} = $targetID;
 
-			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 			undef $chars[$config{'char'}]{'time_cast'};
 			undef $ai_v{'temp'}{'castWait'};
 
@@ -1198,12 +1329,138 @@ sub parseSkill {
 		printC("${display}${display_ex}\n", $printC);
 	}
 
-	if (switchInput($switch, "013E", "0117") && !$sc_v{'temp'}{'itemsImportantAutoMode'} && $config{'teleportAuto_skill'}) {
+	if (switchInput($switch, "013E", "0117")) {
 		my $i = 0;
 #		my inCity = $cities_lut{$field{'name'}.'.rsw'};
 		my $inCity = getMapName($field{'name'}, 0, 1);
 
-		while (1) {
+		if ($config{"useCast_skill"} && $ai_v{'temp'}{'castWait'} && checkTimeOut('ai_skill_cast_wait')) {
+			undef $ai_v{'temp'}{'foundID'};
+			undef $ai_v{'useCast_skill'};
+			undef $ai_v{'useCast_skill_lvl'};
+
+			while (1) {
+				last if (!$config{"useCast_skill_$i"} || !$config{"useCast_skill_${i}_lvl"});
+
+				if (
+					existsInList($config{"useCast_skill_${i}_cast"}, $skillName)
+					&& existsInList2($config{"useCast_skill_$i"."_castBy"}, $castBy, "and")
+					&& existsInList2($config{"useCast_skill_$i"."_castOn"}, $castOn, "and")
+					&& (
+						!$config{"useCast_skill_$i"."_dist"}
+						|| $dist < $config{"useCast_skill_$i"."_dist"}
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castBy_name"}
+						|| existsInList($config{"useCast_skill_${i}_castBy_name"}, $castBy_name)
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castBy_guildID"}
+						|| existsInList($config{"useCast_skill_${i}_castBy_guildID"}, getID($castBy_guildID))
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castBy_guild"}
+						|| existsInList($config{"useCast_skill_${i}_castBy_guild"}, $guild{$castBy_guildID}{'name'})
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castOn_name"}
+						|| existsInList($config{"useCast_skill_${i}_castOn_name"}, $castOn_name)
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castOn_guildID"}
+						|| existsInList($config{"useCast_skill_${i}_castOn_guildID"}, getID($castOn_guildID))
+					)
+					&& (
+						!$config{"useCast_skill_${i}_castOn_guild"}
+						|| existsInList($config{"useCast_skill_${i}_castOn_guild"}, $guild{$castOn_guildID}{'name'})
+					)
+
+					&& ai_checkToUseSkill("useCast_skill", $i, 1, $ai_v{"useCast_skill_$i"."_time"}{$sourceID}, $sc_v{'ai'}{'temp'}{'useCast_skill_uses'}{$i}{$sourceID})
+				) {
+					undef $ai_v{'temp'}{'found'};
+
+					$ai_v{'temp'}{'found'} = ai_checkToUseSkill("useCast_skill", $i, 0, \%{$chars[$config{'char'}]}, \%{$chars[$config{'char'}]});
+
+#					print "useCast_skill_$i ".$config{"useCast_skill_$i"}." = $ai_v{'temp'}{'found'}\n";
+
+					if (!$ai_v{'temp'}{'found'}) {
+						$ai_v{'useCast_skill'} = lcCht($config{"useCast_skill_$i"});
+
+						undef %{$ai_v{'checkEquip'}};
+						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{$ai_v{'useCast_skill'}}}{'lv'} && $config{"useCast_skill_$i"."_smartEquip"} ne "") {
+							$ai_v{'checkEquip'}{'ignorePos'} = ai_equip_special($config{"useCast_skill_$i"."_smartEquip"});
+							$ai_v{'checkEquip'}{'skillID'} = ai_getSkillUseID($ai_v{'useCast_skill'});
+						}
+						$ai_v{'useCast_skill_index'} = $i;
+#						$ai_v{'useCast_skill'} = lcCht($config{"useCast_skill_$i"});
+						$ai_v{'useCast_skill_lvl'} = $config{"useCast_skill_$i"."_lvl"};
+						$ai_v{'useCast_skill_maxCastTime'} = $config{"useCast_skill_$i"."_maxCastTime"};
+						$ai_v{'useCast_skill_minCastTime'} = $config{"useCast_skill_$i"."_minCastTime"};
+						$ai_v{"useCast_skill_$i"."_time"}{$sourceID} = time;
+
+						$ai_v{'useCast_skill_uses'}{$i}{$sourceID}++;
+
+						if ($config{"useCast_skill_$i"."_useSelf"}) {
+							$ai_v{'temp'}{'foundID'} = $accountID;
+						} elsif ($config{"useCast_skill_$i"."_useToCastOn"}) {
+							$ai_v{'temp'}{'foundID'} = $targetID;
+						} else {
+							$ai_v{'temp'}{'foundID'} = $sourceID;
+						}
+
+						last;
+					}
+				}
+				$i++;
+			}
+
+			if ($ai_v{'temp'}{'foundID'}) {
+				if ($ai_v{'useCast_skill_lvl'} > 0) {
+					if ($config{'attackUseWeapon'}) {
+						sendAttackStop(\$remote_socket);
+#						attackForceStop(\$remote_socket, $ai_v{'ai_attack_ID'});
+#						sleep 0.1;
+					}
+
+					$ai_v{'useCast_skill_retry'} = 4;
+
+					ai_setSuspend(0);
+					timeOutStart(-1, 'ai_skill_use_send');
+
+					print qq~Auto-skill-cast on $castBy_name: $skills_lut{$skills_rlut{$ai_v{'useCast_skill'}}} (lvl $ai_v{'useCast_skill_lvl'})\n~ if ($config{'debug'});
+					if (!ai_getSkillUseType($skills_rlut{$ai_v{'useCast_skill'}})) {
+						ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{$ai_v{'useCast_skill'}}}{'ID'}, $ai_v{'useCast_skill_lvl'}, $ai_v{'useCast_skill_maxCastTime'}, $ai_v{'useCast_skill_minCastTime'}, $ai_v{'temp'}{'foundID'}, "", $ai_v{'checkEquip'}{'ignorePos'}, "cast", $ai_v{'useCast_skill_retry'} );
+					} else {
+
+						undef %{$sc_v{'ai'}{'temp'}{'pos'}};
+
+						if (%{$monsters{$ai_v{'temp'}{'foundID'}}}) {
+							%{$sc_v{'ai'}{'temp'}{'pos'}} = %{$monsters{$ai_v{'temp'}{'foundID'}}{'pos_to'}};
+						} elsif (%{$players{$ai_v{'temp'}{'foundID'}}}) {
+							%{$sc_v{'ai'}{'temp'}{'pos'}} = %{$players{$ai_v{'temp'}{'foundID'}}{'pos_to'}};
+						} else {
+#							$sc_v{'ai'}{'temp'}{'pos'}{'x'} = $accountID;
+#							$sc_v{'ai'}{'temp'}{'pos'}{'y'} = "";
+
+							%{$sc_v{'ai'}{'temp'}{'pos'}} = %{$chars[$config{'char'}]{'pos_to'}};
+						}
+
+						ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{$ai_v{'useCast_skill'}}}{'ID'}, $ai_v{'useCast_skill_lvl'}, $ai_v{'useCast_skill_maxCastTime'}, $ai_v{'useCast_skill_minCastTime'}, $sc_v{'ai'}{'temp'}{'x'}, $sc_v{'ai'}{'temp'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "cast", $ai_v{'useCast_skill_retry'} );
+					}
+
+					timeOutStart('ai_attack');
+
+					$record{"counts"}{'useCast_skill'}{$castBy_name}++ if ($config{'record_useCast_skill'});
+
+				}
+				timeOutStart('ai_skill_cast_wait');
+			}
+
+		}
+
+		$i = 0;
+
+		while (!$sc_v{'temp'}{'itemsImportantAutoMode'} && $config{'teleportAuto_skill'}) {
 #			last if (!$config{"teleportAuto_skill_$i"} || $ai_v{'temp'}{'teleOnEvent'});
 			last if (!$config{"teleportAuto_skill_$i"} || $sc_v{'temp'}{'teleOnEvent'});
 			if (
@@ -1223,19 +1480,32 @@ sub parseSkill {
 				if ($config{"teleportAuto_skill_$i"."_randomWalk"} ne "") {
 					undef @array;
 					splitUseArray(\@array, $config{"teleportAuto_skill_$i"."_randomWalk"}, ",");
+
+					if ($array[1] <= $array[0]) {
+						$array[1] = $array[0]+2;
+#						$result = 1;
+						$config{"teleportAuto_skill_$i"."_randomWalk"} = "$array[0],$array[1]";
+					} elsif (!$array[1]) {
+						$array[1] = 1;
+#						$result = 1;
+						$config{"teleportAuto_skill_$i"."_randomWalk"} = "$array[0],$array[1]";
+					}
+
 					do {
 						$ai_v{'temp'}{'randX'} = $chars[$config{'char'}]{'pos_to'}{'x'} + int(rand() * ($array[1] * 2 + 1)) - $array[1];
 						$ai_v{'temp'}{'randY'} = $chars[$config{'char'}]{'pos_to'}{'y'} + int(rand() * ($array[1] * 2 + 1)) - $array[1];
-					} while (ai_route_getOffset(\%field, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
-								|| $ai_v{'temp'}{'randX'} == $chars[$config{'char'}]{'pos_to'}{'x'} && $ai_v{'temp'}{'randY'} == $chars[$config{'char'}]{'pos_to'}{'y'}
-								|| $ai_v{'temp'}{'randX'} == $coords{'x'} && $ai_v{'temp'}{'randY'} == $coords{'y'}
-								|| abs($ai_v{'temp'}{'randX'} - $chars[$config{'char'}]{'pos_to'}{'x'}) < $array[0] && abs($ai_v{'temp'}{'randY'} - $chars[$config{'char'}]{'pos_to'}{'y'}) < $array[0]);
+					} while (
+						ai_route_getOffset(\%field, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
+						|| $ai_v{'temp'}{'randX'} == $chars[$config{'char'}]{'pos_to'}{'x'} && $ai_v{'temp'}{'randY'} == $chars[$config{'char'}]{'pos_to'}{'y'}
+						|| $ai_v{'temp'}{'randX'} == $coords{'x'} && $ai_v{'temp'}{'randY'} == $coords{'y'}
+						|| abs($ai_v{'temp'}{'randX'} - $chars[$config{'char'}]{'pos_to'}{'x'}) < $array[0] && abs($ai_v{'temp'}{'randY'} - $chars[$config{'char'}]{'pos_to'}{'y'}) < $array[0]
+					);
 
 					move($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'});
 
 					printC(
 						"◆發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}！ - Dist: $dist 格\n"
-						."◆啟動 teleportAuto_skill - 隨機移動！\n"
+						."◆啟動 teleportAuto_skill - 隨機移動至($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})！\n"
 						, "tele"
 					);
 					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 隨機移動！ - Dist: $dist 格");
@@ -1284,10 +1554,14 @@ sub getName {
 		$val = $items_lut{$ID};
 	} elsif (switchInput($switch, "auto")) {
 		if (%{$monsters{$ID}}) {
-			$val = "$monsters{$sourceID}{'name'} ($monsters{$sourceID}{'binID'}) ";
+			$val = "$monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) ";
 		} elsif (%{$players{$ID}}) {
-			$val = "$players{$sourceID}{'name'} ($players{$sourceID}{'binID'}) ";
-		} elsif ($sourceID eq $accountID) {
+			$val = "$players{$ID}{'name'} ($players{$ID}{'binID'}) ";
+		} elsif (%{$pets{$ID}}) {
+			$val = "$pets{$ID}{'name'} ($pets{$ID}{'binID'}) ";
+		} elsif (%{$npcs{$ID}}) {
+			$val = "$npcs{$ID}{'name'} ($npcs{$ID}{'binID'}) ";
+		} elsif ($ID eq $accountID) {
 			$val = "你";
 		}
 	} elsif (switchInput($switch, "attr", "attribute_lut")) {
@@ -1341,6 +1615,9 @@ sub isLevelMax {
 			$val = 1;
 		}
 	}
+
+#	$val = 0;
+
 	return ($val);
 }
 
@@ -1388,6 +1665,24 @@ sub Trim {
 	return $s;
 }
 
+sub RTrim {
+	my $s = shift;
+
+	$s =~ s/\s+$//g;
+#	$s =~ s/^\s+//g;
+
+	return $s;
+}
+
+sub LTrim {
+	my $s = shift;
+
+#	$s =~ s/\s+$//g;
+	$s =~ s/^\s+//g;
+
+	return $s;
+}
+
 sub getString {
 	my $s		= shift;
 	my $mode	= shift;
@@ -1424,7 +1719,7 @@ sub switchInputFix {
 	return 0 if ( @array <= 1);
 
 	for ( my $i=1; $i< @array; $i++ ) {
-		if($switch eq lc($array[$i])){
+		if($switch eq lcCht($array[$i])){
 			return $array[$i];
 		}
 	}
@@ -1543,7 +1838,7 @@ sub getLogFile {
 		$filename = 'Party';
 	} elsif ($switch eq 'g') {
 		$filename = 'Guild';
-	} elsif ($switch eq 'gm') {
+	} elsif ($switch eq 'g_m') {
 		$filename = 'Guild_member';
 	} elsif ($switch eq 'cr') {
 		$filename = 'ChatRoom';
@@ -1577,6 +1872,8 @@ sub getLogFile {
 		$filename = 'Map';
 	} elsif (switchInput($switch, 'debug')) {
 		$filename = 'Debug';
+#	} elsif (switchInput($switch, 'update_portals')) {
+#		$filename = 'update_portals';
 	} else {
 		$filename = 'Chat';
 	}
@@ -1613,6 +1910,7 @@ sub sysLog {
 		printC(
 			join(/\n/, @message)."\n"
 			, (isNum($p) ? $type : $p)
+			, 1
 		);
 	}
 }
@@ -1728,7 +2026,17 @@ sub getTotal {
 	my $dmg;
 
 	if ($ID1 eq $accountID){
-		$dmg = $monsters{$ID2}{'dmgFromYou'};
+		if (%{$monsters{$ID2}}) {
+			$dmg = $monsters{$ID2}{'dmgFromYou'};
+		} elsif (%{$players{$ID2}}) {
+			$dmg = $players{$ID2}{'dmgFromYou'};
+		}
+	} elsif ($ID2 eq $accountID) {
+		if (%{$monsters{$ID1}}) {
+			$dmg = $monsters{$ID1}{'dmgToYou'};
+		} elsif (%{$players{$ID1}}) {
+			$dmg = $players{$ID1}{'dmgToYou'};
+		}
 	}
 
 	$val = " (Total: $dmg)" if ($dmg ne "");
@@ -1772,7 +2080,7 @@ sub parseAttack {
 		$dmgdisplay .= " : $hit hits";
 	}
 
-	if ($ID1 eq $accountID){
+	if ($ID1 eq $accountID || $ID2 eq $accountID){
 		$dmgdisplay .= getTotal($ID1, $ID2) if (!$config{'hideMsg_attackDmgFromYou'});
 	}
 
@@ -1949,6 +2257,21 @@ sub valBolck {
 	return switchInput($key, @{$sc_v{'valBolck'}});
 }
 
+sub scUpdate {
+	my ($hash) = @_;
+
+	$hash = switchInputFix($hash, "timeout", "config");
+
+	return 0 if (!$hash);
+
+	if ($hash eq "timeout"){
+		writeDataFileIntact2("$sc_v{'path'}{'control'}/timeouts.txt", \%timeout);
+	} else {
+#		writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+		updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+	}
+}
+
 sub scModify {
 	my ($hash, $key, $value, $mode, $modeEx) = @_;
 
@@ -1980,7 +2303,11 @@ sub scModify {
 		if ($mode) {
 
 			${$hash}{$key} = $value;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config) if ($mode > 1);
+			if ($mode > 1) {
+#				writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#				updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+				scUpdate("config");
+			}
 
 		}
 	}
@@ -1997,7 +2324,7 @@ sub scModify {
 
 	$hash = switchInputFix($hash, "Timeout", "Config");
 
-	printC("◇$hash $tmpVal\n", "s");
+	printC("◇$hash $tmpVal\n", "s", 1);
 }
 
 sub scMapJump {
@@ -2005,6 +2332,8 @@ sub scMapJump {
 	my $port = shift or 5000;
 
 	return 0 if (!$ip);
+
+	printC("warpperMode ${ip}:${port}\n", "s");
 
 	$sc_v{'warpperMode'}{'do'}	= 1;
 	$sc_v{'warpperMode'}{'ip'}	= $ip;
@@ -2086,21 +2415,30 @@ sub ai_getCaseID {
 	my $ID = shift;
 	my $mode = shift;
 	my ($pos_x, $pos_y) = @_;
-	my ($name, $castBy, $dist);
+	my ($name, $castBy, $dist, $name2, $name_guildID);
 
 	$dist = 99;
 
 	if (%{$players{$ID}}) {
+		$name2 = $players{$ID}{'name'};
+		$name_guildID = $players{$ID}{'guild'}{'ID'};
 		$name = "$players{$ID}{'name'} ($players{$ID}{'binID'}) ";
 		$castBy = 4;
 		$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$ID}{'pos_to'}});
 	} elsif ($ID eq $accountID) {
 		$name = "你";
+		$name2 = "你";
+		$name_guildID = $chars[$config{'char'}]{'guild'}{'ID'};
 		$castBy = 1;
 
 		if ($mode && $mode ne $ID) {
-			$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$mode}{'pos_to'}}) if (%{$monsters{$mode}});
-			$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$mode}{'pos_to'}}) if (%{$players{$mode}});
+			if (%{$monsters{$mode}}) {
+				$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$mode}{'pos_to'}});
+			} elsif (%{$players{$mode}}) {
+				$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$mode}{'pos_to'}});
+			} elsif (%{$npcs{$mode}}) {
+				$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$npcs{$mode}{'pos'}});
+			}
 		}
 	} elsif ($ID eq "floor" || $pos_x || $pos_y) {
 		$name = "座標: ".getFormattedCoords($pos_x, $pos_y);
@@ -2109,11 +2447,18 @@ sub ai_getCaseID {
 		$coords{'y'} = $pos_y;
 		$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%coords);
 	} elsif (%{$monsters{$ID}}) {
+		$name2 = $monsters{$ID}{'name'};
 		$name = "$monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) ";
 		$castBy = 2;
 		$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ID}{'pos_to'}});
+	} elsif (%{$npcs{$ID}}) {
+		$name2 = $npcs{$ID}{'name'};
+		$name = "$npcs{$ID}{'name'} ($npcs{$ID}{'binID'}) ";
+		$castBy = 32;
+		$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$npcs{$ID}{'pos'}});
 	} else {
-		$name = "不明人物[".unpack("L1", $ID)."] ";;
+		$name2 = "不明人物[".unpack("L1", $ID)."]";
+		$name = "不明人物[".unpack("L1", $ID)."] ";
 		$castBy = 8;
 	}
 
@@ -2128,7 +2473,7 @@ sub ai_getCaseID {
 #	$hash[0]	= $name;
 #	$hash[1]	= $castBy;
 
-	return ($name, $castBy, $dist);
+	return ($name, $castBy, $dist, $name2, $name_guildID);
 }
 
 sub getSex {
@@ -2326,12 +2671,22 @@ sub writeDataFileIntact_sell {
 }
 
 sub getItemsMaxWeight {
+	my $mode = shift;
+
 	my $val = 1;
+	my $weight = percent_weight(\%{$chars[$config{'char'}]});
 
-	if (percent_weight(\%{$chars[$config{'char'}]}) >= $config{'itemsMaxWeight'} || percent_weight(\%{$chars[$config{'char'}]}) >= 89) {
-		#print "負重達 ".percent_weight(\%{$chars[$config{'char'}]})."\n";
+	if ($weight >= 89) {
 
-		if ($config{'itemsMaxWeight_considerHpSp'} > 1) {
+	} elsif (
+		!($mode && $config{'itemsGreedyMode'})
+		&& $config{'itemsMaxWeight'} ne "" && $weight >= $config{'itemsMaxWeight'}
+	) {
+#		print "負重達 ".percent_weight(\%{$chars[$config{'char'}]})."\n";
+
+		if ($weight >= 89) {
+			$val = 1;
+		} elsif ($config{'itemsMaxWeight_considerHpSp'} > 1) {
 			if (
 				(
 					!$config{'itemsMaxWeight_sp_lower'} ||
@@ -2353,6 +2708,12 @@ sub getItemsMaxWeight {
 				$val = 0;
 			}
 		}
+	} elsif (
+		$mode
+		&& $config{'itemsMaxWeight_stopTake'} ne ""
+		&& $weight >= $config{'itemsMaxWeight_stopTake'}
+	) {
+
 	} else {
 		$val = 0;
 	}
@@ -2372,7 +2733,8 @@ sub isCollector {
 
 	} elsif (
 		$ai_v{'temp'}{'takenByMonsters'}{$monsters{$ID}{'nameID'}} > 0
-		|| existsInList($config{'attackAuto_takenByMonsters'}, $monsters{$ID}{'name'})
+#		|| existsInList($config{'attackAuto_takenByMonsters'}, $monsters{$ID}{'name'})
+		|| existsInList($config{'attackAuto_takenByMonsters'}, getName("monsters_lut", $monsters{$ID}{'nameID'}))
 	) {
 		$ai_v{'temp'}{'takenByMonsters'}{$monsters{$ID}{'nameID'}} = 1;
 
@@ -2923,6 +3285,150 @@ sub ai_attack_clear {
 
 	aiRemove("attack");
 	aiRemove("skill_use");
+}
+
+sub ai_checkShop {
+	my $verbose = shift;
+	my $mode;
+	my $msg;
+
+	if (!$cart{'weight_max'}) {
+		$msg = "擺\設攤位失敗 - 你並沒有手推車！\n";
+	} elsif ($myShop{'shop_title'} eq "" && $myShop{'title'} eq "") {
+		$msg = "擺\設攤位失敗 - 尚未設定攤位名稱！\n";
+	} elsif ($chars[$config{'char'}]{'skill_ban'}) {
+		$msg = "擺\設攤位失敗 - 你處在禁止聊天和使用技能的狀態下！\n";
+	} elsif ($myShop{"shop_$i"} eq "") {
+		$msg = "擺\設攤位失敗 - 尚未設定攤位物品！\n";
+	} else {
+		$mode = 1;
+	}
+
+	printVerbose($msg, $verbose, "alert");
+
+	if (!$mode) {
+		$myShop{'shop_autoStart'}	= 0 if ($myShop{'shop_autoStart'});
+		$config{'shopAuto_open'}	= 0 if ($config{'shopAuto_open'});
+	}
+
+	return $mode;
+}
+
+sub ebm2bmp {
+	my ($file_ebm, $file_bmp, $mode) = @_;
+	my $file_bin;
+
+	$file_bmp = $mode?"ebm2bmp.bmp":getFileName($file_ebm).".bmp" if ($file_bmp eq "");
+
+	if ($mode) {
+		$file_bin = $file_ebm;
+	} else {
+		open FILE, $file_ebm;
+		foreach (<FILE>) {
+			$file_bin .= $_;
+		}
+		close FILE;
+	}
+
+	open FILE, "> ${file_bmp}";
+	binmode(FILE);
+	print FILE uncompress($file_bin);
+	close FILE;
+
+#	print "ebm2bmp -> ${file_bmp}\n";
+}
+
+sub getFileName {
+	my ($fname, $mode) = @_;
+	my $ex = ($mode?'.':'/');
+	my $pos;
+
+	$fname =~ s/\\/\//g;
+	#$fname =~ s/\.\.//g;
+	#$fname =~ s/%20/ /g;
+
+	if (($pos = rindex($fname, $ex)) != -1) {
+		$fname = substr($fname, $pos + 1);
+	}
+
+	return $fname;
+}
+
+sub parseItemData {
+	my $switch	= shift;
+	my $msg		= shift;
+	my $r_hash	= shift;
+	my $i		= shift;
+
+#	$$r_hash{'equipped'} = "" if !($$r_hash{'equipped'});
+
+	if ($$r_hash{'type_equip'} == 1024) {
+		$$r_hash{'borned'}	= unpack("C1", substr($msg, $i - 2, 1));
+		$$r_hash{'named'}	= unpack("C1", substr($msg, $i + 6, 1));
+	} else {
+		$$r_hash{'broken'}       = unpack("C1", substr($msg, $i - 2, 1));
+		$$r_hash{'refined'}      = unpack("C1", substr($msg, $i - 1, 1));
+
+		if (unpack("S1", substr($msg, $i, 2)) == 0x00FF || unpack("S1", substr($msg, $i, 2)) == 0x00FE) {
+			$$r_hash{'attribute'} = unpack("C1", substr($msg, $i+2, 1));
+			$$r_hash{'star'}      = unpack("C1", substr($msg, $i+3, 1)) / 0x05;
+			$$r_hash{'maker_charID'} = substr($msg, $i+4, 4);
+			if (!$charID_lut{$$r_hash{'maker_charID'}}) {
+				sendGetPlayerInfoByCharID(\$remote_socket, $$r_hash{'maker_charID'});
+			}
+		} else {
+			$$r_hash{'card'}[0]   = unpack("S1", substr($msg, $i, 2));
+			$$r_hash{'card'}[1]   = unpack("S1", substr($msg, $i+2, 2));
+			$$r_hash{'card'}[2]   = unpack("S1", substr($msg, $i+4, 2));
+			$$r_hash{'card'}[3]   = unpack("S1", substr($msg, $i+6, 2));
+		}
+	}
+
+	return $display;
+
+#parseItemData($switch, $msg, \%{$chars[$config{'char'}]{'inventory'}[$invIndex]}, 11);
+}
+
+sub getSpend {
+	my ($spend_s, $spend_e, $mode) = @_;
+	my ($w_sec, $w_hour, $w_min, $val, @arg);
+	$w_sec = abs($spend_e - $spend_s);
+
+	if ($w_sec >= 3600) {
+		$w_hour = int($w_sec / 3600);
+		$w_sec %= 3600;
+	}
+
+	if ($w_sec >= 60) {
+		$w_min = int($w_sec / 60);
+		$w_sec %= 60;
+	}
+
+	$w_hour = "0" . $w_hour if ($mode && $w_hour < 10);
+	$w_min = "0" . $w_min if ($mode && $w_min < 10);
+	$w_sec = "0" . $w_sec if ($mode && $w_sec < 10);
+
+	push @arg, "$w_hour 小時" if ($w_hour > 0);
+	push @arg, "$w_min 分" if ($w_min > 0);
+	push @arg, "$w_sec 秒" if ($w_sec > 0);
+
+	$val = join(/ /, @arg);
+
+	return $val;
+}
+
+#mKore
+
+sub lcCht {
+	my $string = shift;
+	$string =~ s/([\x80-\xff].|[\x00-\x7f])/(length($1) == 1) ? lc $1 : $1/eg;
+	return $string;
+}
+
+sub ucCht {
+	my $string = shift;
+	$string =~ s/([\x80-\xff].|[\x00-\x7f])/(length $1 == 1) ? uc $1 : $1/eg;
+	return $string;
 }
 
 1;
