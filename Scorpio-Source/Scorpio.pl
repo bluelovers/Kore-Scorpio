@@ -16,6 +16,8 @@ use Win32::Sound;
 use Digest::MD5 qw(md5 md5_hex);
 use Getopt::Long;
 
+use Time::Local;
+
 unshift @INC, '.';
 
 require 'miscFunctions.pl';
@@ -30,6 +32,7 @@ require 'AI.pl';
 require 'scFunctions.pl';
 require 'sc_event.pl';
 require 'ai_funs.pl';
+require 'ai_route.pl';
 
 #require 'mod_route.pl';
 
@@ -52,17 +55,26 @@ require 'Scorpio_version.pl';
 	addVersionText("modKore-Hybrid ReB!rth","","http://modkore.sf.net");
 	addVersionText("JeanPaul","丁辰(Mnmmmv)","2004/09/14");
 	addVersionText("koreSE2.2","kisa76347","");
+	addVersionText("mKore-2.05.04","Harry","http://mkore.hn.org");
+	addVersionText("KoreSP 940401","小沙","");
+	addVersionText("","","");
+	addVersionText("","","");
+	addVersionText("","","");
+	addVersionText("","","");
 	addVersionText("","","");
 	addVersionText("","","");
 	addVersionText("","","");
 
-	addVersionText("Scorpio","Bluelovers。風","http://my-online.24cc.com",1);
+	addVersionText("Scorpio","Bluelovers。風","",1);
 
 	getVersionText();
 
 	$sc_v{'kore'}{'exeName'} = "Scorpio";
 
 	$sc_v{'Scorpio'}{'checkServer'} = "Iris-2B,Iris-2B,Geiriod";
+
+	$sc_v{'kore'}{'023B'}{'key'}	= 'EC D0 D9 95 3B 82 54 23 71 5B 78 25 03 D2 33 7C';
+	$sc_v{'kore'}{'023B'}{'key2'}	= 'EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8';
 
 #	$sc_v{'checkUser'} = 1;
 
@@ -106,8 +118,8 @@ require 'Scorpio_version.pl';
 	addFixerValue('timeout', 'ai_teleport_dmgFromYou', 30);
 	addFixerValue('timeout', 'injectSync', 5);
 	addFixerValue('timeout', 'injectKeepAlive', 12);
-	addFixerValue('timeout', '');
-	addFixerValue('timeout', '');
+	addFixerValue('timeout', 'ai_first_wait', 5);
+	addFixerValue('timeout', 'ai_teleport_player', 3);
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
@@ -144,16 +156,16 @@ require 'Scorpio_version.pl';
 #	addFixerValue('config', 'autoResurrect', 3);
 	addFixerValue('config', 'autoResurrect_dist', 5);
 	addFixerValue('config', 'autoResurrect_retry', 2);
-	addFixerValue('config', 'dcOnDualLogin_protect', 1, 2);
+#	addFixerValue('config', 'dcOnDualLogin_protect', 1, 2);
 #	addFixerValue('config', 'teleportAuto_search_portal', 150);
 #	addFixerValue('config', 'teleportAuto_search_portal_inCity', 1);
 	addFixerValue('config', 'autoRoute_npcChoice', 1);
 	addFixerValue('config', 'commandPrefix', '-', 2);
-	addFixerValue('config', '');
-	addFixerValue('config', '');
-	addFixerValue('config', '');
-	addFixerValue('config', '');
-	addFixerValue('config', '');
+	addFixerValue('config', 'teleportAuto_away', 1);
+	addFixerValue('config', 'teleportAuto_skill', 1);
+	addFixerValue('config', 'route_NPC_distance', 2);
+	addFixerValue('config', 'password_noChoice', 0);
+	addFixerValue('config', 'attackAuto_unLock', 0, 2);
 	addFixerValue('config', '');
 	addFixerValue('config', '');
 	addFixerValue('config', '');
@@ -175,7 +187,6 @@ require 'Scorpio_version.pl';
 	addFixerExValue('timeout', '', '');
 	addFixerExValue('timeout', '', '');
 	addFixerExValue('timeout', '', '');
-	addFixerExValue('timeout', '', '');
 
 	addFixerExValue('config', 'useSelf_smartAutomake', 'useSelf_skill_smartAutomake');
 	addFixerExValue('config', 'useSelf_smartAutoarrow', 'useSelf_skill_smartAutoarrow_item');
@@ -187,9 +198,11 @@ require 'Scorpio_version.pl';
 
 	if ($sc_v{'Scorpio'}{'checkUser'}) {
 		addFixerValue('config', 'attackBerserk', 1, 4);
-		addFixerValue('config', 'dcOnDualLogin', 0, 2);
+#		addFixerValue('config', 'dcOnDualLogin', 0, 2);
 
 		$sc_v{'Scorpio'}{'checkUser'} = 2;
+	} else {
+		ai_event_checkUser_free(1);
 	}
 
 	@{$sc_v{'valBolck'}} = (
@@ -225,6 +238,10 @@ require 'Scorpio_version.pl';
 		, 'attackAuto_beCastOn'
 		, 'attackAuto_mvp'
 		, 'serverType'
+	);
+
+	@{$sc_v{'valBan'}} = (
+		  '4294806'
 	);
 
 	sub addVersionText {
@@ -389,6 +406,37 @@ unless (-e "$sc_v{'path'}{'plugin'}/") {
 
 #sleep(1);
 
+if ($sc_v{'path'}{'delay'}) {
+	sleep ($sc_v{'path'}{'delay'});
+}
+
+#setColor($sc_v{'Console'}{'original'});
+
+undef @{$sc_v{'parseFiles'}};
+
+our ($quit);
+
+addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2);
+addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
+load(\@{$sc_v{'parseFiles'}}, 0, 1);
+
+$sc_v{'kore'}{'multiPortals'} = $config{'multiPortals'}?1:0;
+
+if (!$config{'dcQuick'}) {
+
+	$SIG{"HUP"} = \&kore_close;
+	$SIG{"INT"} = \&kore_close;
+#	$SIG{'DIE'} = \&kore_close;
+	#$SIG{"INT"} = \&quit;
+
+	print "dcQuick : off\n";
+
+} else {
+	print "dcQuick : on\n";
+}
+
+input_start();
+
 setColor($FG_LIGHTCYAN);
 
 #print <<"EOM";
@@ -407,30 +455,69 @@ setColor($FG_LIGHTCYAN);
 #;
 
 if ($sc_v{'Scorpio'}{'checkVer'}) {
+
 	print <<"EOM";
+
+	臨時論壇
+	http://bluelovers.idv.st/
+
+	有什麼問題建議就去發表吧
+	如果有BUG也回報在此
+	以後我將不會在回答有人問過ㄉ問題
 
 	Yahoo! 網上聯盟 : bluelovers-Scorpio
 	http://hk.groups.yahoo.com/group/bluelovers-Scorpio/
 
 	請至 檔案 > kore > help 下載新增設定說明檔
 
-	[2005/05/15 00:42:14][錯誤] 嚴重錯誤: 遭相同序號登入
-	[2005/05/29 03:58:08][錯誤] 嚴重錯誤: 遭相同序號登入
+	關於倉庫密碼請至網站自行查看說明
 
-	螞蟻一個月被盜兩次....
-	強制更改 dcOnDualLogin 為 0
-
-	阿宿又再賣帳囉 賣IRIS2 99騎領~99戰鬥鐵匠
-	http://tw.page.bid.yahoo.com/tw/auction/1135046009
-
-	歡迎去看看
+	解除強制啟動相同帳號登入保護模式
 
 EOM
 ;
+
+#	print <<"EOM";
+#
+#	Yahoo! 網上聯盟 : bluelovers-Scorpio
+#	http://hk.groups.yahoo.com/group/bluelovers-Scorpio/
+#
+#	請至 檔案 > kore > help 下載新增設定說明檔
+#
+#	[2005/05/15 00:42:14][錯誤] 嚴重錯誤: 遭相同序號登入
+#	[2005/05/29 03:58:08][錯誤] 嚴重錯誤: 遭相同序號登入
+#
+#	螞蟻一個月被盜兩次....
+#	強制更改 dcOnDualLogin 為 0
+#
+#	阿宿又再賣帳囉 賣IRIS2 99騎領~99戰鬥鐵匠
+#	http://tw.page.bid.yahoo.com/tw/auction/1135046009
+#
+#	歡迎去看看
+#
+#EOM
+#;
+
+#	print <<"EOM";
+#
+#	累了 停止自動更新.........
+#
+#EOM
+#;
+	$sc_v{'Scorpio'}{'checkVer'} = 2;
 }
 
 {
 	if ($sc_v{'Scorpio'}{'checkVer'}) {
+
+#		print "開始檢查更新\n";
+		print <<"EOM";
+	開始檢查更新...
+	當網路流量過大時請勿關閉程式 稍微等待幾分鐘後
+	如果仍然沒有作用 再關閉程式
+EOM
+;
+
 		my $url_ver = "http://bluelovers.myweb.hinet.net/kore/version.txt";
 
 		my $url_exe = "http://bluelovers.myweb.hinet.net/kore/Scorpio.exe";
@@ -442,14 +529,63 @@ EOM
 
 		use HTTP::Lite;
 
+#		$useragent = new HTTP::Lite;
+#		$useragent->add_req_header('Cache-Control', 'nocache');
+#		$request = $useragent->request("http://bluelovers.no-ip.info/netroot_check.js");
+#		if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
+#
+#		my (%tmp, $key, $value);
+#
+#		open (FILE, "> version.txt") or printDie("Error：$!\n");
+##		binmode(FILE);
+#		print FILE $useragent->body();
+#		close FILE;
+#
+#		foreach (split(/\n/, $useragent->body())) {
+#			next if (/^#/);
+#			s/[\r\n]//g;
+#			s/[\t]//g;
+#			s/\s+$//g;
+#			($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
+#			$key =~ s/\s//g;
+#			if ($key eq "") {
+#				($key) = $_ =~ /([\s\S]*)$/;
+#				$key =~ s/\s//g;
+#			}
+#			if ($key eq "web" && $value eq "= 1;") {
+##				$tmp{$key} = $value;
+#				#print "$key $value\n";
+#
+##				print "$key -- $value\n";
+#
+##				print "http://bluelovers.no-ip.info/";
+#
+#				last;
+#			}
+#		}
+#
+#		undef %tmp;
+
 		$useragent = new HTTP::Lite;
 		$useragent->add_req_header('Cache-Control', 'nocache');
+
+#		print "useragent->status = ".$useragent->status."\n";
+#		print "useragent->status_message = ".$useragent->status_message."\n";
+
+#		foreach ($useragent->request($url_ver, \&tempUrlT)) {
+#			print "1";
+#		}
+
 		$request = $useragent->request($url_ver);
-		if ($request != 200) { printErr("Error：無法連接更新伺服器\n"); }
+
+#		print "useragent->status = ".$useragent->status."\n";
+#		print "useragent->status_message = ".$useragent->status_message."\n";
+
+		if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
 
 		my (%tmp, $key, $value);
 
-		open (FILE, "> version.txt") or printErr("Error：$!\n");
+		open (FILE, "> version.txt") or printDie("Error：$!\n");
 #		binmode(FILE);
 		print FILE $useragent->body();
 		close FILE;
@@ -470,8 +606,20 @@ EOM
 			}
 		}
 
+#		$tmp{'checkExpire'} = checkExpire(0, 0, 0, 15, 5, 2005);
+		$tmp{'checkExpire'} = 1;
+
 		if ($tmp{'version'} eq "") {
 			print "Error：無法連接更新伺服器\n";
+
+			if ($tmp{'checkExpire'}) {
+				printDie("$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式，請自行更新。\n");
+
+				kore_close();
+			} else {
+#				printDie("$sc_v{'kore'}{'exeName'}版本未過期，繼續使用程式。\n");
+			}
+
 			last;
 		}
 
@@ -485,14 +633,53 @@ EOM
 目前最新版本為 $tmp{'version'}
 EOM
 ;
-			print "開始下載更新..";
+
+			undef $tmp{'msg'};
+
+			$timeout{'ai_parseInput'}{'timeout'} = 10;
+
+			print "立即下載(y/n)？, $timeout{'ai_parseInput'}{'timeout'}秒後自動下載...\n";
+
+			timeOutStart('ai_parseInput');
+			while (!checkTimeOut('ai_parseInput')) {
+				if (dataWaiting(\$input_socket)) {
+		#			$input_socket->recv($msg, $MAX_READ);
+					$tmp{'msg'} = input_readLine();
+				}
+				last if $tmp{'msg'};
+			}
+			if (!switchInput($tmp{'msg'}, "y", "yes")) {
+
+				if ($tmp{'checkExpire'}) {
+					printDie("$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式，請更新程式。\n");
+
+					kore_close();
+				} else {
+					print "請自行更新程式版本\n";
+				}
+
+				last;
+			} else {
+				print "開始下載更新..";
+			}
+
+#			if ($sc_v{'Scorpio'}{'checkVer'} > 1) {
+#
+#				print "自行更新版本\n";
+#
+#				if (checkExpire(0, 0, 0, 0, 7, 2005)) {
+#					printErr("$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式。\n");
+#				}
+#
+#				last;
+#			}
 
 			undef $useragent;
 
 			$useragent = new HTTP::Lite;
 			$useragent->add_req_header('Cache-Control', 'nocache');
 			$request = $useragent->request($url_exe);
-			if ($request != 200) { printErr("Error：無法連接更新伺服器\n"); }
+			if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
 
 #			print @INC;
 
@@ -503,10 +690,22 @@ EOM
 #			print $path;
 #			chdir $path;
 
-			open (FILE, "> ${f_new}") or printErr("Error：$!\n");
+			open (FILE, "> ${f_new}") or printDie("Error：$!\n");
 			binmode(FILE);
 			print FILE $useragent->body();
 			close FILE;
+
+			open (FILE, "> koreSC.bat");
+			print FILE "call ${f_new} -control=%1  -tables=%2\n";
+			close FILE;
+
+#			open (FILE, "> koreSC.bat") or printDie("Error：$!\n");
+##			binmode(FILE);
+#			print FILE <<"EOM";
+#${f_new} -control=%1  -tables=%2
+#EOM
+#;
+#			close FILE;
 
 #			rename "$path/${f_now}", "$path/${f_old}";
 #			rename "$path/${f_new}", "$path/${f_now}";
@@ -531,6 +730,8 @@ EOM
 #			input_start();
 
 			kore_close();
+		} else {
+			sleep (2);
 		}
 
 		unless (-e "gemini.txt") {
@@ -540,6 +741,7 @@ EOM
 嘗試連接下載 Gemini. 伺服器.
 
 此版本為 T 之防封包及消除一些功\能之版本
+以效率為發展目標
 
 但無 Scorpio 的功\能
 EOM
@@ -550,14 +752,14 @@ EOM
 			$useragent = new HTTP::Lite;
 			$useragent->add_req_header('Cache-Control', 'nocache');
 			$request = $useragent->request("http://bluelovers.myweb.hinet.net/kore/Gemini.exe");
-			if ($request != 200) { printErr("Error：無法連接更新伺服器\n"); }
+			if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
 
-			open (FILE, "> Gemini.exe") or printErr("Error：$!\n");
+			open (FILE, "> Gemini.exe") or printDie("Error：$!\n");
 			binmode(FILE);
 			print FILE $useragent->body();
 			close FILE;
 
-			open (FILE, "> Gemini.txt") or printErr("Error：$!\n");
+			open (FILE, "> Gemini.txt") or printDie("Error：$!\n");
 			close FILE;
 
 			$spend_e = time;
@@ -628,47 +830,57 @@ EOM
 			return $val;
 		}
 
-		sub printErr {
-			print @_;
+		sub printDie {
+			my $msg = shift;
 
-			sleep (3);
+			print $msg;
 
-			die @_;
+			kore_close(1);
+
+			sleep (5);
+
+			die $msg;
 		}
+	}
+	print "\n";
 
+	unless (-e "koreSC.bat") {
+		open (FILE, "> koreSC.bat");
+		print FILE "call $sc_v{'kore'}{'exeName'}-$sc_v{'Scorpio'}{'version'} -control=%1  -tables=%2\n";
+		close FILE;
 	}
 }
 
-if ($sc_v{'path'}{'delay'}) {
-	sleep ($sc_v{'path'}{'delay'});
-}
-
+#if ($sc_v{'path'}{'delay'}) {
+#	sleep ($sc_v{'path'}{'delay'});
+#}
+#
 setColor($sc_v{'Console'}{'original'});
-
-undef @{$sc_v{'parseFiles'}};
-
-our ($quit);
-
-addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2);
-addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
-load(\@{$sc_v{'parseFiles'}});
-
-$sc_v{'kore'}{'multiPortals'} = $config{'multiPortals'}?1:0;
-
-if (!$config{'dcQuick'}) {
-
-	$SIG{"HUP"} = \&kore_close;
-	$SIG{"INT"} = \&kore_close;
-#	$SIG{'DIE'} = \&kore_close;
-	#$SIG{"INT"} = \&quit;
-
-	print "dcQuick : off\n";
-
-} else {
-	print "dcQuick : on\n";
-}
-
-input_start();
+#
+#undef @{$sc_v{'parseFiles'}};
+#
+#our ($quit);
+#
+#addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2);
+#addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
+#load(\@{$sc_v{'parseFiles'}});
+#
+#$sc_v{'kore'}{'multiPortals'} = $config{'multiPortals'}?1:0;
+#
+#if (!$config{'dcQuick'}) {
+#
+#	$SIG{"HUP"} = \&kore_close;
+#	$SIG{"INT"} = \&kore_close;
+##	$SIG{'DIE'} = \&kore_close;
+#	#$SIG{"INT"} = \&quit;
+#
+#	print "dcQuick : off\n";
+#
+#} else {
+#	print "dcQuick : on\n";
+#}
+#
+#input_start();
 
 #Karasu Start
 ## Setup MVP monster ID
@@ -880,6 +1092,10 @@ while ($quit != 1) {
 			(inet_aton($remote_socket->peerhost()) == inet_aton('localhost')) || die "Inject Socket must be connected from localhost";
 			print "InjectDLL Socket connected - Ready to start botting\n";
 			$timeout{'injectKeepAlive'}{'time'} = time;
+
+
+#			等待溝通協定連結中...
+#			溝通協定連結完成 - 準備進入自動控制狀態
 		}
 		if (timeOut(\%{$timeout{'injectSync'}})) {
 			sendSyncInject(\$remote_socket);
