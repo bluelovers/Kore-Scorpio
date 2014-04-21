@@ -1,0 +1,268 @@
+# 此檔案為 ex_config 部分設定整理說明
+
+#--------------------------------------------------------------------
+
+# [ 通用技能組設定 ]
+
+useSkill_smartCheck 1
+# 使用智慧型技能使用檢查模式(0=關、1=開、預設=開)
+
+#--------------------------------------------------------------------
+
+# [ 通用技能組設定 ]
+#
+# ${key} 為 attackSkillSlot、useSelf_skill、useParty_skill、useGuild_skill
+# ${i} 為 數字組
+# 範例:
+#	attackSkillSlot_0_lvl
+#	useSelf_skill_0_lvl
+#	useParty_skill_0_lvl
+#	useGuild_skill_0_lvl
+
+${key}_${i} 技能名稱
+# 指定使用之技能，請打上技能中文名稱啟動此組功能
+${key}_${i}_disabled 0
+# 停止使用此技能(0=關、1=開)
+${key}_${i}_lvl 1
+# 使用技能等級
+${key}_${i}_checkItem
+# 使用前確認是否擁有指定物品(可包含多樣物品，必需要擁有全部)
+${key}_${i}_checkItem_${j}
+# 使用前確認是否擁有指定物品以及大於指定數量[格式:名稱,數量]
+${key}_${i}_checkItemEx
+# 使用前確認是否擁有特定物品(可包含多樣物品，只需要擁有其中一樣)
+${key}_${i}_checkItemNot
+# 使用前確認身上沒有擁有指定物品(可包含多樣物品，必需要身上全部都沒有)
+${key}_${i}_checkItemNot_${j}
+# 使用前確認身上沒有擁有指定物品或者低於指定數量[格式:名稱,數量]
+${key}_${i}_smartEquip
+# 指定必須先裝備後才可獲得此技能之裝備名稱及位置[格式:名稱,位置]
+${key}_${i}_checkEquipped
+# 使用此技能時需穿著特定裝備(任一)，請打上裝備名稱[格式:名稱A,名稱B,名稱C, ...]
+${key}_${i}_hp_lower 0
+${key}_${i}_hp_upper 100
+# HP介於此兩設定值(lower,upper)之間時使用(%)
+${key}_${i}_sp_lower 0
+${key}_${i}_sp_upper 100
+# SP介於此兩設定值(lower,upper)之間時使用(%)
+${key}_${i}_minAggressives
+${key}_${i}_maxAggressives
+# 最多被幾隻怪物同時攻擊使用(0=不限制)
+${key}_${i}_maxUses 0
+# 對同一目標最多使用次數(0=不限制)
+${key}_${i}_unSteal 0
+# 於攻擊中目標怪物未被偷竊的時候使用
+${key}_${i}_monsters 
+# 於攻擊中使用此技能對應之怪物，請打上目標中文名稱並以逗號隔開(空白=不限制)
+${key}_${i}_monstersNot 
+# 於攻擊中不使用此技能對應之怪物，請打上目標中文名稱並以逗號隔開(空白=不限制)
+${key}_${i}_maxCastTime 10
+# 使用技能所需最長時間(秒) - 施展成功即會繼續AI動作，不需等到延遲時間結束
+${key}_${i}_minCastTime 0
+# 使用技能所需最短時間(秒) - 施展成功仍需等到延遲時間結束，才會繼續AI動作
+${key}_${i}_stopWhenHit 0
+# 被攻擊時停止使用(0=關、1=開)
+${key}_${i}_stopWhenSit 0
+# 角色蹲坐時停止使用(0=關、1=開)
+${key}_${i}_stopWhenTake 0
+# 撿取物品時停止使用(0=關、1=開)
+${key}_${i}_stopWhenAttack 0
+# 於攻擊任務時停止使用(0=關、1=開)
+# 於 attackSkillSlot 時不可以設定
+${key}_${i}_waitAfterKill
+# 戰鬥後暫時不使用(0=關、1=開) - 暫停秒數請於
+${key}_${i}_spirits_lower 0
+${key}_${i}_spirits_upper 5
+# 氣球數介於此兩設定值(lower,upper)之間時使用此技能(非武道家可不必設定)
+${key}_${i}_useSelf 0 
+# 對自己使用此技能(0=關、1=開)
+# 於 useSelf_skill 時不需設定
+${key}_${i}_timeout 0
+# 使用此技能之間隔時間(秒)
+${key}_${i}_inCity 0
+# 允許在城市內使用(0=關、1=開)
+${key}_${i}_inLockOnly 0
+# 只在鎖定地圖使用(0=關、1=開)
+${key}_${i}_unLockOnly 0
+# 只在非鎖定地圖使用(0=關、1=開)
+${key}_${i}_param1 0
+# 目標變成特殊狀態Ａ時(任一)使用此技能，請以逗號隔開(0=關、1以上=指定特殊狀態Ａ、負數=不在此狀態下)
+${key}_${i}_param2 0
+# 目標陷入特殊狀態Ｂ時(任一)使用此技能，請以逗號隔開(0=關、1以上=指定特殊狀態Ｂ、負數=不在此狀態下)
+${key}_${i}_param3 0
+# 目標處於特殊狀態Ｃ時(任一)使用此技能，請以逗號隔開(0=關、1以上=指定特殊狀態Ｃ、負數=不在此狀態下)
+${key}_${i}_status 
+# 不在持續狀態時使用此技能，請以逗號隔開(空白=關、0以上=指定持續狀態、負數=在此狀態下)
+# 對應tables/msgstrings.txt內0196部分
+# attackSkillSlot、useSelf_skill 為 角色本身持續狀態，其它為目標持續狀態
+${key}_${i}_spells
+# 目標附近沒有指定地面持續型技能，請打上技能編號並以逗號隔開啟動此組功能(空白=關、0以上=地面持續型技能、負數=在此地面持續型技能下)
+# 對應tables/msgstrings.txt內011F部分
+${key}_${i}_spells_dist
+# 目標地面持續型技能出現位置在指定距離之內(0=不限制、1=腳下、2以上=指定距離)
+
+#--------------------------------------------------------------------
+
+# [ 自動使用攻擊技能設定 ]
+
+attackSkillSlot 1
+# 自動使用攻擊技能開關(0=關、1=開、預設=開)
+
+attackSkillSlot_${i}_dist 3
+# 使用技能的距離(格)
+attackSkillSlot_$i_unSteal 0
+# 目標未被偷竊的時候使用
+attackSkillSlot_${i}_monsters 
+# 使用此技能對應之目標，請打上目標中文名稱並以逗號隔開(空白=不限制)
+attackSkillSlot_${i}_monstersNot 
+# 不使用此技能對應之目標，請打上目標中文名稱並以逗號隔開(空白=不限制)
+attackSkillSlot_${i}_loopSlot 
+# 此組技能之後要接續的組別(空白=關、0以上=指定組別)
+# 將會清除該組的使用時間與次數紀錄，用以配合maxUses和timeouts等設定來控制技能的使用
+
+#--------------------------------------------------------------------
+
+# [ 自動使用輔助技能設定 ]
+
+useSelf_skill 1
+# 自動使用輔助技能開關(0=關、1=開、預設=開)
+
+useSelf_skill_smartHeal 1 
+# 自動選擇治癒術的等級(0=關、1=開)
+useSelf_skill_smartAutospell 
+# 自動選擇自動念咒的技能，請打上技能中文名稱
+
+useSelf_smartAutomake
+# 自動選擇製作的物品(製藥、武器但是不包括屬性及星角)
+useSelf_smartAutoarrow 秘銀之衣(1洞),腳鍊,加勒結晶,銳利錐子,鰓刺
+# 自動選擇製作箭的物品
+useSelf_smartAutocall 
+# 自動選擇孵化的寵物
+useSelf_skill_smartAutoidentify 0
+# 自動鑑定物品開關(0=關、1=開)
+
+#--------------------------------------------------------------------
+
+# [ 自動使用工會技能設定 ]
+
+useGuild_skill 1
+# 自動使用工會技能開關(0=關、1=開、2=開:特殊支援模式會支援與工會人物相同帳號之角色人物)
+# ☆檢查使用間隔秒數請設定control/timeouts.txt中 ai_skill_guild，請勿設定過短秒數
+
+useGuild_skill_${i}_dist 3
+# 使用技能的距離(格)
+useGuild_skill_${i}_players 
+# 使用此技能對應之目標角色，請打上目標角色名稱並以逗號隔開(空白=不限制)
+useGuild_skill_0_jobs 
+# 使用此技能對應之目標角色職業編號，請打上目標角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+useGuild_skill_0_jobsNot 
+# 不使用此技能對應之目標角色職業編號，請打上目標角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+
+#--------------------------------------------------------------------
+
+# [ 自動使用隊伍技能設定 ]
+
+useParty_skill 1
+# 自動使用組隊技能開關(0=關、1=開)
+# ☆檢查使用間隔秒數請設定 control/timeouts.txt中 ai_skill_party，請勿設定過短秒數
+useParty_skill_smartHeal 0
+# 組隊技能使用治癒術時自動選擇等級(0=關、1=開)
+
+useParty_skill_${i}_dist 3
+# 使用技能的距離(格)
+useParty_skill_${i}_players 
+# 使用此技能對應之目標角色，請打上目標角色名稱並以逗號隔開(空白=不限制)
+useParty_skill_0_player_hp_lower 0 
+useParty_skill_0_player_hp_upper 100 
+# 目標 HP 介於此兩設定值(lower,upper)之間時使用此技能(%)
+useParty_skill_0_jobs 
+# 使用此技能對應之目標角色職業編號，請打上目標角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+useParty_skill_0_jobsNot 
+# 不使用此技能對應之目標角色職業編號，請打上目標角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+
+#--------------------------------------------------------------------
+
+# [ 自動使用技能回應設定 ]
+
+useCast_skill 0
+# 自動使用技能回應開關(0=關、1=開)
+# ☆檢查使用間隔秒數請設定 control/timeouts.txt中 ai_skill_cast_wait，請勿設定過短秒數
+
+useCast_skill_${i}_cast
+# 指定回應之技能，請打上技能中文名稱，設置多樣請以逗號隔開
+useCast_skill_${i}_castBy
+# 指定回應之技能使用者類型，請以逗號隔開(0=關、1=自己、2=怪物、4=玩家、8=不明人物)
+useCast_skill_${i}_castOn
+# 指定回應之被該技能鎖定之目標類型，請以逗號隔開(0=關、1=自己、2=怪物、4=玩家、8=不明人物)
+useCast_skill_${i}_dist 
+# 指定回應之技能距離
+useCast_skill_${i}_castBy_name
+# 指定回應之技能使用者名字
+useCast_skill_${i}_castBy_guildID
+# 指定回應之技能使用者工會編碼
+useCast_skill_${i}_castBy_guild
+# 指定回應之技能使用者工會名字
+useCast_skill_${i}_castOn_name
+# 指定回應之被該技能鎖定之目標名字
+useCast_skill_${i}_castOn_guildID
+# 指定回應之被該技能鎖定之目標工會編碼
+useCast_skill_${i}_castOn_guild
+# 指定回應之被該技能鎖定之目標工會名字
+useCast_skill_${i}_useToCastOn 0
+# 將技能使用於被鎖定者(0=關、1=開)
+useCast_skill_${i}_useSelf 0
+# 將技能使用於自己(0=關、1=開)
+
+
+#--------------------------------------------------------------------
+
+# [ 自動使用物品設定 ]
+
+useSelf_item_${i} 
+# 指定使用之物品，請打上物品中文名稱啟動此組功能，設置多樣請以逗號隔開，將會依序使用
+useSelf_item_${i}_checkItem
+# 使用前確認是否擁有指定物品(可包含多樣物品，必需要擁有全部)
+useSelf_item_${i}_checkItem_${j}
+# 使用前確認是否擁有指定物品以及大於指定數量[格式:名稱,數量]
+useSelf_item_${i}_checkItemEx
+# 使用前確認是否擁有特定物品(可包含多樣物品，只需要擁有其中一樣)
+useSelf_item_${i}_checkItemNot
+# 使用前確認身上沒有擁有指定物品(可包含多樣物品，必需要身上全部都沒有)
+useSelf_item_${i}_checkItemNot_${j}
+# 使用前確認身上沒有擁有指定物品或者低於指定數量[格式:名稱,數量]
+useSelf_item_${i}_hp_lower 0
+useSelf_item_${i}_hp_upper 100
+# HP介於此兩設定值(lower,upper)之間時使用此物品(%)
+useSelf_item_${i}_maxAggressives 0
+# 最多被幾隻怪物同時攻擊使用此物品(0=不限制)
+useSelf_item_${i}_minAggressives 0
+# 最少被幾隻怪物同時攻擊使用此物品(0=不限制)
+useSelf_item_${i}_monsters 
+# 使用此物品對應之怪物，請打上怪物中文名稱並以逗號隔開(空白=不限制)
+useSelf_item_${i}_sp_lower 0
+useSelf_item_${i}_sp_upper 100
+# SP介於此兩設定值(lower,upper)之間時使用此物品(%)
+useSelf_item_${i}_stopWhenHit 0 
+# 被攻擊時停止使用此物品(0=關、1=開)
+useSelf_item_${i}_stopWhenSit 0 
+# 角色蹲坐時停止使用此物品(0=關、1=開)
+useSelf_item_${i}_stopWhenTake 0
+# 撿取物品時停止使用(0=關、1=開)
+useSelf_item_${i}_stopWhenAttack 0
+# 於攻擊任務時停止使用(0=關、1=開)
+useSelf_item_${i}_repeat 1
+# 連續使用此物品(0~1=1次、2以上=次數)
+useSelf_item_${i}_timeout 0
+# 使用此物品之間隔時間(秒)，設置1~5秒可防LAG時連用 註:時效性物品改用status判斷會較為準確
+useSelf_item_${i}_inCity 1
+# 允許在城市內使用(0=關、1=開、空白=預設開)
+useSelf_item_${i}_inLockOnly 0 
+# 只在鎖定地圖使用此物品(0=關、1=開)
+${key}_${i}_unLockOnly 0
+# 只在非鎖定地圖使用(0=關、1=開)
+useSelf_item_${i}_checkSupplyFirst 0 
+# 使用此物品前先檢查是否使用後會到達取倉或買物之下限(0=關、1=開)
+# 如果檢查成立，將會直接啟動補給流程，而不使用此物品
+useSelf_item_${i}_param2 0
+# 角色陷入特殊狀態Ｂ時(任一)使用此物品，請以逗號隔開(0=關、1以上=指定特殊狀態Ｂ、負數=不在此狀態下)
+useSelf_item_${i}_status 
