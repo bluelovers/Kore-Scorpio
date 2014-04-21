@@ -286,6 +286,19 @@ sub injectAdminMessage {
 	sendToClientByInject(\$remote_socket, $msg);
 }
 
+sub injectMessageBroadcastinMap {
+	my $message = shift;
+	my $msg .= $message . chr(0);
+	encrypt_mk(\$msg, $msg);
+	$msg = pack("C*", 0xc3, 0x01) . pack("v*", length($msg) + 16) . pack("C*", 0xff, 0x9c, 0x00, 0x00, 0x64, 0x00, 0x14, 0x00, 0x00, 0x00, 0x02, 0x00) . $msg;
+	encrypt_mk(\$msg, $msg);
+	sendToClientByInject(\$remote_socket, $msg);
+	
+#0xff, 0x9c, 0x00 is the html hex color: #009CFF
+#0x64, 0x00 seems to be something like width, but is not working.
+#0x14, 0x00 is the Fontsize.
+}
+
 sub encrypt_mk {
 	my $r_msg = shift;
 	my $themsg = shift;
@@ -1105,7 +1118,8 @@ sub sendPartyOrganize {
 
 	$name = substr($name, 0, 24) if (length($name) > 24);
 	$name = $name . chr(0) x (24 - length($name));
-	my $msg = pack("C*", 0xF9, 0x00) . $name . pack("C*", $flag1) . pack("C*", $flag2);
+#	my $msg = pack("C*", 0xF9, 0x00) . $name . pack("C*", $flag1) . pack("C*", $flag2);
+	my $msg = pack("C*", 0xE8, 0x01) . $name . pack("C*", $flag1) . pack("C*", $flag2);
 	encrypt($r_socket, $msg);
 	print "Sent Organize Party: $name [$flag1, $flag2]\n" if ($config{'debug'} >= 2);
 }
