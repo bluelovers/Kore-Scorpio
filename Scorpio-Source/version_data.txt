@@ -1,15 +1,15 @@
 #--------------------------
 
-version 6.5.29.0
-update 29/05/06 - 22:14:20
-regkey 4e7262f944bde5ba318eb9d9f37d41cd
-chkkey tAnpMdlauwMac
-MD5 9bc517b3c81afc8adf1c37e406c95c58
+version 6.6.3.0
+update 03/06/06 - 21:03:48
+regkey 91942a4ebe54008c518e33eb75dfa530
+chkkey bfMgtoS/r/u8.
+MD5 eaf68c66eaf065dadb1e51996cb2583d
 
-old_version 6.5.6.0
-old_update 06/05/06 - 20:59:17
-old_regkey 862cc9bd63366bfa3392c106ad829070
-old_chkkey s.hXXN0Bi0Y/s
-old_MD5 2a75ec0747dd6cca75d4ab8dbb3ca239
+old_version 6.5.29.0
+old_update 29/05/06 - 22:14:20
+old_regkey 4e7262f944bde5ba318eb9d9f37d41cd
+old_chkkey tAnpMdlauwMac
+old_MD5 9bc517b3c81afc8adf1c37e406c95c58
 
 #--------------------------
