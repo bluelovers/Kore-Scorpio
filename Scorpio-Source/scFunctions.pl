@@ -3514,4 +3514,30 @@ sub vectorToDegree {
 	}
 }
 
+sub calPercent {
+	my $r_hash = shift;
+	my $pos = shift;
+	my $val = shift;
+	#optimize assignment when old value = new value
+	if ($val == 0) {
+		$$r_hash{$pos} = $val;
+		$$r_hash{"percent_$pos"} = 0;
+
+	} elsif ($$r_hash{$pos} != $val && $val > 0) {
+		# out of bound
+		if ($val > $$r_hash{$pos."_max"}) {
+			$$r_hash{$pos} = $$r_hash{$pos."_max"};
+		# normal
+		} else {
+			$$r_hash{$pos} = $val;
+		}
+		#calculate %
+		if ($$r_hash{$pos."_max"} > 0) {
+			$$r_hash{"percent_$pos"} = int($$r_hash{$pos}/$$r_hash{$pos."_max"}*100);
+		} else {
+			$$r_hash{"percent_$pos"} = int($$r_hash{$pos}/$val*100);
+		}
+	}
+}
+
 1;
