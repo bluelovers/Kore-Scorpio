@@ -1,0 +1,893 @@
+
+# 有些設定沒用到就把它關閉
+# 效率不一定增加 但是對電腦比較好
+
+storagegetAuto_smartAdd 1
+# 當物品無法成功放置入倉庫時、略過放置該樣物品(0=關、1=開)
+# 適合給經常爆倉、而且不會因為此開關而造成其他錯誤
+# 不適合使用之類型: 太多物品無法放倉 造成負重而無法回血 連續死亡
+
+attackAuto_checkMethod 1
+# 攻擊時檢查是否擁有戰鬥方式(0=關、1=開、預設=開)
+
+recordEvent_escape 1
+# 紀錄瞬間移動逃離事件(0=關、1=開)
+
+autoAdmin_type 
+# 遠端控制檢查頻道(空白=不限制)
+# 參數 :
+#	c	聊天
+#	cr	聊天室
+#	pm	密語
+#	g	工會
+#	p	隊伍
+#	e	表情
+# 範例 :
+#	autoAdmin_type c,g,p
+#	會檢查 聊天,隊伍,工會頻道
+autoAdmin_user
+# 遠端控制檢查玩家類型(空白=不限制)
+# 參數 :
+#	g	工會
+#	p	隊伍
+#	f	朋友
+# 範例 :
+#	autoAdmin_type g,p,f
+#	會檢查玩家是否符合 工會 or 隊伍 or 朋友名單其中一項
+autoAdmin_guild
+# 遠端控制檢查玩家工會名稱(空白=不限制)
+autoAdmin_guildID
+# 遠端控制檢查玩家工會ID(空白=不限制)
+
+# autoAdmin_user , autoAdmin_guild , autoAdmin_guildID
+# 這三個只要有一個條件達到 就算符合條件
+
+autoAdmin_code_${i}
+# 檢查訊息(表情或者說話內容)
+autoAdmin_code_${i}_call
+# 條件達到時 執行的指令
+
+dcOnWord_checkNpc 1
+# 於公告發現指定GM關鍵字時，檢查是否為NPC公告，如果是則忽略(0=關、1=開)
+
+partyAutoParam 1,0
+# 2005-9-24(六) 更新之建立隊伍參數格式:[物品共享,物品隨機均分]
+
+itemsMaxWeight_stopTake 45
+# 負重高於多少百分比後停止撿取物品，但不會啟動自動補給功能
+# 此功能也不會去計算 itemsMaxWeight_considerHpSp
+
+useSelf_smartAutocall 
+# 自動選擇孵化的寵物
+useSelf_skill_smartAutoidentify 0
+# 自動鑑定物品開關(0=關、1=開)
+
+#------------------------------------------------------------
+
+talkAuto_${i}_checkItem
+# 確認是否擁有指定物品(可包含多樣物品，必需要擁有全部)
+talkAuto_${i}_checkItem_${j}
+# 確認是否擁有指定物品以及大於指定數量[格式:名稱,數量]
+talkAuto_${i}_checkItemEx
+# 確認是否擁有特定物品(可包含多樣物品，只需要擁有其中一樣)
+talkAuto_${i}_checkItemNot
+# 確認身上沒有擁有指定物品(可包含多樣物品，必需要身上全部都沒有)
+talkAuto_${i}_checkItemNot_${j}
+# 確認身上沒有擁有指定物品或者低於指定數量[格式:名稱,數量]
+
+#------------------------------------------------------------
+
+talkAuto_checkItem
+# 確認是否擁有指定物品(可包含多樣物品，必需要擁有全部)
+talkAuto_checkItem_${j}
+# 確認是否擁有指定物品以及大於指定數量[格式:名稱,數量]
+talkAuto_checkItemEx
+# 確認是否擁有特定物品(可包含多樣物品，只需要擁有其中一樣)
+talkAuto_checkItemNot
+# 確認身上沒有擁有指定物品(可包含多樣物品，必需要身上全部都沒有)
+talkAuto_checkItemNot_${j}
+# 確認身上沒有擁有指定物品或者低於指定數量[格式:名稱,數量]
+
+#------------------------------------------------------------
+
+parseNpcAuto 1
+# 使用NPC座標位置取代傳統NPC編號(0=關、1=開)
+#
+# 範例 yuno 152 187 卡普拉 職員
+#	storageAuto_npc <auto> yuno 152 187
+#
+
+guildAutoEmblem 1
+# 要求工會圖回應並且儲存轉為BMP(0=關、1=開+檢查是否已經有下載在電腦裡、2=開+不檢查)
+# 不論設定為多少 程式執行時所有工會圖只會要求一次
+
+#-----------------------------------------
+
+# ${key} 為 attackSkillSlot、useSelf_skill、useParty_skill、useGuild_skill、useSelf_item
+# ${i} 為 數字組
+# 範例:
+#	attackSkillSlot_0
+#	useSelf_skill_0
+#	useParty_skill_0
+#	useGuild_skill_0
+#	useSelf_item_0
+
+${key}_${i}_checkItem_${j}
+# 使用前確認是否擁有指定物品以及大於指定數量[格式:名稱,數量]
+${key}_${i}_checkItemNot
+# 使用前確認身上沒有擁有指定物品(可包含多樣物品，必需要身上全部都沒有)
+${key}_${i}_checkItemNot_${j}
+# 使用前確認身上沒有擁有指定物品或者低於指定數量[格式:名稱,數量]
+
+#-----------------------------------------
+
+useSelf_item_$i_inCity 1
+# 允許在城市內使用此物品(0=關、1=開)
+
+debug_switchNot 
+# 略過分析的封包編號，請打上封包編號並以逗號隔開(空白=不限制)
+# 某些特定人物在接收某些封包時會產生程式錯誤
+
+unstuckAuto_utcount_dll 10
+# 嘗試重新載入DLL檔失敗多少次後重新登入(0=關、1以上=指定次數)
+
+updateNPC 2
+# 當同座標且同名稱之NPC的編號有更動時，自動更新tables/npcs.txt中該NPC之編號
+# (0=關、1=開、2=新型更新方式-修正舊有BUG)
+
+teleportAuto_away 1
+# 指定怪物瞬移逃離開關(0=關、1=開、預設=開)
+teleportAuto_skill 1
+# 迴避指定目標型技能開關(0=關、1=開、預設=開)
+teleportAuto_spell 1
+# 迴避地面持續型技能開關(0=關、1=開、預設=開)
+
+password_noChoice 0
+# 密碼錯誤時不要求重新輸入(0=關、1=開)
+
+route_NPC_distance 5
+# 與NPC傳點對話之隨機距離(格)
+
+char_password 
+# 角色密碼金鑰
+storageAuto_password 
+# 倉庫密碼金鑰
+
+teleportAuto_away 1
+# 偵測瞬移迴避怪物開關(0=關、1=開、1=預設開)
+# 相關參數 control/timeouts.txt 之 ai_teleport_away
+# 控制所有 control/mon_control 裡的逃離開關
+
+teleportAuto_player 0
+# 看到玩家或者NPC時瞬移(0=關、1=開-玩家、1=開-玩家+NPC)
+
+equipAuto_${i}_monstersNot 
+# 切換裝備不對應之怪物，請打上怪物中文名稱並以逗號隔開(空白=不限制)
+equipAuto_${i}_inCity 1
+# 允許在城市內切換裝備(0=關、1=開)
+equipAuto_${i}_inLockOnly 0
+# 只在鎖定地圖切換裝備(0=關、1=開)
+equipAuto_${i}_unLockOnly 0
+# 只在非鎖定地圖切換裝備(0=關、1=開)
+
+equipAuto_${i}_useWeapon 
+# 切換裝備後使用武器攻擊(空白=關、0=關-不使用武器、1=開-使用武器)
+equipAuto_${i}_attackDistance 0
+# 切換裝備後使用武器攻擊距離(格)(0=關、1以上為距離)
+
+attackAuto_mvpFirst 1
+# 發現MVP時同時攻擊MVP怪物(0=關、1=開)
+
+teleportAuto_dmgFromYou 1
+# 對幾隻以上怪物造成傷害時自動瞬移逃離(0=關、1以上=指定數量)
+# 相關參數 control/timeouts.txt 之 ai_teleport_dmgFromYou
+
+teleportAuto_skipMiss 1
+# 計算圍攻怪物時，是否忽略Miss攻擊(0=關、1=開)
+
+autoRoute_npcChoice 1
+# 智慧型NPC傳點編號選擇模式(0=關、1=開)
+# 自動將所有NPC傳點編號當作 <auto>
+
+autoRoute_saveMap 1
+# 如果儲存點在路徑中則瞬移回城(0=關、1=開)
+
+teleportAuto_inCity 1
+# 在城市內允許使用瞬間移動(0=關、1=開)
+
+teleportAuto_search_portal 300
+# 使用順移功能加速到達定目標地圖
+# 距離傳送點多少格以外就用瞬移方式(數值不要設太小免得飛太久)
+# 相關參數 control/timeouts.txt 之 ai_teleport_search_portal
+
+hideMsg_takenByInfo 0
+# 不顯示撿取重要物品者的資料(0=關、1=開)
+
+modifiedWalkType 2
+# 當移動時使用修正座標方法(0=關、1或2=修正方法、3以上=未知模式修正方法)
+# 由於這部分是抄來的
+# 我也搞不清楚有啥差別
+# 有興趣的人可以研究看看
+modifiedWalkDistance 5
+# 重新計算座標距離
+
+itemsImportantAutoMode 0
+# 啟動死命撿取模式(0=關、1=開)
+# 撿取目標物品直到角色瀕臨死亡
+
+dcOnDualLogin_protect 1
+# 相同帳號登入時啟動保護模式(0=關、1=開、預設=開)
+# 解除連線主伺服器等待時間舊有限制改為基本時間5秒,亂數時間5秒(�d避免伺服器負荷太大)
+dcOnEmptyArrow 0
+# 用盡使用中箭矢立即登出(0=關、1=開)
+
+autoResurrect 0
+# 自動使用技能/道具復活玩家(0=關、1=開-隊友、2=開-隊友&工會、3=開-任意玩家)
+autoResurrect_dist 5
+# 自動使用技能/道具復活玩家距離
+autoResurrect_checkItem 
+# 自動使用技能/道具復活玩家時檢查指定物品，請打上物品名稱並以逗號隔開(0=不檢查)
+
+autoResurrect_hp_lower 0 
+autoResurrect_hp_upper 100 
+# HP介於此兩設定值(lower,upper)之間時使用(%)
+autoResurrect_sp_lower 0 
+autoResurrect_sp_upper 100 
+# SP介於此兩設定值(lower,upper)之間時使用(%)
+autoResurrect_maxAggressives 0 
+# 最多被幾隻怪物同時攻擊使用(0=不限制)
+useParty_skill_0_maxCastTime 0 
+# 使用復活技能所需最長時間(秒) - 施展成功即會繼續AI動作，不需等到延遲時間結束
+useParty_skill_0_minCastTime 0 
+# 使用復活技能所需最短時間(秒) - 施展成功仍需等到延遲時間結束，才會繼續AI動作
+autoResurrect_stopWhenHit 0 
+# 被攻擊時停止使用(0=關、1=開)
+autoResurrect_stopWhenSit 0 
+# 角色蹲坐時停止使用(0=關、1=開)
+autoResurrect_stopWhenAttack 0 
+# 於攻擊任務時停止使用(0=關、1=開)
+autoResurrect_stopWhenTake 0 
+# 撿取物品時停止使用(0=關、1=開)
+autoResurrect_waitAfterKill 0
+# 戰鬥後暫時不使用(0=關、1=開) - 暫停秒數請於control/timeouts.txt中設定
+autoResurrect_inLockOnly 0 
+# 只在鎖定地圖使用(0=關、1=開)
+autoResurrect_unLockOnly 0 
+# 只在非鎖定地圖使用(0=關、1=開)
+autoResurrect_inCity 0 
+# 允許在城市內使用(0=關、1=開)
+autoResurrect_players 
+# 使用對應之角色，請打上角色名稱並以逗號隔開(空白=不限制)
+autoResurrect_jobs 
+# 使用此技能對應之角色職業編號，請打上角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+
+attackAuto_overTimeMode 1
+# 使用新型攻擊放棄檢查模式(0=關、1=開)
+
+useSkill_smartCheck 1
+# 使用智慧型技能使用檢查模式(0=關、1=開、預設=開)
+
+preferRoute_warp 1
+# 依照偏好路徑前往指定地圖時會先檢查是否具有傳送之陣通往指定地圖(0=關、1=開、預設=開)
+autoWarp_checkItem 藍色魔力礦石
+# 依照偏好路徑使用傳送之陣時檢查物品
+# preferRoute_warp_checkItem 更改為 autoWarp_checkItem
+
+preferRoute_returnQuickly 1
+# 依照偏好路徑前往指定地圖時會先偵測附近傳點是否通往指定地圖(0=關、1=開、預設=開)
+# ☆如果發現會卡點(可能傳點四周有牆阻擋)請關閉此功能
+
+petAuto_play 1
+# 定時表演寵物(0=關、1=開: control/timeouts.txt 之 ai_petAuto_play)
+petAuto_intimate_lower 300
+# 寵物親密度低於設定值時，自動將寵物回復成蛋的狀態(0=關、1~1000=設定值、預設=300)
+
+#----------------------------------[自動使用工會技能設定]----------------------------------
+
+attackSkillSlot 1
+# 自動使用攻擊技能開關(0=關、1=開、預設=開)
+useSelf_skill 1
+# 自動使用輔助技能開關(0=關、1=開、預設=開)
+
+useGuild_skill 1
+# 自動使用工會技能開關(0=關、1=開、2=開:特殊支援模式會支援與工會人物相同帳號之角色人物)
+# ☆檢查使用間隔秒數請設定control/timeouts.txt中 ai_skill_guild，請勿設定過短秒數
+
+useGuild_skill_0 治癒術 
+# 指定使用之技能，請打上技能中文名稱啟動此組功能
+useGuild_skill_0_smartEquip 
+# 指定必須先裝備後才可獲得此技能之裝備名稱及位置[格式:名稱,位置]
+useGuild_skill_0_checkEquipped 
+# 使用此技能時需穿著特定裝備(任一)，請打上裝備名稱[格式:名稱A,名稱B,名稱C, ...]
+useGuild_skill_0_lvl 10
+# 使用技能等級
+useGuild_skill_0_dist 15 
+# 使用技能的距離(格)
+useGuild_skill_0_hp_lower 0 
+useGuild_skill_0_hp_upper 100 
+# HP介於此兩設定值(lower,upper)之間時使用此技能(%)
+useGuild_skill_0_sp_lower 0 
+useGuild_skill_0_sp_upper 100 
+# SP介於此兩設定值(lower,upper)之間時使用此技能(%)
+useGuild_skill_0_maxAggressives 0 
+# 最多被幾隻怪物同時攻擊使用此技能(0=不限制)
+useGuild_skill_0_minAggressives 0 
+# 至少被幾隻怪物同時攻擊使用此技能(0=不限制)
+useGuild_skill_0_maxCastTime 0 
+# 使用此技能所需最長時間(秒) - 施展成功即會繼續AI動作，不需等到延遲時間結束
+useGuild_skill_0_minCastTime 0 
+# 使用此技能所需最短時間(秒) - 施展成功仍需等到延遲時間結束，才會繼續AI動作
+useGuild_skill_0_stopWhenHit 0 
+# 被攻擊時停止使用此技能(0=關、1=開)
+# (詠唱時間較長且容易被中斷之法術應該要設為1)
+useGuild_skill_0_stopWhenSit 0 
+# 角色蹲坐時停止使用此技能(0=關、1=開)
+useGuild_skill_0_stopWhenAttack 0 
+# 於攻擊任務時停止使用此技能(0=關、1=開)
+useGuild_skill_0_stopWhenTake 0 
+# 撿取物品時停止使用此技能(0=關、1=開)
+useGuild_skill_0_inLockOnly 0 
+# 只在鎖定地圖使用此技能(0=關、1=開)
+useGuild_skill_0_timeout 0 
+# 使用此技能之間隔時間(秒)
+useGuild_skill_0_players 
+# 使用此技能對應之工會角色，請打上隊友角色名稱並以逗號隔開(空白=不限制)
+useGuild_skill_0_jobs 
+# 使用此技能對應之工會角色職業編號，請打上工會角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+useGuild_skill_0_status 
+# 工會角色不在持續狀態時使用此技能，請以逗號隔開(空白=關、0以上=指定持續狀態、負數=在此狀態下)
+useGuild_skill_$i_player_spells
+# 目標附近沒有指定地面持續型技能，請打上技能編號並以逗號隔開啟動此組功能(對應tables/msgstrings.txt內011F部分)
+useGuild_skill_$i_player_spells_dist
+# 地面持續型技能出現位置在目標指定距離之內(0=不限制、1=腳下、2以上=指定距離)
+
+
+
+useSelf_skill_$i_spells
+# 附近沒有指定地面持續型技能，請打上技能編號並以逗號隔開啟動此組功能(對應tables/msgstrings.txt內011F部分)
+useSelf_skill_$i_spells_dist
+# 地面持續型技能出現位置在指定距離之內(0=不限制、1=腳下、2以上=指定距離)
+
+attackSkillSlot_$i_spells
+# 附近沒有指定地面持續型技能，請打上技能編號並以逗號隔開啟動此組功能(對應tables/msgstrings.txt內011F部分)
+attackSkillSlot_$i_spells_dist
+# 地面持續型技能出現位置在指定距離之內(0=不限制、1=腳下、2以上=指定距離)
+
+useParty_skill_$i_player_spells
+# 目標附近沒有指定地面持續型技能，請打上技能編號並以逗號隔開啟動此組功能(對應tables/msgstrings.txt內011F部分)
+useParty_skill_$i_player_spells_dist
+# 地面持續型技能出現位置在目標指定距離之內(0=不限制、1=腳下、2以上=指定距離)
+
+attackAutoHitAndRun 0
+# 攻擊時自動遠離怪物模式(0=關、1=開)
+attackAutoHitAndRun_monsters 
+# 攻擊時自動遠離怪物模式對應之怪物，請打上怪物中文名稱並以逗號隔開(空白=不限制)
+attackAutoHitAndRun_minDistance 5
+# 與目標的最短距離
+attackAutoHitAndRun_runDistance 5
+# 每次逃離目標距離
+
+attackAuto_checkWall 0
+# 與怪物之間有障礙物就不鎖定(0=關、1=開)
+
+#----------------------------------[自動使用組隊技能設定]----------------------------------
+
+useParty_skill 1
+# 自動使用組隊技能開關(0=關、1=開)
+# ☆檢查使用間隔秒數請設定control/timeouts.txt中 ai_skill_party，請勿設定過短秒數
+
+useParty_skill_smartHeal 0
+# 組隊技能使用治癒術時自動選擇等級(0=關、1=開)
+
+useParty_skill_0 治癒術 
+# 指定使用之技能，請打上技能中文名稱啟動此組功能
+useParty_skill_0_smartEquip 
+# 指定必須先裝備後才可獲得此技能之裝備名稱及位置[格式:名稱,位置]
+useParty_skill_0_checkEquipped 
+# 使用此技能時需穿著特定裝備(任一)，請打上裝備名稱[格式:名稱A,名稱B,名稱C, ...]
+useParty_skill_0_lvl 10
+# 使用技能等級
+useParty_skill_0_dist 15 
+# 使用技能的距離(格)
+useParty_skill_0_hp_lower 0 
+useParty_skill_0_hp_upper 100 
+# HP介於此兩設定值(lower,upper)之間時使用此技能(%)
+useParty_skill_0_sp_lower 0 
+useParty_skill_0_sp_upper 100 
+# SP介於此兩設定值(lower,upper)之間時使用此技能(%)
+useParty_skill_0_maxAggressives 0 
+# 最多被幾隻怪物同時攻擊使用此技能(0=不限制)
+useParty_skill_0_minAggressives 0 
+# 至少被幾隻怪物同時攻擊使用此技能(0=不限制)
+useParty_skill_0_maxCastTime 0 
+# 使用此技能所需最長時間(秒) - 施展成功即會繼續AI動作，不需等到延遲時間結束
+useParty_skill_0_minCastTime 0 
+# 使用此技能所需最短時間(秒) - 施展成功仍需等到延遲時間結束，才會繼續AI動作
+useParty_skill_0_useSelf 0 
+# 對自己使用此技能(0=關、1=開)
+useParty_skill_0_stopWhenHit 0 
+# 被攻擊時停止使用此技能(0=關、1=開)
+# (詠唱時間較長且容易被中斷之法術應該要設為1)
+useParty_skill_0_stopWhenSit 0 
+# 角色蹲坐時停止使用此技能(0=關、1=開)
+useParty_skill_0_stopWhenAttack 0 
+# 於攻擊任務時停止使用此技能(0=關、1=開)
+useParty_skill_0_stopWhenTake 0 
+# 撿取物品時停止使用此技能(0=關、1=開)
+useParty_skill_0_inLockOnly 0 
+# 只在鎖定地圖使用此技能(0=關、1=開)
+useParty_skill_0_timeout 0 
+# 使用此技能之間隔時間(秒)
+useParty_skill_0_players 
+# 使用此技能對應之隊友角色，請打上隊友角色名稱並以逗號隔開(空白=不限制)
+useParty_skill_0_player_hp_lower 0 
+useParty_skill_0_player_hp_upper 70 
+# 隊友HP介於此兩設定值(lower,upper)之間時使用此技能(%)
+useParty_skill_0_jobs 
+# 使用此技能對應之隊友角色職業編號，請打上隊友角色職業編號並以逗號隔開(空白=不限制 參考tables/jobs.txt)
+useParty_skill_0_status 
+# 隊友角色不在持續狀態時使用此技能，請以逗號隔開(空白=關、0以上=指定持續狀態、負數=在此狀態下)
+
+storagegetAuto_uneqArrow 1
+# 開倉時卸下已裝備箭矢(0=關、1=開)
+
+partyAutoCreate 1
+# 自動建立隊伍(0=關、1=開)
+
+attackAuto_preventParam1 1,2,3,4,6
+# 防止搶怪狀態Param1
+
+kore_autoUpdate 1
+# 程式自動更新模式開關
+# 0: 不更新程式
+# 1: 僅更新下載執行檔 Scorpio.exe
+# 2: 更新下載 kore2Scorpio.rar
+
+unstuckAuto_indoor 25
+# 於室內卡點幾次後重登
+
+recordStorage 2
+# 開啟倉庫後自動紀錄倉庫物品存量(0=關、1=開、2=開+嘗試計算倉庫物品販售價值-僅供參考)
+# 紀錄位置: logs/StorageLog.txt
+
+attackAuto_party 2
+# 幫助隊友攻擊(0=關、1=開、2=優先攻擊隊友的怪)
+# 2: 即使設定於不攻擊的怪也會去攻擊、如果為坐下狀態也會站起來幫忙攻擊
+
+autoCheckItemUse 30
+# 連續使用物品失敗幾次之後重登
+# ☆檢查使用間隔秒數請設定control/timeouts.txt中 ai_item_use_check，請勿設定過短秒數
+
+useSelf_item_$i_stopWhenTake 1
+
+talkAuto 0
+# 執行NPC對話任務
+# 	0=關
+# 	1=開
+# 	2=開(使用 5.3.23.1 開始的NPC對話設定格式)
+
+talkAuto_$i_npc 56056
+# 指定NPC編號
+talkAuto_$i_npc_dist 10
+# 與談話NPC對話之隨機距離(格)
+talkAuto_$i_npc_steps c r0 c r0 n
+# 與指定NPC對話之順序，請以空白隔開
+# (c='talk cont'、r#='talk resp #'、a#='talk answer #'、n='talk no')
+talkAuto_$i_hp 0
+# HP低於多少百分比時啟動自動談話功能(%)
+talkAuto_$i_sp 0
+# SP低於多少百分比時啟動自動談話功能(%)
+talkAuto_$i_peace 0
+# 目前任務為attack時不觸發talkAuto功能(0=關、1=開)
+
+talkAuto_$i_broken 1
+# 物品損壞時觸發talkAuto功能(0=關、1以上=指定數量)
+
+talkAuto_$i_end_warpedToSave 1
+#對話結束時回城(此 npc 不可在無法順移之地點)
+talkAuto_$i_zeny 500000
+# 檢查身上是否有指定數量的錢
+
+talkAuto_$i_inNpcMapOnly
+# 在對話npc 的那個地圖才進行對話
+
+buyAuto_smartEquip 髮夾(1洞) [邪骸海盜卡片]
+
+storagegetAuto_zeny
+buyAuto_$i_zeny
+# 檢查身上是否有指定數量的錢
+
+storagegetAuto_$i_inNpcMapOnly
+buyAuto_$i_inNpcMapOnly
+sellAuto_inNpcMapOnly
+# 在存買npc 的那個地圖才進行補給
+
+itemsTakeDist 3
+# 直接撿取物品距離
+
+itemsTakeDamage 1
+# 對怪傷害超過設定值才嚐試撿取物品使用(%)(可節省檢不到物品浪費的時間,增加掛機效率)
+
+itemsMaxWeight_considerHpSp 1
+#開啟後就算達到負重仍然會撿取物品並且不會回城
+#負重後 一並計算 hp, sp (0=關、1=只要其中一個條件達到、2=全部條件達到)
+
+itemsMaxWeight_hp_lower 50
+itemsMaxWeight_sp_lower 50
+
+attackAuto_notParam3 2,4,64
+# 不攻擊變成特殊狀態Param3ㄉ怪
+attackAuto_takenBy 1
+# 攻擊吃掉物品的怪(0=關、1=開、2=開-判斷物品消失的位置上是否有怪物、3=開-判斷接近物品消失的位置的怪物通通有嫌疑)
+# 怪物只指 attackAuto_takenByMonsters 所設定的值
+attackAuto_takenByMonsters 茲諾克,工蟻,兵蟻,波利,土波利,波波利,盜蟲,瑪勒盜蟲,溜溜猴,庫克雷,魔鍋蛋
+# 會吃掉物品的怪
+
+sitAuto_stopWhenHit 1
+# 被攻擊時停止坐下(0=關、1=開)
+
+route_randomWalk_inCity 0
+# 開啟可在城市裡隨機移動
+
+multiPortals 0
+# 多重傳點模式(0=關、1=開)
+# 開啟此模式時 於某些室內地圖容易造成無法計算路徑
+# 而產生程式錯誤
+
+recordMonsterInfo_mvp 1
+# 1 - 紀錄 MVP
+# 2 - 紀錄 MVP & RM
+
+broadcastMode 3
+# 發現怪物廣播模式
+# 1 - 隊伍
+# 2 - 工會
+# 3 - 隊伍 & 工會
+
+#warpperMode 1
+
+#mapserver 
+
+map_name_2_3_0 斐羊工會密穴
+map_host_2_3_0 220.130.113.213
+
+map_name_2_3_1 鬼城
+map_host_2_3_1 220.130.113.219
+
+map_name_2_3_2 地間
+map_host_2_3_2 220.130.113.217
+
+attackCounterFirst 0
+#反擊優先距離(n=距離)
+
+attackAuto_notMode 0
+# 1 - 不反擊 mon_control 裡設定為  0 的怪物
+# 2 - 不反擊 mon_control 裡設定為 -1 的怪物
+
+autoAddStatusOrSkill 0
+# 自動分配技能、素質點數(0=關、1=開)
+autoAddStatusOrSkill_jobs
+# 自動分配技能、素質點數時確認職業編號(空白=不限制 參考tables/jobs.txt)
+
+autoAddSkill_0
+# 自動分配技能 - 請設定技能名稱
+autoAddSkill_0_limit
+# 自動分配技能上限
+autoAddStatus_0
+# 自動分配素質點數(str | agi | vit | int | dex | luk)
+autoAddStatus_0_limit
+# 自動分配素質點數上限
+
+deadRespawn 1
+# 死後回城(0=關、1=開、預設開)
+
+dcQuick 0
+# 不處理外掛非主動關閉時的訊息(0=關、1=開)
+
+attackAuto_checkSkills 1
+# 開啟判斷技能是否卡點(0=關、1=開)
+#	0=關
+#	1=開+加入判斷是否有造成傷害
+#	2=開
+
+attackAuto_unLock 0
+# 解除攻擊時間限制(0=關、1=開)
+attackAuto_mvp 1
+# 無視 MVP 是否已經被人搶先攻擊(0=關、1=MVP、2=MVP+小王)
+attackAuto_beCastOn 1
+# 無視怪物是否已經被技能搶先鎖定(0=關、1=開)
+
+attackAuto_stopOnTele 1
+# 順移時停止攻擊
+
+teleportAuto_autoMode 2
+# 順移模式 (1-AI, 2-封包)
+# 1; 再hp低於設定值後啟動 teleportAuto_onHit 1
+# 2; 再hp低於設定值後啟動 teleportAuto_whenDmgToYou 1
+# 此模式可增加效率
+
+recordItemPickup 1
+#紀錄撿取的物品
+
+preferRoute_teleport 1
+
+cartAuto 2
+# 使用手推車 - 自動放置(拿取)物品(0=關、1=開、2=開啟手推車放到倉庫)
+# 設 1 時 只會將 items_control 中物品存倉設定為 2 的從手推車放入倉庫
+
+recordGuildMember 0
+# 紀錄工會成員上下線
+
+itemsGreedyMode 1
+# 貪婪撿物模式(超過負重上限回存點途中遇怪攻擊仍把怪物清完並撿取)(0=關、1=開)
+
+dcOnAtkMiss 0
+# 攻擊怪物未擊中超過次數立即登出(0=關、n=次數)
+teleportAuto_AtkMiss 0
+# 攻擊怪物未擊中超過次數立即順移(0=關、n=次數)
+
+teleportAuto_useSkill 0
+# 使用技能瞬間移動(0=關、1=開-會消耗SP)
+teleportAuto_onSitting 1
+# 坐下時仍然發送順移封包(0=關、1=開)
+
+useSelf_skill_smartAutomake
+# 自動選擇製作的物品(不包括屬性及星星)
+useSelf_skill_smartAutoarrow_item 秘銀之衣(1洞),土人之角,腳鍊,加勒結晶,銳利錐子,土靈礦石,水靈礦石,風靈礦石,火靈礦石,鰓刺
+# 自動選擇製作箭的物品
+
+useSelf_skill_$i_stopWhenAttack
+# 於攻擊時停止使用此技能(0=關、1=開)
+
+attackSkillSlot_$i_checkItemEx
+useSelf_skill_$i_checkItemEx
+useSelf_item_$i_checkItemEx
+# 使用前確認是否擁有特定物品(可包含多樣物品，只需要擁有其中一樣)
+
+attackSkillSlot_$i_checkItem
+useSelf_skill_$i_checkItem
+useSelf_item_$i_checkItem
+# 使用前確認是否擁有指定物品(可包含多樣物品，必需要擁有全部)
+
+attackSkillSlot_$i_unSteal 0
+# 怪物未被偷竊的時候使用
+attackSkillSlot_$i_monstersNot
+# 不使用此技能對應之怪物，請打上怪物中文名稱並以逗號隔開(空白=不限制)
+
+attackSkillSlot_$i_unLockOnly 0
+useSelf_skill_$i_unLockOnly 0
+# 限定未再鎖定地圖時使用此技能
+
+preferRoute_teleport 1
+
+attackAuto_unLockOnly 0
+# 只在非鎖定地圖戰鬥
+attackAuto_inLockOnly 0
+# 只在鎖定地圖戰鬥
+
+cartMaxWeight 95
+
+attackBerserk 1
+# 不放棄已經鎖定的怪(0=關、1=開)
+# 也就是搶怪設定 自行決定是否使用
+
+itemsDropAuto 0
+# 開啟自動丟棄在 pickupitems 裡面檢取設定為 -1 的物品
+
+warpPortalRandomDist 5
+# 施放傳陣ㄉ隨機距離 預設為 3
+
+stealOnly 0
+# 偷竊到物品後放棄目標 (0=關、1=開)
+
+useSelf_skill_smartAutospell 冰箭術
+
+saveMap_warpToBuyOrSell 1
+
+teleportAuto_onSteal 0
+#當你使用偷竊技能成功時自動瞬移
+
+teleportAuto_deadly 1
+#當受到的傷害可能會造成死亡時順移
+teleportAuto_whenDmgToYou 0
+#當受到傷害時順移(封包)
+teleportAuto_onHit 0
+#當受到傷害時順移(AI)
+teleportAuto_maxDmg 500
+# 失血多少以上就瞬移
+
+hideMsg_arrowRemove 1
+hideMsg_attackDmgFromYou 0
+recordPlayerInfo 0
+
+dcOnYourName 1
+# 當聊天或公告出限你的名字 就登出
+
+dealAuto 2
+# 自動接受交易(0=關、1=自動取消、2=自動接受並且進行交易)
+partyAuto 2
+# 自動加入組隊(0=關、1=自動取消、2=自動接受)
+guildAuto 2
+# 自動加入工會(0=關、1=自動取消、2=自動接受)
+
+master_name_0 Alfheim(chaos, loki)
+master_host_0 61.220.60.11
+master_port_0 6900
+master_version_0 5
+
+master_name_1 Asgard(lidia, sakray, idun)
+master_host_1 61.220.60.36
+master_port_1 6900
+master_version_1 5
+
+master_name_2 Jotunheim(iris, penril)
+master_host_2 61.220.56.147
+master_port_2 6900
+master_version_2 5
+
+master_name_3 Muspelheim(sara, odin, thor)
+master_host_3 61.220.56.132
+master_port_3 6900
+master_version_3 5
+
+master_name_4 Midgard(balder, freyia, heimdall, gerd)
+master_host_4 61.220.62.30
+master_port_4 6900
+master_version_4 5
+
+master_name_5 Midgard(honir, aegir, bragi)
+master_host_5 61.220.62.30
+master_port_5 6900
+master_version_5 5
+
+master_name_6 Niflheim(?)
+master_host_6 61.220.62.28
+master_port_6 6900
+master_version_6 5
+
+master_name_7 Urtgard(grimnir, tyr)
+master_host_7 203.69.46.166
+master_port_7 6900
+master_version_7 5
+
+master_name_8 Manaheim(geiriod, hel)
+master_host_8 203.69.46.167
+master_port_8 6900
+master_version_8 5
+
+master_name_9 Taiwan Test server
+master_host_9 61.220.62.26
+master_port_9 6900
+master_version_9 5
+
+master_name_10 PK SERVER
+master_host_10 220.130.120.1
+master_port_10 6900
+master_version_10 5
+
+# charServer_host 38.144.194.195
+# charServer_port 5000
+
+server_name Iris-2B
+#server_name Iris-2A
+
+teleportAuto_param1 1
+itemsImportantAuto 10
+NotAttackDistance 0
+
+teleportAuto_skill_0 自盡,自我毀滅,怒爆,無影之牙
+teleportAuto_skill_0_castBy 2
+teleportAuto_skill_0_castOn 1,4,8,16
+teleportAuto_skill_0_dist 3
+teleportAuto_skill_0_inCity 0 
+teleportAuto_skill_0_randomWalk 
+
+teleportAuto_skill_1 強酸攻擊,火煙瓶投擲,火柱攻擊,暴風雪,怒雷強擊,隕石術,崩裂術,騎乘攻擊,無影之牙,卸除盾牌,卸除鎧甲,卸除頭盔,卸除武器,野蠻凶砍
+teleportAuto_skill_1_castBy 2
+teleportAuto_skill_1_castOn 1,2,4,8,16
+teleportAuto_skill_1_dist 10
+teleportAuto_skill_1_inCity 0
+teleportAuto_skill_1_randomWalk 
+
+teleportAuto_skill_2 強酸攻擊,火煙瓶投擲,火柱攻擊,冰凍術,狂擊,無影之牙,音速投擲,卸除盾牌,卸除鎧甲,卸除頭盔,卸除武器,野蠻凶砍,Unknown 347
+teleportAuto_skill_2_castBy 2
+teleportAuto_skill_2_castOn 1
+teleportAuto_skill_2_dist 0
+teleportAuto_skill_2_inCity 0 
+teleportAuto_skill_2_randomWalk 
+
+
+teleportAuto_spell_0 傳送之陣,冰刃之牆
+teleportAuto_spell_0_castBy 4,8
+teleportAuto_spell_0_dist 2
+teleportAuto_spell_0_inCity 0 
+teleportAuto_spell_0_randomWalk 3,5
+
+teleportAuto_spell_1 強酸攻擊,火煙瓶投擲,火柱攻擊,暴風雪,怒雷強擊,隕石術,崩裂術,無影之牙
+teleportAuto_spell_1_castBy 2,8
+teleportAuto_spell_1_dist 10
+teleportAuto_spell_1_inCity 0
+teleportAuto_spell_1_randomWalk 
+
+teleportAuto_spell_2 定位陷阱,魔耗陷阱,睡魔陷阱
+teleportAuto_spell_2_castBy 2,8
+teleportAuto_spell_2_dist 3
+teleportAuto_spell_2_inCity 0
+teleportAuto_spell_2_randomWalk 
+
+equipAuto_teleport 髮夾(1洞) [克瑞米卡片],128
+
+dcOnDualLogin 1
+
+debug 0
+debug_packet 0
+
+itemsImportantAuto 15
+
+partyAutoDeny 0
+
+ignoreAll 0
+
+recordLocation 0
+
+petAuto_feed 70
+petAuto_return 1000
+petAuto_protect 1
+
+dcOnGM_ignoreArea 1,4
+
+dcOnGM_paranoia 1
+
+dcOnSkillBan 1
+
+dcOnWord_quote 0
+dcOnWord_split
+
+dcOnGM 1
+dcOnGM_ignoreArea 0
+dcOnGM_count 0
+
+dcOnGM_paranoia 1
+dcOnSkillBan 1
+
+dcOnChatWord 我是官方新幹線BOT緝查小組,將對您做出以下測試,為確保您的權益,請您遵守遊戲規章給我回應,若您不同意,請給我一個回應,只要任何的文字或數字都可以,麻煩您給我一個回應,現在將依遊戲規章第十三條對您做測試,有意見請提出,您可以登入表示您鍵盤沒問題,請給我回應表示您人在電腦前,確保,遵守,回 應,規 章,強制離線,離開傳送點,GM01,GM02,GM03
+
+dcOnSysWord 我是官方新幹線BOT緝查小組,將對您做出以下測試,為確保您的權益,請您遵守遊戲規章給我回應,若您不同意,請給我一個回應,只要任何的文字或數字都可以,麻煩您給我一個回應,現在將依遊戲規章第十三條對您做測試,有意見請提出,您可以登入表示您鍵盤沒問題,請給我回應表示您人在電腦前,確保,遵守,回 應,規 章,強制離線,離開傳送點,GM01,GM02,GM03
+
+storageAuto_npc 54224
+
+sellAuto_npc 54178
+
+buyAuto_0_npc 51730
+
+talkAuto_npc 55699
+# 指定NPC編號
+talkAuto_npc_dist 10
+# 與談話NPC對話之隨機距離(格)
+talkAuto_npc_steps c r0 c r0 n
+# 與指定NPC對話之順序，請以空白隔開
+# (c='talk cont'、r#='talk resp #'、a#='talk answer #'、n='talk no')
+talkAuto_hp 0
+# HP低於多少百分比時啟動自動談話功能(%)
+talkAuto_sp 0
+# SP低於多少百分比時啟動自動談話功能(%)
+talkAuto_peace 0 
+# 目前任務為attack時不觸發talkAuto功能(0=關、1=開)
+
+talkAuto_broken 1
+# 物品損壞時觸發talkAuto功能(0=關、1以上=指定數量)
+
+talkAuto_zeny 10000
+
+sex 
+
+guildAutoInfo 1
+# 自動索取公會資訊間隔時間(0=關、1以上=間隔時間(秒))
+
+recordLocation 0
+recordMonsterInfo 0 
+
+recordExp 2
+recordExp_timeout 3600
+
+waitRecon 5,10
