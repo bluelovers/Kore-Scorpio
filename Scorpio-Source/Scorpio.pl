@@ -18,6 +18,12 @@ use Getopt::Long;
 use Compress::Zlib;
 
 use Time::Local;
+use Utils::Crypton;
+use Math::Trig;
+
+#use warnings;
+#use diagnostics;
+#發生錯誤時會有詳盡的解釋，一些類似教學的東東 
 
 unshift @INC, '.';
 
@@ -35,6 +41,7 @@ require 'sc_event.pl';
 require 'ai_funs.pl';
 require 'ai_route.pl';
 require 'ai_npc.pl';
+require 'ai_cmd.pl';
 
 #require 'mod_route.pl';
 
@@ -59,7 +66,8 @@ require 'Scorpio_version.pl';
 	addVersionText("koreSE2.2","kisa76347","");
 	addVersionText("mKore-2.05.04","Harry","http://mkore.hn.org");
 	addVersionText("KoreSP 940401","小沙","");
-	addVersionText("","","");
+	addVersionText("mKore-2.06.02","Harry","http://mkore.hn.org");
+	addVersionText("PkoreSE 0.1.94.3","Pentel837","2005/10/05");
 	addVersionText("","","");
 	addVersionText("","","");
 	addVersionText("","","");
@@ -127,6 +135,20 @@ require 'Scorpio_version.pl';
 	addFixerValue('timeout', 'ai_skill_use_send', 0.1);
 	addFixerValue('timeout', 'ai_skill_cast_wait', 1);
 	addFixerValue('timeout', 'ai_kore_sleepTime', 10);
+	addFixerValue('timeout', 'ai_code_request', 1);
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
+	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
@@ -268,8 +290,8 @@ require 'Scorpio_version.pl';
 
 	addFixerValue('config', 'partyAutoParam', "1,0");
 	addFixerValue('config', 'useSelf_item', 1);
-	addFixerValue('config', '');
-	addFixerValue('config', '');
+	addFixerValue('config', 'storageAuto_encryptKey', '', 2);
+	addFixerValue('config', 'attackAuto_checkMethod', 1);
 	addFixerValue('config', '');
 	addFixerValue('config', '');
 	addFixerValue('config', '');
@@ -408,6 +430,8 @@ require 'Scorpio_version.pl';
 			,$show
 			,["Version: $sc_v{'Scorpio'}{'version'}"]
 			,$show
+			,["ActivePerl $] - $^O"]
+			,$show
 #			,["Modify By $mod Update ".getupdateDay(".")])
 			,["Modify By $mod Update $sc_v{'Scorpio'}{'update'}"])
 			;
@@ -541,8 +565,8 @@ undef @{$sc_v{'parseFiles'}};
 
 our ($quit);
 
-addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2_new, "", 0, "$sc_v{'path'}{'control'}/plus_*.txt");
-addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
+addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2_new, "主要程式執行設定檔", 0, "$sc_v{'path'}{'control'}/plus_*.txt");
+addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2, "X-Kore 模式設定檔");
 load(\@{$sc_v{'parseFiles'}}, 0, 1);
 
 $sc_v{'kore'}{'multiPortals'} = $config{'multiPortals'}?1:0;
@@ -580,64 +604,27 @@ setColor($FG_LIGHTCYAN);
 #;
 
 if ($sc_v{'Scorpio'}{'checkVer'}) {
-
+	
 	print <<"EOM";
-
-	BLUELOVERS
-	http://bluelovers.idv.st/
-
-	有什麼問題建議就去發表於此站內的論壇
-	如果有BUG也回報在此
-
-	Yahoo! 網上聯盟 : bluelovers-Scorpio
-	http://hk.groups.yahoo.com/group/bluelovers-Scorpio/
-
-	請至 檔案 > kore > help 查看設定說明檔
-
-	歡迎下載
-		control / plus_維修時間.txt <== 這ㄇ明顯 不需要解釋吧..
-		Tools / data2.rar
-			自製可以看到城戰地圖(有一點點是我畫的...)
-			解壓縮到 ro 資料夾內
-			不過要有先安裝雙視窗才可以
-			要不然沒用
-
-	partyAutoParam 1,1
-	\# 2005-9-24(六) 更新之建立隊伍參數格式:[物品共享,物品隨機均分]
-
-	修正在某些條件下 無法行走到鎖定地圖
-
-	--------------------
-
-	程式更新時
-	雖然一定是有修正以前的某些問題
-	但是也不代表以前沒出現的問題不會出現
-
-	-- 未測試之新功能 --
-
-	dcOnWord_checkNpc 1
-	\# 於公告發現指定GM關鍵字時，檢查是否為NPC公告，如果是則忽略(0=關、1=開)
-
-	--------------------
-
-	懶的測試 所以有測試的人回報看看
-
-	--------------------
-
-	recvpackets.txt 新增 01EC -1
-	誰知道正確長度的在跟我說
-
-	--------------------
-
-	決定輕量化執行檔大小
-	以減輕更新時的流量問題(少了四百K差狠多)
-
-	以後的版本需要 perl58.dll
-	之前的版本即使沒有 perl58.dll 也可以執行
-
-	請至檔案區挑選 合適的 perl58.dll (相對的 程式執行速度也會比較快)
+	
+	新增 storagegetAuto_smartAdd 1
+	\# 當物品無法成功放置入倉庫時、略過放置該樣物品(0=關、1=開)
+	\# 適合給經常爆倉、而且不會因為此開關而造成其他錯誤
+	\# 不適合使用之類型: 太多物品無法放倉 造成負重而無法回血 連續死亡
+	
 EOM
 ;
+
+#	print <<"EOM";
+#
+#	BLUELOVERS
+#	http://bluelovers.idv.st/
+#
+#	有什麼問題建議就去發表於此站內的論壇
+#	如果有BUG也回報在此
+#
+#EOM
+#;
 
 #	print <<"EOM";
 #
@@ -1109,7 +1096,7 @@ addParseFiles("$sc_v{'path'}{'control'}/importantitems.txt", \@importantItems, \
 addParseFiles("$sc_v{'path'}{'control'}/items_control.txt", \%items_control, \&parseItemsControl, '設定自動存放、自動賣出之物品清單');
 addParseFiles("$sc_v{'path'}{'control'}/map_control.txt", \%map_control, \&parseMapControl, '設定限制瞬移及指定活動之地圖清單');
 addParseFiles("$sc_v{'path'}{'control'}/mon_control.txt", \%mon_control, \&parseMonControl, '設定自動攻擊、自動逃離、自動搜尋之怪物清單');
-#addParseFiles("$sc_v{'path'}{'control'}/overallauth.txt", \%overallAuth, \&parseDataFile, '設定授權使用遙控功能之玩家清單');
+addParseFiles("$sc_v{'path'}{'control'}/overallauth.txt", \%overallAuth, \&parseDataFile, '設定授權使用遙控功能之玩家清單');
 addParseFiles("$sc_v{'path'}{'control'}/pfroute.txt", \@preferRoute, \&parsePreferRoute, '設定指定行走之偏好路徑清單');
 addParseFiles("$sc_v{'path'}{'control'}/pickupitems.txt", \%itemsPickup, \&parseDataFile_lc, '設定要自動撿取之物品清單');
 #addParseFiles("$sc_v{'path'}{'control'}/responses.txt", \%responses, \&parseResponses, '設定遠端遙控之回應清單');
@@ -1363,18 +1350,26 @@ while ($quit != 1) {
 			$timeout{'injectKeepAlive'}{'time'} = time;
 		}
 	}
-	$ai_cmdQue_shift = 0;
-	do {
-		AI(\%{$ai_cmdQue[$ai_cmdQue_shift]}) if (
-			!$ai_v{'teleOnGM'}
-			&& $sc_v{'input'}{'conState'} == 5
-			&& checkTimeOut('ai')
-			&& $remote_socket
-			&& $remote_socket->connected()
-		);
-		undef %{$ai_cmdQue[$ai_cmdQue_shift++]};
-		$ai_cmdQue-- if ($ai_cmdQue > 0);
-	} while ($ai_cmdQue > 0);
+#	$ai_cmdQue_shift = 0;
+#	do {
+#		AI(\%{$ai_cmdQue[$ai_cmdQue_shift]}) if (
+#			!$ai_v{'teleOnGM'}
+#			&& $sc_v{'input'}{'conState'} == 5
+#			&& checkTimeOut('ai')
+#			&& $remote_socket
+#			&& $remote_socket->connected()
+#		);
+#		undef %{$ai_cmdQue[$ai_cmdQue_shift++]};
+#		$ai_cmdQue-- if ($ai_cmdQue > 0);
+#	} while ($ai_cmdQue > 0);
+	
+	AI() if (
+		!$ai_v{'teleOnGM'}
+		&& $sc_v{'input'}{'conState'} == 5
+		&& checkTimeOut('ai')
+		&& $remote_socket
+		&& $remote_socket->connected()
+	);
 
 	checkConnection();
 }
