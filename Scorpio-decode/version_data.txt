@@ -1,0 +1,15 @@
+#--------------------------
+
+version 5.10.25.5
+update 25/10/05 - 06:11:58
+regkey bcfad2eae24b6d82a0da7117a7369a10
+chkkey NEl7afVkERK.k
+MD5 c4c699871c3c6a94c1e5f80753f982ca
+
+old_version 5.10.25.4
+old_update 25/10/05 - 06:11:51
+old_regkey 4a58993fda89b086a348c6092fdbeee9
+old_chkkey ZapsUBizCAEno
+old_MD5 ff8dfb1e4128d1803a59132a2842e9e4
+
+#--------------------------
