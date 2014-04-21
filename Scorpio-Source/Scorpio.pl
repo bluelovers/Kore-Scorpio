@@ -15,6 +15,7 @@ use Win32::Process;
 use Win32::Sound;
 use Digest::MD5 qw(md5 md5_hex);
 use Getopt::Long;
+use Compress::Zlib;
 
 use Time::Local;
 
@@ -121,59 +122,152 @@ require 'Scorpio_version.pl';
 	addFixerValue('timeout', 'injectKeepAlive', 12);
 	addFixerValue('timeout', 'ai_first_wait', 5);
 	addFixerValue('timeout', 'ai_teleport_player', 3);
+	addFixerValue('timeout', 'ai_talkAuto', 2);
+	addFixerValue('timeout', 'ai_teleport_waitAfterKill', 1);
+	addFixerValue('timeout', 'ai_skill_use_send', 0.1);
+	addFixerValue('timeout', 'ai_skill_cast_wait', 1);
+	addFixerValue('timeout', 'ai_kore_sleepTime', 10);
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
 	addFixerValue('timeout', '');
 
-	addFixerValue('config', 'dcOnYourName', 1, 1);
-	addFixerValue('config', 'map_port', 5000);
-	addFixerValue('config', 'dcOnGM', 1, 1);
-	addFixerValue('config', 'attackAuto_takenByMonsters', '茲諾克,工蟻,兵蟻,波利,土波利,波波利,盜蟲,瑪勒盜蟲,溜溜猴,庫克雷,魔鍋蛋,狂暴野貓,舞獅,綠龍蠅,綠盜蟲,大盜蟲');
-	addFixerValue('config', 'itemsTakeDist', 2, 1);
-	addFixerValue('config', 'autoCheckItemUse', 1200);
-	addFixerValue('config', 'attackAuto_takenBy', 2, 8);
-	addFixerValue('config', 'unstuckAuto_indoor', 25, 1);
-	addFixerValue('config', 'serverType', 0, 2);
-	addFixerValue('config', 'partyAuto', 2);
-	addFixerValue('config', 'recordItemPickup', 1);
+#	addFixerValue('config', 'dcOnYourName', 1);
+#	addFixerValue('config', 'map_port', 5000);
+#	addFixerValue('config', 'dcOnGM', 1, 1);
+#	addFixerValue('config', 'attackAuto_takenByMonsters', '茲諾克,工蟻,兵蟻,波利,土波利,波波利,盜蟲,瑪勒盜蟲,溜溜猴,庫克雷,魔鍋蛋,狂暴野貓,舞獅,綠龍蠅,綠盜蟲,大盜蟲,綠蒼蠅');
+#	addFixerValue('config', 'itemsTakeDist', 3, 1);
+#	addFixerValue('config', 'autoCheckItemUse', 1200);
+#	addFixerValue('config', 'attackAuto_takenBy', 2, 8);
+#	addFixerValue('config', 'unstuckAuto_indoor', 25, 1);
+#	addFixerValue('config', 'serverType', 0, 2);
+#	addFixerValue('config', 'partyAuto', 2);
+#	addFixerValue('config', 'recordItemPickup', 1);
+#	addFixerValue('config', 'NotAttackDistance', 1, 3);
+#	addFixerValue('config', 'attackAuto_preventParam1', '1,2,3,4,6', 1);
+#	addFixerValue('config', 'partyAutoCreate', 1);
+#	addFixerValue('config', 'storagegetAuto_uneqArrow', 0);
+#	addFixerValue('config', 'NotAttackNearSpell', 1);
+#	addFixerValue('config', 'modifiedWalkType', 0);
+#	addFixerValue('config', 'modifiedWalkDistance', 5);
+#	addFixerValue('config', 'teleportAuto_spell', 1);
+#	addFixerValue('config', 'petAuto_play', 1);
+#	addFixerValue('config', 'preferRoute_returnQuickly', 1);
+#	addFixerValue('config', 'preferRoute_warp', 1);
+#	addFixerValue('config', 'petAuto_intimate_lower', 300);
+#	addFixerValue('config', 'useSelf_skill', 1);
+#	addFixerValue('config', 'useSkill_smartCheck', 1);
+#	addFixerValue('config', 'attackSkillSlot', 1);
+#	addFixerValue('config', 'autoWarp_checkItem', '藍色魔力礦石');
+##	addFixerValue('config', 'hideMsg_takenByInfo', 1);
+#	addFixerValue('config', 'autoResurrect_checkItem', '藍色魔力礦石,天地樹葉子');
+##	addFixerValue('config', 'autoResurrect', 3);
+#	addFixerValue('config', 'autoResurrect_dist', 5);
+#	addFixerValue('config', 'autoResurrect_retry', 2);
+##	addFixerValue('config', 'dcOnDualLogin_protect', 1, 2);
+#	addFixerValue('config', 'dcOnDualLogin_protect', 1);
+##	addFixerValue('config', 'teleportAuto_search_portal', 150);
+##	addFixerValue('config', 'teleportAuto_search_portal_inCity', 1);
+#	addFixerValue('config', 'autoRoute_npcChoice', 1);
+#	addFixerValue('config', 'commandPrefix', '-', 2);
+#	addFixerValue('config', 'teleportAuto_away', 1);
+#	addFixerValue('config', 'teleportAuto_skill', 1);
+#	addFixerValue('config', 'route_NPC_distance', 2);
+#	addFixerValue('config', 'password_noChoice', 0);
+#	addFixerValue('config', 'attackAuto_unLock', 0, 2);
+##	addFixerValue('config', 'parseNpcAuto', 0, 2);
+#	addFixerValue('config', 'parseNpcAuto', 0);
+#	addFixerValue('config', 'updateNPC', 2, 7);
+#	addFixerValue('config', 'unstuckAuto_utcount_dll', 10);
+#	addFixerValue('config', 'message_length_max', 80);
+#	addFixerValue('config', 'route_randomWalk_maxRouteTime', 15);
+#	addFixerValue('config', 'route_step', 15);
+#	addFixerValue('config', 'waitRecon', '20, 10');
+#	addFixerValue('config', 'waitRecon_noChoice', 1);
+#	addFixerValue('config', 'unstuckAuto_margin', 7);
+#	addFixerValue('config', 'unstuckAuto_mfcount', 10);
+#	addFixerValue('config', 'unstuckAuto_rfcount', 10);
+#	addFixerValue('config', 'unstuckAuto_utcount', 3);
+#	addFixerValue('config', 'recordStorage', 1);
+#	addFixerValue('config', 'recordExp_timeout', 3600);
+#	addFixerValue('config', 'equipAuto', 1);
+#	addFixerValue('config', 'guildAutoEmblem', 0);
+#	addFixerValue('config', 'teleportAuto_maxUses', 5);
+#	addFixerValue('config', 'teleportAuto_waitAfterKill', 0);
+#	addFixerValue('config', 'teleportAuto_verbose', 1);
+#	addFixerValue('config', 'seconds_per_block', 0.12);
+#	addFixerValue('config', 'sleepTime', 5000);
+#	addFixerValue('config', 'dcOnSkillBan', 1);
+#	addFixerValue('config', 'dcOnGM', 1);
+#	addFixerValue('config', 'handyMove_step', 5);
+#	addFixerValue('config', 'recordExp', 3);
+#	addFixerValue('config', 'recordExp_timeout', 3600);
+#	addFixerValue('config', 'petAuto_protect', 1);
 	addFixerValue('config', 'NotAttackDistance', 1, 3);
-	addFixerValue('config', 'attackAuto_preventParam1', '1,2,3,4,6', 1);
-	addFixerValue('config', 'partyAutoCreate', 1);
-	addFixerValue('config', 'storagegetAuto_uneqArrow', 1);
 	addFixerValue('config', 'NotAttackNearSpell', 1);
-	addFixerValue('config', 'modifiedWalkType', 0);
-	addFixerValue('config', 'modifiedWalkDistance', 5);
-	addFixerValue('config', 'teleportAuto_spell', 1);
-	addFixerValue('config', 'petAuto_play', 1);
-	addFixerValue('config', 'preferRoute_returnQuickly', 1);
-	addFixerValue('config', 'preferRoute_warp', 1);
-	addFixerValue('config', 'petAuto_intimate_lower', 300);
-	addFixerValue('config', 'useSelf_skill', 1);
-	addFixerValue('config', 'useSkill_smartCheck', 1);
+	addFixerValue('config', 'attackAuto_preventParam1', '1,2,3,4,6', 1);
+	addFixerValue('config', 'attackAuto_takenBy', 2, 8);
+	addFixerValue('config', 'attackAuto_takenByMonsters', '茲諾克,工蟻,兵蟻,波利,土波利,波波利,盜蟲,瑪勒盜蟲,溜溜猴,庫克雷,魔鍋蛋,狂暴野貓,舞獅,綠龍蠅,綠盜蟲,大盜蟲,綠蒼蠅,裘卡');
+	addFixerValue('config', 'attackAuto_unLock', 0, 2);
 	addFixerValue('config', 'attackSkillSlot', 1);
-	addFixerValue('config', 'autoWarp_checkItem', '藍色魔力礦石');
-#	addFixerValue('config', 'hideMsg_takenByInfo', 1);
+	addFixerValue('config', 'autoCheckItemUse', 1200);
 	addFixerValue('config', 'autoResurrect_checkItem', '藍色魔力礦石,天地樹葉子');
-#	addFixerValue('config', 'autoResurrect', 3);
 	addFixerValue('config', 'autoResurrect_dist', 5);
 	addFixerValue('config', 'autoResurrect_retry', 2);
-#	addFixerValue('config', 'dcOnDualLogin_protect', 1, 2);
-	addFixerValue('config', 'dcOnDualLogin_protect', 1);
-#	addFixerValue('config', 'teleportAuto_search_portal', 150);
-#	addFixerValue('config', 'teleportAuto_search_portal_inCity', 1);
 	addFixerValue('config', 'autoRoute_npcChoice', 1);
+	addFixerValue('config', 'autoWarp_checkItem', '藍色魔力礦石');
 	addFixerValue('config', 'commandPrefix', '-', 2);
-	addFixerValue('config', 'teleportAuto_away', 1);
-	addFixerValue('config', 'teleportAuto_skill', 1);
-	addFixerValue('config', 'route_NPC_distance', 2);
+	addFixerValue('config', 'dcOnDualLogin_protect', 1);
+	addFixerValue('config', 'dcOnGM', 1);
+	addFixerValue('config', 'dcOnSkillBan', 1);
+	addFixerValue('config', 'dcOnYourName', 1);
+	addFixerValue('config', 'equipAuto', 1);
+	addFixerValue('config', 'guildAutoEmblem', 0);
+	addFixerValue('config', 'handyMove_step', 5);
+	addFixerValue('config', 'itemsTakeDist', 3, 1);
+	addFixerValue('config', 'map_port', 5000);
+	addFixerValue('config', 'message_length_max', 80);
+	addFixerValue('config', 'modifiedWalkDistance', 5);
+	addFixerValue('config', 'modifiedWalkType', 0);
+	addFixerValue('config', 'parseNpcAuto', 0);
+	addFixerValue('config', 'partyAuto', 2);
+	addFixerValue('config', 'partyAutoCreate', 1);
 	addFixerValue('config', 'password_noChoice', 0);
-	addFixerValue('config', 'attackAuto_unLock', 0, 2);
-	addFixerValue('config', 'parseNpcAuto', 0, 2);
+	addFixerValue('config', 'petAuto_intimate_lower', 300);
+	addFixerValue('config', 'petAuto_play', 1);
+	addFixerValue('config', 'petAuto_protect', 1);
+	addFixerValue('config', 'preferRoute_returnQuickly', 1);
+	addFixerValue('config', 'preferRoute_warp', 1);
+	addFixerValue('config', 'recordExp', 3);
+	addFixerValue('config', 'recordExp_timeout', 3600);
+	addFixerValue('config', 'recordItemPickup', 1);
+	addFixerValue('config', 'recordStorage', 1);
+	addFixerValue('config', 'route_NPC_distance', 2);
+	addFixerValue('config', 'route_randomWalk_maxRouteTime', 15);
+	addFixerValue('config', 'route_step', 15);
+	addFixerValue('config', 'seconds_per_block', 0.12);
+	addFixerValue('config', 'serverType', 0, 2);
+	addFixerValue('config', 'sleepTime', 50000);
+	addFixerValue('config', 'storagegetAuto_uneqArrow', 0);
+	addFixerValue('config', 'teleportAuto_away', 1);
+	addFixerValue('config', 'teleportAuto_maxUses', 5);
+	addFixerValue('config', 'teleportAuto_skill', 1);
+	addFixerValue('config', 'teleportAuto_spell', 1);
+	addFixerValue('config', 'teleportAuto_verbose', 1);
+	addFixerValue('config', 'teleportAuto_waitAfterKill', 0);
+	addFixerValue('config', 'unstuckAuto_indoor', 25, 1);
+	addFixerValue('config', 'unstuckAuto_margin', 7);
+	addFixerValue('config', 'unstuckAuto_mfcount', 10);
+	addFixerValue('config', 'unstuckAuto_rfcount', 10);
+	addFixerValue('config', 'unstuckAuto_utcount', 3);
+	addFixerValue('config', 'unstuckAuto_utcount_dll', 10);
 	addFixerValue('config', 'updateNPC', 2, 7);
-	addFixerValue('config', '');
-	addFixerValue('config', '');
-	addFixerValue('config', '');
-	addFixerValue('config', '');
+	addFixerValue('config', 'useSelf_skill', 1);
+	addFixerValue('config', 'useSkill_smartCheck', 1);
+	addFixerValue('config', 'waitRecon', '20, 10');
+	addFixerValue('config', 'waitRecon_noChoice', 1);
+
+	addFixerValue('config', 'partyAutoParam', "1,0");
+	addFixerValue('config', 'useSelf_item', 1);
 	addFixerValue('config', '');
 	addFixerValue('config', '');
 	addFixerValue('config', '');
@@ -182,6 +276,17 @@ require 'Scorpio_version.pl';
 	addFixerValue('config', '');
 
 	addFixerValue('option', 'X-Kore_exeName', 'ragexe.exe');
+	addFixerValue('option', 'kore_displayMode', 1);
+
+	addFixerValue('autoLogoff', 'GM01B', 1);
+	addFixerValue('autoLogoff', 'GM02B', 1);
+	addFixerValue('autoLogoff', 'GM03B', 1);
+	addFixerValue('autoLogoff', 'GM01A', 1);
+	addFixerValue('autoLogoff', 'GM02A', 1);
+	addFixerValue('autoLogoff', 'GM03A', 1);
+	addFixerValue('autoLogoff', 'GM01', 1);
+	addFixerValue('autoLogoff', 'GM02', 1);
+	addFixerValue('autoLogoff', 'GM03', 1);
 
 	addFixerExValue('timeout', 'ai_take_giveup_important', 'ai_take_giveup');
 	addFixerExValue('timeout', 'ai_take_giveup_gather', 'ai_take_giveup');
@@ -192,11 +297,15 @@ require 'Scorpio_version.pl';
 
 	addFixerExValue('config', 'useSelf_smartAutomake', 'useSelf_skill_smartAutomake');
 	addFixerExValue('config', 'useSelf_smartAutoarrow', 'useSelf_skill_smartAutoarrow_item');
+	addFixerExValue('config', 'partyAuto', 'partyAutoDeny');
+	addFixerExValue('config', 'guildAuto', 'guildAutoDeny');
 	addFixerExValue('config', '', '');
 	addFixerExValue('config', '', '');
 	addFixerExValue('config', '', '');
-	addFixerExValue('config', '', '');
-	addFixerExValue('config', '', '');
+
+	addFixerExValue('myShop', 'shop_title', 'title');
+	addFixerExValue('myShop', '', '');
+	addFixerExValue('myShop', '', '');
 
 	if ($sc_v{'Scorpio'}{'checkUser'}) {
 		addFixerValue('config', 'attackBerserk', 1, 4);
@@ -207,7 +316,8 @@ require 'Scorpio_version.pl';
 #		ai_event_checkUser_free(1);
 #
 #		addFixerValue('config', 'attackBerserk', 3, 4);
-		addFixerValue('config', 'parseNpcAuto', 0);
+#		addFixerValue('config', 'parseNpcAuto', 0);
+#		addFixerValue('config', 'serverType', 0);
 	}
 
 	@{$sc_v{'valBolck'}} = (
@@ -247,6 +357,10 @@ require 'Scorpio_version.pl';
 
 	@{$sc_v{'valBan'}} = (
 		  '4294806'
+	);
+
+	@{$sc_v{'valBan_name'}} = (
+		  'Miss兔'
 	);
 
 	sub addVersionText {
@@ -335,7 +449,8 @@ $sc_v{'Console'}{'original'} = $CONSOLE->Attr();
 	fields	=> "fields",
 	logs	=> "logs",
 	delay	=> 0,
-	plugin	=> "plugin"
+	plugin	=> "plugin",
+	ebm2bmp	=> "ebm2bmp"
 );
 
 &GetOptions(
@@ -346,6 +461,7 @@ $sc_v{'Console'}{'original'} = $CONSOLE->Attr();
 	, 'help'	, \$help
 	, 'delay=s'	, \$sc_v{'path'}{'delay'}
 	, 'plugin=s'	, \$sc_v{'path'}{'plugin'}
+	, 'ebm2bmp=s'	, \$sc_v{'path'}{'ebm2bmp'}
 );
 
 if ($help) {
@@ -394,7 +510,7 @@ if (!$sc_v{'path'}{'delay'}) {
 #srand(time());
 #$versionText  = "***Kore 0.93.191 - Ragnarok Online Bot - http://kore.sourceforge.net/ ***\n";
 #$versionText .= "***型號:[Tiffany I], 製作者:[阿用], 出廠:[2004/05/08], 下次升級:[未知]***\n\n";
-printC("$sc_v{versionText}\n", "version");
+printC("$sc_v{versionText}\n", "version", 1);
 
 # Make logs directory if necessary
 unless (-e "$sc_v{'path'}{'logs'}/") {
@@ -409,6 +525,10 @@ unless (-e "$sc_v{'path'}{'plugin'}/") {
 	mkdir("$sc_v{'path'}{'plugin'}/", 0777) or die '無法產生擴充目錄';
 }
 
+unless (-e "$sc_v{'path'}{'ebm2bmp'}/") {
+	mkdir("$sc_v{'path'}{'ebm2bmp'}/", 0777) or die '無法產生emp目錄';
+}
+
 #sleep(1);
 
 if ($sc_v{'path'}{'delay'}) {
@@ -421,7 +541,7 @@ undef @{$sc_v{'parseFiles'}};
 
 our ($quit);
 
-addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2, "", 0, "$sc_v{'path'}{'control'}/plus_*.txt");
+addParseFiles("$sc_v{'path'}{'control'}/config.txt", \%config, \&parseDataFile2_new, "", 0, "$sc_v{'path'}{'control'}/plus_*.txt");
 addParseFiles("$sc_v{'path'}{'control'}/option.txt", \%option, \&parseDataFile2);
 load(\@{$sc_v{'parseFiles'}}, 0, 1);
 
@@ -463,26 +583,59 @@ if ($sc_v{'Scorpio'}{'checkVer'}) {
 
 	print <<"EOM";
 
-	臨時論壇
+	BLUELOVERS
 	http://bluelovers.idv.st/
 
-	有什麼問題建議就去發表吧
+	有什麼問題建議就去發表於此站內的論壇
 	如果有BUG也回報在此
-	以後我將不會在回答有人問過ㄉ問題
 
 	Yahoo! 網上聯盟 : bluelovers-Scorpio
 	http://hk.groups.yahoo.com/group/bluelovers-Scorpio/
 
-	請至 檔案 > kore > help 下載新增設定說明檔
+	請至 檔案 > kore > help 查看設定說明檔
 
-	關於倉庫密碼請至網站自行查看說明
+	歡迎下載
+		control / plus_維修時間.txt <== 這ㄇ明顯 不需要解釋吧..
+		Tools / data2.rar
+			自製可以看到城戰地圖(有一點點是我畫的...)
+			解壓縮到 ro 資料夾內
+			不過要有先安裝雙視窗才可以
+			要不然沒用
 
-	解除強制啟動相同帳號登入保護模式
+	partyAutoParam 1,1
+	\# 2005-9-24(六) 更新之建立隊伍參數格式:[物品共享,物品隨機均分]
 
-	updateNPC 2
-	\# 當同座標且同名稱之NPC的編號有更動時，自動更新tables/npcs.txt中該NPC之編號
-	\# (0=關、1=開、2=新型更新方式-修正舊有BUG)
+	修正在某些條件下 無法行走到鎖定地圖
 
+	--------------------
+
+	程式更新時
+	雖然一定是有修正以前的某些問題
+	但是也不代表以前沒出現的問題不會出現
+
+	-- 未測試之新功能 --
+
+	dcOnWord_checkNpc 1
+	\# 於公告發現指定GM關鍵字時，檢查是否為NPC公告，如果是則忽略(0=關、1=開)
+
+	--------------------
+
+	懶的測試 所以有測試的人回報看看
+
+	--------------------
+
+	recvpackets.txt 新增 01EC -1
+	誰知道正確長度的在跟我說
+
+	--------------------
+
+	決定輕量化執行檔大小
+	以減輕更新時的流量問題(少了四百K差狠多)
+
+	以後的版本需要 perl58.dll
+	之前的版本即使沒有 perl58.dll 也可以執行
+
+	請至檔案區挑選 合適的 perl58.dll (相對的 程式執行速度也會比較快)
 EOM
 ;
 
@@ -514,6 +667,10 @@ EOM
 #EOM
 #;
 	$sc_v{'Scorpio'}{'checkVer'} = 2;
+
+	if ($sc_v{'path'}{'delay'}) {
+		sleep ($sc_v{'path'}{'delay'});
+	}
 }
 
 {
@@ -590,7 +747,7 @@ EOM
 #		print "useragent->status = ".$useragent->status."\n";
 #		print "useragent->status_message = ".$useragent->status_message."\n";
 
-		if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
+		if ($request != 200) { printDie("Error：無法連接更新$sc_v{'kore'}{'exeName'}伺服器\n"); }
 
 		my (%tmp, $key, $value);
 
@@ -619,18 +776,20 @@ EOM
 		$tmp{'checkExpire'} = 1;
 
 		if ($tmp{'version'} eq "") {
-			print "Error：無法連接更新伺服器\n";
+			print "Error：無法連接更新$sc_v{'kore'}{'exeName'}伺服器\n";
 
 			if ($tmp{'checkExpire'}) {
 				printDie("$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式，請自行更新。\n");
 
-				kore_close();
+				kore_close($sc_v{'kore'}{'delay'});
 			} else {
 #				printDie("$sc_v{'kore'}{'exeName'}版本未過期，繼續使用程式。\n");
 			}
 
 			last;
 		}
+
+		$sc_v{'Scorpio'}{'MD5'} = $tmp{'MD5'};
 
 		($f_now, $f_old, $f_new) = getFilename($0);
 
@@ -647,7 +806,7 @@ EOM
 
 			$timeout{'ai_parseInput'}{'timeout'} = 10;
 
-			print "立即下載(y/n)？, $timeout{'ai_parseInput'}{'timeout'}秒後自動下載...\n";
+			print "立即下載(y/n)？, $timeout{'ai_parseInput'}{'timeout'}秒後自動取消下載...\n";
 
 			timeOutStart('ai_parseInput');
 			while (!checkTimeOut('ai_parseInput')) {
@@ -662,7 +821,7 @@ EOM
 				if ($tmp{'checkExpire'}) {
 					printDie("$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式，請更新程式。\n");
 
-					kore_close();
+					kore_close(1);
 				} else {
 					print "請自行更新程式版本\n";
 				}
@@ -670,6 +829,16 @@ EOM
 				last;
 			} else {
 				print "開始下載更新..";
+
+				if (-e "${f_new}") {
+					print ".失敗\n您已經下載過了新版執行檔 ${f_new} 請重新執行 ${f_new}\n";
+
+					open (FILE, "> koreSC.bat");
+					print FILE "call ${f_new} -control=%1  -tables=%2\n";
+					close FILE;
+
+					kore_close(1);
+				}
 			}
 
 #			if ($sc_v{'Scorpio'}{'checkVer'} > 1) {
@@ -688,7 +857,7 @@ EOM
 			$useragent = new HTTP::Lite;
 			$useragent->add_req_header('Cache-Control', 'nocache');
 			$request = $useragent->request($url_exe);
-			if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
+			if ($request != 200) { printDie("Error：無法連接更新$sc_v{'kore'}{'exeName'}伺服器\n"); }
 
 #			print @INC;
 
@@ -724,7 +893,7 @@ EOM
 
 			$spend_e = time;
 
-			print ".更新完成. 花費：".getSpend()."\n";
+			print ".更新完成. 花費：".getSpend($spend_s, $spend_e, 1)."\n";
 #			print "請重新執行 ${f_now}\n";
 			print <<"EOM";
 請重新執行 ${f_new}
@@ -738,7 +907,7 @@ EOM
 
 #			input_start();
 
-			kore_close();
+			kore_close($sc_v{'kore'}{'delay'});
 		} else {
 			sleep (2);
 		}
@@ -761,7 +930,7 @@ EOM
 			$useragent = new HTTP::Lite;
 			$useragent->add_req_header('Cache-Control', 'nocache');
 			$request = $useragent->request("http://bluelovers.myweb.hinet.net/kore/Gemini.exe");
-			if ($request != 200) { printDie("Error：無法連接更新伺服器\n"); }
+			if ($request != 200) { printDie("Error：無法連接更新Gemini伺服器\n"); }
 
 			open (FILE, "> Gemini.exe") or printDie("Error：$!\n");
 			binmode(FILE);
@@ -773,28 +942,28 @@ EOM
 
 			$spend_e = time;
 
-			print "下載完成. 花費：".getSpend()."\n";
+			print "下載完成. 花費：".getSpend($spend_s, $spend_e, 1)."\n";
 		}
 
 		undef $f_now, $f_old, $f_new, $useragent, $request, $spend_s, $spend_e;
 
 		#print $useragent->body() if ($request == 200 || 1);
 
-		sub getFileName {
-			my ($fname, $mode) = @_;
-			my $ex = ($mode?'.':'/');
-			my $pos;
-
-			$fname =~ s/\\/\//g;
-			#$fname =~ s/\.\.//g;
-			#$fname =~ s/%20/ /g;
-
-			if (($pos = rindex($fname, $ex)) != -1) {
-				$fname = substr($fname, $pos + 1);
-			}
-
-			return $fname;
-		}
+#		sub getFileName {
+#			my ($fname, $mode) = @_;
+#			my $ex = ($mode?'.':'/');
+#			my $pos;
+#
+#			$fname =~ s/\\/\//g;
+#			#$fname =~ s/\.\.//g;
+#			#$fname =~ s/%20/ /g;
+#
+#			if (($pos = rindex($fname, $ex)) != -1) {
+#				$fname = substr($fname, $pos + 1);
+#			}
+#
+#			return $fname;
+#		}
 
 		sub getFilename {
 			my $name = shift;
@@ -810,33 +979,6 @@ EOM
 #			print "$0 -> $file\n";
 
 			return ("${file}.exe", "${file}-old.exe", "$sc_v{'kore'}{'exeName'}-$tmp{'version'}.exe");
-		}
-
-		sub getSpend {
-			my ($w_sec, $w_hour, $w_min, $val, @arg);
-			$w_sec = int($spend_e - $spend_s);
-
-			if ($w_sec >= 3600) {
-				$w_hour = int($w_sec / 3600);
-				$w_sec %= 3600;
-			}
-
-			if ($w_sec >= 60) {
-				$w_min = int($w_sec / 60);
-				$w_sec %= 60;
-			}
-
-			$w_hour = "0" . $w_hour if ($w_hour < 10);
-			$w_min = "0" . $w_min if ($w_min < 10);
-			$w_sec = "0" . $w_sec if ($w_sec < 10);
-
-			push @arg, "$w_hour 小時" if ($w_hour > 0);
-			push @arg, "$w_min 分" if ($w_min > 0);
-			push @arg, "$w_sec 秒" if ($w_sec > 0);
-
-			$val = join(/ /, @arg);
-
-			return $val;
 		}
 
 		sub printDie {
@@ -908,54 +1050,103 @@ setColor($sc_v{'Console'}{'original'});
 #);
 ##Karasu End
 
-addParseFiles("$sc_v{'path'}{'control'}/items_control.txt", \%items_control, \&parseItemsControl, '設定自動存放、自動賣出之物品清單');
-addParseFiles("$sc_v{'path'}{'control'}/mon_control.txt", \%mon_control, \&parseMonControl, '設定自動攻擊、自動逃離、自動搜尋之怪物清單');
-addParseFiles("$sc_v{'path'}{'control'}/overallauth.txt", \%overallAuth, \&parseDataFile, '設定授權使用遙控功能之玩家清單');
-addParseFiles("$sc_v{'path'}{'control'}/pickupitems.txt", \%itemsPickup, \&parseDataFile_lc, '設定要自動撿取之物品清單');
-addParseFiles("$sc_v{'path'}{'control'}/responses.txt", \%responses, \&parseResponses, '設定遠端遙控之回應清單');
-addParseFiles("$sc_v{'path'}{'control'}/timeouts.txt", \%timeout, \&parseTimeouts);
-
-addParseFiles("$sc_v{'path'}{'tables'}/cities.txt", \%cities_lut, \&parseROLUT, '城市地圖名稱清單');
-addParseFiles("$sc_v{'path'}{'tables'}/emotions.txt", \%emotions_lut, \&parseDataFile2, '表情清單');
-addParseFiles("$sc_v{'path'}{'tables'}/equiptypes.txt", \%equipTypes_lut, \&parseDataFile2, '裝備類別清單');
-addParseFiles("$sc_v{'path'}{'tables'}/items.txt", \%items_lut, \&parseROLUT, '物品名稱清單');
-addParseFiles("$sc_v{'path'}{'tables'}/itemsdescriptions.txt", \%itemsDesc_lut, \&parseRODescLUT, '物品說明資料庫');
-addParseFiles("$sc_v{'path'}{'tables'}/itemslots.txt", \%itemSlots_lut, \&parseROSlotsLUT);
-addParseFiles("$sc_v{'path'}{'tables'}/itemtypes.txt", \%itemTypes_lut, \&parseDataFile2, '物品類別清單');
-addParseFiles("$sc_v{'path'}{'tables'}/jobs.txt", \%jobs_lut, \&parseDataFile2, '職業清單');
-addParseFiles("$sc_v{'path'}{'tables'}/maps.txt", \%maps_lut, \&parseROLUT, '地圖名稱清單');
-addParseFiles("$sc_v{'path'}{'tables'}/monsters.txt", \%monsters_lut, \&parseDataFile2, '怪物名稱清單');
-addParseFiles("$sc_v{'path'}{'tables'}/npcs.txt", \%npcs_lut, \&parseNPCs, ' NPC 清單');
-addParseFiles("$sc_v{'path'}{'tables'}/portals.txt", \%portals_lut, \&parsePortals, '傳點設定檔包含NPC傳點', 0, "$sc_v{'path'}{'tables'}/portals_*.txt");
-addParseFiles("$sc_v{'path'}{'tables'}/portalsLOS.txt", \%portals_los, \&parsePortalsLOS, '已編譯之傳點路徑');
-addParseFiles("$sc_v{'path'}{'tables'}/sex.txt", \%sex_lut, \&parseDataFile2, '性別清單');
-addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_lut, \&parseSkillsLUT, '技能清單');
-addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skillsID_lut, \&parseSkillsIDLUT);
-addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_rlut, \&parseSkillsReverseLUT_lc);
-addParseFiles("$sc_v{'path'}{'tables'}/skillsdescriptions.txt", \%skillsDesc_lut, \&parseRODescLUT, '技能說明資料庫');
-addParseFiles("$sc_v{'path'}{'tables'}/skillssp.txt", \%skillsSP_lut, \&parseSkillsSPLUT);
+#addParseFiles("$sc_v{'path'}{'control'}/items_control.txt", \%items_control, \&parseItemsControl, '設定自動存放、自動賣出之物品清單');
+#addParseFiles("$sc_v{'path'}{'control'}/mon_control.txt", \%mon_control, \&parseMonControl, '設定自動攻擊、自動逃離、自動搜尋之怪物清單');
+#addParseFiles("$sc_v{'path'}{'control'}/overallauth.txt", \%overallAuth, \&parseDataFile, '設定授權使用遙控功能之玩家清單');
+#addParseFiles("$sc_v{'path'}{'control'}/pickupitems.txt", \%itemsPickup, \&parseDataFile_lc, '設定要自動撿取之物品清單');
+#addParseFiles("$sc_v{'path'}{'control'}/responses.txt", \%responses, \&parseResponses, '設定遠端遙控之回應清單');
+#addParseFiles("$sc_v{'path'}{'control'}/timeouts.txt", \%timeout, \&parseTimeouts);
+#
+#addParseFiles("$sc_v{'path'}{'tables'}/cities.txt", \%cities_lut, \&parseROLUT, '城市地圖名稱清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/emotions.txt", \%emotions_lut, \&parseDataFile2, '表情清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/equiptypes.txt", \%equipTypes_lut, \&parseDataFile2, '裝備類別清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/items.txt", \%items_lut, \&parseROLUT, '物品名稱清單', 0, "$sc_v{'path'}{'plugin'}/items.txt");
+#addParseFiles("$sc_v{'path'}{'tables'}/itemsdescriptions.txt", \%itemsDesc_lut, \&parseRODescLUT, '物品說明資料庫');
+#addParseFiles("$sc_v{'path'}{'tables'}/itemslots.txt", \%itemSlots_lut, \&parseROSlotsLUT, "物品類別設定檔");
+#addParseFiles("$sc_v{'path'}{'tables'}/itemtypes.txt", \%itemTypes_lut, \&parseDataFile2, '物品類別清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/jobs.txt", \%jobs_lut, \&parseDataFile2, '職業清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/maps.txt", \%maps_lut, \&parseROLUT, '地圖名稱清單', 0, "$sc_v{'path'}{'plugin'}/maps.txt");
+#addParseFiles("$sc_v{'path'}{'tables'}/monsters.txt", \%monsters_lut, \&parseDataFile2, '怪物名稱清單', 0, "$sc_v{'path'}{'plugin'}/monsters.txt");
+#addParseFiles("$sc_v{'path'}{'tables'}/npcs.txt", \%npcs_lut, \&parseNPCs, ' NPC 清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/portals.txt", \%portals_lut, \&parsePortals, '傳點設定檔包含NPC傳點', 0, "$sc_v{'path'}{'tables'}/portals_*.txt");
+#addParseFiles("$sc_v{'path'}{'tables'}/portalsLOS.txt", \%portals_los, \&parsePortalsLOS, '已編譯之傳點路徑');
+#addParseFiles("$sc_v{'path'}{'tables'}/sex.txt", \%sex_lut, \&parseDataFile2, '性別清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_lut, \&parseSkillsLUT, '技能清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skillsID_lut, \&parseSkillsIDLUT);
+#addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_rlut, \&parseSkillsReverseLUT_lc);
+#addParseFiles("$sc_v{'path'}{'tables'}/skillsdescriptions.txt", \%skillsDesc_lut, \&parseRODescLUT, '技能說明資料庫');
+#addParseFiles("$sc_v{'path'}{'tables'}/skillssp.txt", \%skillsSP_lut, \&parseSkillsSPLUT);
+#
+#addParseFiles("$sc_v{'path'}{'control'}/autologoff.txt", \%autoLogoff, \&parseDataFile_quote, '設定自動下線之人物清單');
+#addParseFiles("$sc_v{'path'}{'control'}/gmaid.txt", \%GMAID_lut, \&parseGMAIDLUT, '設定自動下線之人物AID清單');
+#addParseFiles("$sc_v{'path'}{'control'}/importantitems.txt", \@importantItems, \&parseDataFile3, '設定強制撿取之重要物品清單');
+#addParseFiles("$sc_v{'path'}{'control'}/map_control.txt", \%map_control, \&parseMapControl, '設定限制瞬移及指定活動之地圖清單');
+#addParseFiles("$sc_v{'path'}{'control'}/pfroute.txt", \@preferRoute, \&parsePreferRoute, '設定指定行走之偏好路徑清單');
+#addParseFiles("$sc_v{'path'}{'control'}/shop.txt", \%myShop, \&parseDataFile2_new, '設定自動擺攤商品');
+#addParseFiles("$sc_v{'path'}{'tables'}/cards.txt", \%cards_lut, \&parseROLUT, '卡片名稱清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/elements.txt", \%attribute_lut, \&parseROLUT, '屬性清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/materialdescriptions.txt", \%materialDesc_lut, \&parseRODescLUT, '鍛造物品說明資料庫');
+#addParseFiles("$sc_v{'path'}{'tables'}/msgstrings.txt", \%messages_lut, \&parseMsgStrings, '狀態清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/stars.txt", \%stars_lut, \&parseROLUT, '武器強悍清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/mapalias.txt", \%mapAlias_lut, \&parseROLUT2, '相同地圖設定');
+#
+##addParseFiles("$sc_v{'path'}{'tables'}/recvpackets.txt", \%rpackets, \&parseDataFile2, '封包控制檔', 1);
+#addParseFiles("$sc_v{'path'}{'tables'}/recvpackets.txt", \%rpackets, \&parsePacketsFile, '封包接收控制檔', 1);
+#addParseFiles("$sc_v{'path'}{'tables'}/sendpackets.txt", \%spackets, \&parsePacketsFile, '封包送出控制檔');
+#
+#addParseFiles("$sc_v{'path'}{'tables'}/mon_mvp.txt", \@MVPID, \&parseDataFile3, ' MVP 怪物清單');
+#addParseFiles("$sc_v{'path'}{'tables'}/mon_rm.txt", \@RMID, \&parseDataFile3, ' RM 怪物清單');
+#
+#addParseFiles("$sc_v{'path'}{'tables'}/indoor.txt", \%indoors_lut, \&parseROLUT, '室內地圖名稱清單');
+#
+#addParseFiles("$sc_v{'path'}{'tables'}/modifiedWalk.txt", \%modifiedWalk, \&parseDataFile2, '移動時使用修正座標資料檔');
+#
+#addParseFiles("$sc_v{'path'}{'tables'}/guilds.txt", \%guilds_lut, \&parseDataFile2, '工會名稱清單');
 
 addParseFiles("$sc_v{'path'}{'control'}/autologoff.txt", \%autoLogoff, \&parseDataFile_quote, '設定自動下線之人物清單');
 addParseFiles("$sc_v{'path'}{'control'}/gmaid.txt", \%GMAID_lut, \&parseGMAIDLUT, '設定自動下線之人物AID清單');
 addParseFiles("$sc_v{'path'}{'control'}/importantitems.txt", \@importantItems, \&parseDataFile3, '設定強制撿取之重要物品清單');
+addParseFiles("$sc_v{'path'}{'control'}/items_control.txt", \%items_control, \&parseItemsControl, '設定自動存放、自動賣出之物品清單');
 addParseFiles("$sc_v{'path'}{'control'}/map_control.txt", \%map_control, \&parseMapControl, '設定限制瞬移及指定活動之地圖清單');
+addParseFiles("$sc_v{'path'}{'control'}/mon_control.txt", \%mon_control, \&parseMonControl, '設定自動攻擊、自動逃離、自動搜尋之怪物清單');
+#addParseFiles("$sc_v{'path'}{'control'}/overallauth.txt", \%overallAuth, \&parseDataFile, '設定授權使用遙控功能之玩家清單');
 addParseFiles("$sc_v{'path'}{'control'}/pfroute.txt", \@preferRoute, \&parsePreferRoute, '設定指定行走之偏好路徑清單');
-addParseFiles("$sc_v{'path'}{'control'}/shop.txt", \%myShop, \&parseDataFile2, '設定自動擺攤商品');
+addParseFiles("$sc_v{'path'}{'control'}/pickupitems.txt", \%itemsPickup, \&parseDataFile_lc, '設定要自動撿取之物品清單');
+#addParseFiles("$sc_v{'path'}{'control'}/responses.txt", \%responses, \&parseResponses, '設定遠端遙控之回應清單');
+addParseFiles("$sc_v{'path'}{'control'}/shop.txt", \%myShop, \&parseDataFile2_new, '設定自動擺攤商品');
+addParseFiles("$sc_v{'path'}{'control'}/timeouts.txt", \%timeout, \&parseTimeouts, 'Timeouts控制設定');
 addParseFiles("$sc_v{'path'}{'tables'}/cards.txt", \%cards_lut, \&parseROLUT, '卡片名稱清單');
+addParseFiles("$sc_v{'path'}{'tables'}/cities.txt", \%cities_lut, \&parseROLUT, '城市地圖名稱清單');
 addParseFiles("$sc_v{'path'}{'tables'}/elements.txt", \%attribute_lut, \&parseROLUT, '屬性清單');
-addParseFiles("$sc_v{'path'}{'tables'}/materialdescriptions.txt", \%materialDesc_lut, \&parseRODescLUT, '鍛造物品說明資料庫');
-addParseFiles("$sc_v{'path'}{'tables'}/msgstrings.txt", \%messages_lut, \&parseMsgStrings, '狀態清單');
-addParseFiles("$sc_v{'path'}{'tables'}/stars.txt", \%stars_lut, \&parseROLUT, '武器強悍清單');
+addParseFiles("$sc_v{'path'}{'tables'}/emotions.txt", \%emotions_lut, \&parseDataFile2, '表情清單');
+addParseFiles("$sc_v{'path'}{'tables'}/equiptypes.txt", \%equipTypes_lut, \&parseDataFile2, '裝備物品類別清單');
+addParseFiles("$sc_v{'path'}{'tables'}/guilds.txt", \%guilds_lut, \&parseDataFile2, '工會名稱清單');
+addParseFiles("$sc_v{'path'}{'tables'}/indoor.txt", \%indoors_lut, \&parseROLUT, '室內地圖名稱清單');
+addParseFiles("$sc_v{'path'}{'tables'}/items.txt", \%items_lut, \&parseROLUT, '物品名稱清單', 0, "$sc_v{'path'}{'plugin'}/items.txt");
+addParseFiles("$sc_v{'path'}{'tables'}/itemsdescriptions.txt", \%itemsDesc_lut, \&parseRODescLUT, '物品說明資料庫');
+addParseFiles("$sc_v{'path'}{'tables'}/itemslots.txt", \%itemSlots_lut, \&parseROSlotsLUT, "裝備物品類別設定檔");
+addParseFiles("$sc_v{'path'}{'tables'}/itemtypes.txt", \%itemTypes_lut, \&parseDataFile2, '物品類別清單');
+addParseFiles("$sc_v{'path'}{'tables'}/jobs.txt", \%jobs_lut, \&parseDataFile2, '職業清單');
 addParseFiles("$sc_v{'path'}{'tables'}/mapalias.txt", \%mapAlias_lut, \&parseROLUT2, '相同地圖設定');
-
-addParseFiles("$sc_v{'path'}{'tables'}/recvpackets.txt", \%rpackets, \&parseDataFile2, '封包控制檔', 1);
-
+addParseFiles("$sc_v{'path'}{'tables'}/maps.txt", \%maps_lut, \&parseROLUT, '地圖名稱清單', 0, "$sc_v{'path'}{'plugin'}/maps.txt");
+addParseFiles("$sc_v{'path'}{'tables'}/materialdescriptions.txt", \%materialDesc_lut, \&parseRODescLUT, '鍛造物品說明資料庫');
+addParseFiles("$sc_v{'path'}{'tables'}/modifiedWalk.txt", \%modifiedWalk, \&parseDataFile2, '移動時使用修正座標資料檔');
 addParseFiles("$sc_v{'path'}{'tables'}/mon_mvp.txt", \@MVPID, \&parseDataFile3, ' MVP 怪物清單');
 addParseFiles("$sc_v{'path'}{'tables'}/mon_rm.txt", \@RMID, \&parseDataFile3, ' RM 怪物清單');
-
-addParseFiles("$sc_v{'path'}{'tables'}/indoor.txt", \%indoors_lut, \&parseROLUT, '室內地圖名稱清單');
-
-addParseFiles("$sc_v{'path'}{'tables'}/modifiedWalk.txt", \%modifiedWalk, \&parseDataFile2, '移動時使用修正座標資料檔');
+addParseFiles("$sc_v{'path'}{'tables'}/monsters.txt", \%monsters_lut, \&parseDataFile2, '怪物名稱清單', 0, "$sc_v{'path'}{'plugin'}/monsters.txt");
+addParseFiles("$sc_v{'path'}{'tables'}/msgstrings.txt", \%messages_lut, \&parseMsgStrings, '狀態清單');
+addParseFiles("$sc_v{'path'}{'tables'}/npcs.txt", \%npcs_lut, \&parseNPCs, ' NPC 清單');
+addParseFiles("$sc_v{'path'}{'tables'}/portals.txt", \%portals_lut, \&parsePortals, '傳點設定檔包含NPC傳點', 0, "$sc_v{'path'}{'tables'}/portals_*.txt");
+addParseFiles("$sc_v{'path'}{'tables'}/portalsLOS.txt", \%portals_los, \&parsePortalsLOS, '已編譯之傳點路徑');
+addParseFiles("$sc_v{'path'}{'tables'}/recvpackets.txt", \%rpackets, \&parsePacketsFile, '封包接收控制檔', 1);
+addParseFiles("$sc_v{'path'}{'tables'}/sendpackets.txt", \%spackets, \&parsePacketsFile, '封包送出控制檔');
+addParseFiles("$sc_v{'path'}{'tables'}/sex.txt", \%sex_lut, \&parseDataFile2, '性別清單');
+addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skillsID_lut, \&parseSkillsIDLUT);
+addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_lut, \&parseSkillsLUT, '技能清單');
+addParseFiles("$sc_v{'path'}{'tables'}/skills.txt", \%skills_rlut, \&parseSkillsReverseLUT_lc);
+addParseFiles("$sc_v{'path'}{'tables'}/skillsdescriptions.txt", \%skillsDesc_lut, \&parseRODescLUT, '技能說明資料庫');
+addParseFiles("$sc_v{'path'}{'tables'}/skillssp.txt", \%skillsSP_lut, \&parseSkillsSPLUT, '技能SP清單');
+addParseFiles("$sc_v{'path'}{'tables'}/stars.txt", \%stars_lut, \&parseROLUT, '武器強悍清單');
 
 load(\@{$sc_v{'parseFiles'}});
 
@@ -967,17 +1158,19 @@ importDynaLib();
 {
 	my ($msg, $found, $i);
 
-	# Auto generate if null
-	if ($config{'adminPassword'} eq 'x' x 10 || $config{'adminPassword'} eq "") {
-		print "\n隨機產生遠端控制授權密碼\n";
-		configModify("adminPassword", vocalString(10));
-	}
-
-	# Auto generate if null
-	if ($config{'callSign'} eq 'x' x 10 || $config{'callSign'} eq "") {
-		print "\n隨機產生遠端控制前置字詞\n";
-		configModify("callSign", vocalString(10));
-	}
+#	# Auto generate if null
+#	if ($config{'adminPassword'} eq 'x' x 10 || $config{'adminPassword'} eq "") {
+#		print "\n隨機產生遠端控制授權密碼\n";
+##		configModify("adminPassword", vocalString(10));
+#		scModify("config", "adminPassword", vocalString(10), 1);
+#	}
+#
+#	# Auto generate if null
+#	if ($config{'callSign'} eq 'x' x 10 || $config{'callSign'} eq "") {
+#		print "\n隨機產生遠端控制前置字詞\n";
+##		configModify("callSign", vocalString(10));
+#		scModify("config", "callSign", vocalString(10), 1);
+#	}
 
 	###COMPILE PORTALS###
 
@@ -1009,6 +1202,9 @@ importDynaLib();
 	}
 
 	if (!$option{'X-Kore'}) {
+		undef $msg;
+
+		print "\n為保護帳密安全，輸入的資料將不會顯示於畫面上\n" if (!$config{'username'} || !$config{'password'});
 
 		if (!$config{'username'}) {
 			print "請輸入遊戲帳號:\n";
@@ -1016,7 +1212,11 @@ importDynaLib();
 
 			$msg = input_readLine();
 			$config{'username'} = $msg;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			scUpdate("config");
 
 			setColor($sc_v{'Console'}{'original'});
 		}
@@ -1026,7 +1226,11 @@ importDynaLib();
 
 			$msg = input_readLine();
 			$config{'password'} = $msg;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			scUpdate("config");
 
 			setColor($sc_v{'Console'}{'original'});
 		}
@@ -1048,8 +1252,14 @@ $i, $config{"master_name_$i"}
 			print "選擇主伺服器, 請輸入編號:\n";
 			$msg = input_readLine();
 			$config{'master'} = $msg;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+#			scUpdate("config");
 		}
+
+		scUpdate("config") if ($msg ne "");
 
 	} else {
 		$timeout{'injectSync'}{'time'} = time;
@@ -1067,6 +1277,8 @@ $sc_v{'kore'}{'startTime'} = time;
 $sc_v{'input'}{'errorCount'} = 0;
 $sc_v{'input'}{'waitingForInput'} = 0;
 #Ayon End
+
+$sc_v{'parseMsg'}{'server_name'} = "x-kore";
 
 our ($input, $msg, $msg_length);
 our ($accountID, $sessionID);
