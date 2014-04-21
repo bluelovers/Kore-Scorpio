@@ -31,12 +31,29 @@ sub initConnectVars {
 
 	undef %{$chars[$config{'char'}]{'guild'}{'users'}};
 
+	undef %{$sc_v{'ai'}{'temp'}};
+
 	$sc_v{'ai'}{'first'} = 1;
 
 	# Reset attackSkillslot/useSelf_skill/useSelf_item timeout
 	resetTimeout();
 
-	timeOutStart(-1, 'ai_warpTo_wait');
+	timeOutStart(
+		-1
+#		, 'ai_warpTo_wait'
+		, 'ai_partyAutoShare'
+		, 'ai_storageAuto'
+		, 'ai_partyAutoCreate'
+		, 'ai_talkAuto'
+	);
+
+	timeOutStart(
+		'ai_checkUser'
+		, 'ai_teleport_waitAfterKill'
+	);
+
+	$sc_v{'exp'}{'base_add'} = 0;
+	$sc_v{'exp'}{'job_add'} = 0;
 #Ayon End
 }
 
@@ -70,7 +87,12 @@ sub initMapChangeVars {
 		'ai_skill_party_wait',
 		'ai_resurrect_wait',
 		'ai_warpTo_wait'
+		, 'ai_teleport_waitAfterKill'
+		, 'ai_skill_use_send'
+		, 'ai_skill_cast_wait'
 	);
+
+#	undef $chars[$config{'char'}]{'mvp'};
 
 	undef %{$chars[$config{'char'}]{'useSelf_skill_uses'}};
 
@@ -201,8 +223,8 @@ sub useTeleport {
 	}
 
 	if (
-		$map_control{lc($field{'name'})}{'teleport_allow'} == 1
-		|| ($map_control{lc($field{'name'})}{'teleport_allow'} == 2 && $level == 2)
+		$map_control{lcCht($field{'name'})}{'teleport_allow'} == 1
+		|| ($map_control{lcCht($field{'name'})}{'teleport_allow'} == 2 && $level == 2)
 		|| $sc_v{'temp'}{'dcOnDualLogin'}
 		|| $level > 2
 	) {
@@ -315,13 +337,17 @@ sub auth {
 	writeDataFile("$sc_v{'path'}{'control'}/overallAuth.txt", \%overallAuth);
 }
 
-sub configModify {
-	my $key = shift;
-	my $val = shift;
-	printC("◇Config '$key' 設定成 $val\n", "s");
-	$config{$key} = $val;
-	writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
-}
+#sub configModify {
+#	my $key = shift;
+#	my $val = shift;
+#	printC("◇Config '$key' 設定成 $val\n", "s");
+#	$config{$key} = $val;
+##	writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#
+##	updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+#
+#	scUpdate("config");
+#}
 
 #sub setTimeout {
 #	my $timeout = shift;
@@ -438,24 +464,35 @@ sub updateDamageTables {
 				$record{'mvp'}{$monsters{$ID1}{'nameID'}}{'dmgFrom'}{'map'} += $damage;
 			}
 
-#			my $t_m_t = $mon_control{lc($monsters{$ID1}{'name'})}{'teleport_auto'};
+#			my $t_m_t = $mon_control{lcCht($monsters{$ID1}{'name'})}{'teleport_auto'};
 
-			my $teleported;
-			my $tele_verbose;
+#			my $teleported;
+#			my $tele_verbose;
 
-			if($config{'teleportAuto_deadly'} && $damage >= $chars[$config{'char'}]{'hp'}){
-				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
-				$teleported = 2;
-			} elsif ($config{'teleportAuto_deadly'} && $chars[$config{'char'}]{'hp'} <= 1) {
-				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
-				$teleported = 2;
-			} elsif ($damage > 0 && !$sc_v{'temp'}{'itemsImportantAutoMode'}){
-				if ($config{'teleportAuto_whenDmgToYou'}){
-					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you $damage dmg. Teleporting...\n";
-					$teleported = 1;
-				} elsif ($config{'teleportAuto_maxDmg'} && $damage >= $config{'teleportAuto_maxDmg'}){
-					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you more than $config{'teleportAuto_maxDmg'} dmg. Teleporting...\n";
-					$teleported = 1;
+			undef $sc_v{'ai'}{'temp'}{'teleported'};
+			undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
+
+			$sc_v{'ai'}{'temp'}{'tele_lock'} = ($map_control{lcCht($field{'name'})}{'teleport_allow'} < 0)?1:0;
+
+			if (!$sc_v{'ai'}{'temp'}{'tele_lock'}) {
+				if($config{'teleportAuto_deadly'} && $damage >= $chars[$config{'char'}]{'hp'}){
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 遭受致命傷害 $damage\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($config{'teleportAuto_deadly'} && $chars[$config{'char'}]{'hp'} <= 1) {
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 下一次的攻擊將使你遭受致命傷害\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($damage > 0 && !$sc_v{'temp'}{'itemsImportantAutoMode'}){
+					if ($config{'teleportAuto_whenDmgToYou'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you $damage dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - $monsters{$ID1}{'name'} ($monsters{$ID}{'binID'}) 對你造成 $damage 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					} elsif ($config{'teleportAuto_maxDmg'} && $damage >= $config{'teleportAuto_maxDmg'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you more than $config{'teleportAuto_maxDmg'} dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - $monsters{$ID1}{'name'} ($monsters{$ID}{'binID'}) 對你造成超過 $config{'teleportAuto_maxDmg'} 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					}
 				}
 			}
 
@@ -465,14 +502,14 @@ sub updateDamageTables {
 				$chars[$config{'char'}]{'hp'} = 1;
 			}
 
-			if ($teleported && !($sc_v{'temp'}{'teleOnEvent'} && $ai_v{'temp'}{'teleOnEvent'})){
+			if ($sc_v{'ai'}{'temp'}{'teleported'} && !($sc_v{'temp'}{'teleOnEvent'} && $ai_v{'temp'}{'teleOnEvent'})){
 				$ai_v{'temp'}{'teleOnEvent'} = 1;
 				timeOutStart('ai_teleport_event');
 				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
 				$ai_v{'clear_aiQueue'} = 1;
 #				ai_clientSuspend(0, 1);
 
-				printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
 
 				ai_stopByTele(1);
 
@@ -481,14 +518,161 @@ sub updateDamageTables {
 #				if ($ai_index ne "" && $ai_seq_args[$ai_index]{'mode'}) {
 #					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
 #				}
-			} elsif ($teleported > 1) {
+			} elsif ($sc_v{'ai'}{'temp'}{'teleported'} > 1) {
 				$ai_v{'temp'}{'teleOnEvent'} = 1;
 				timeOutStart('ai_teleport_event');
 				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
 				$ai_v{'clear_aiQueue'} = 1;
 #				ai_clientSuspend(0, 1);
 
-				printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
+
+				ai_stopByTele(1);
+
+#				my $ai_index = binFind(\@ai_seq, "take");
+#
+#				if ($ai_index ne "" && $ai_seq_args[$ai_index]{'mode'}) {
+#					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
+#				}
+			}
+		} elsif (%{$players{$ID1}}) {
+			$players{$ID1}{'dmgFrom'} += $damage;
+			$players{$ID1}{'dmgToYou'} += $damage;
+			if ($damage == 0) {
+				$players{$ID1}{'missedYou'}++;
+			} else {
+				$sc_v{'ai'}{'onHit'} = $damage;
+			}
+			timeOutStart('ai_event_onHit');
+
+			undef $sc_v{'ai'}{'temp'}{'teleported'};
+			undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
+
+			$sc_v{'ai'}{'temp'}{'tele_lock'} = ($map_control{lcCht($field{'name'})}{'teleport_allow'} < 0)?1:0;
+
+			if (!$sc_v{'ai'}{'temp'}{'tele_lock'}) {
+				if($config{'teleportAuto_deadly'} && $damage >= $chars[$config{'char'}]{'hp'}){
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 遭受致命傷害 $damage\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($config{'teleportAuto_deadly'} && $chars[$config{'char'}]{'hp'} <= 1) {
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 下一次的攻擊將使你遭受致命傷害\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($damage > 0 && !$sc_v{'temp'}{'itemsImportantAutoMode'}){
+					if ($config{'teleportAuto_whenDmgToYou'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you $damage dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - $players{$ID1}{'name'} ($players{$ID}{'binID'}) 對你造成 $damage 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					} elsif ($config{'teleportAuto_maxDmg'} && $damage >= $config{'teleportAuto_maxDmg'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you more than $config{'teleportAuto_maxDmg'} dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - $players{$ID1}{'name'} ($players{$ID}{'binID'}) 對你造成超過 $config{'teleportAuto_maxDmg'} 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					}
+				}
+			}
+
+			if ($chars[$config{'char'}]{'hp'} > $damage) {
+				$chars[$config{'char'}]{'hp'} -= $damage;
+			} elsif ($chars[$config{'char'}]{'hp'} <= $damage) {
+				$chars[$config{'char'}]{'hp'} = 1;
+			}
+
+			if ($sc_v{'ai'}{'temp'}{'teleported'} && !($sc_v{'temp'}{'teleOnEvent'} && $ai_v{'temp'}{'teleOnEvent'})){
+				$ai_v{'temp'}{'teleOnEvent'} = 1;
+				timeOutStart('ai_teleport_event');
+				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
+				$ai_v{'clear_aiQueue'} = 1;
+#				ai_clientSuspend(0, 1);
+
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
+
+				ai_stopByTele(1);
+
+#				my $ai_index = binFind(\@ai_seq, "take");
+#
+#				if ($ai_index ne "" && $ai_seq_args[$ai_index]{'mode'}) {
+#					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
+#				}
+			} elsif ($sc_v{'ai'}{'temp'}{'teleported'} > 1) {
+				$ai_v{'temp'}{'teleOnEvent'} = 1;
+				timeOutStart('ai_teleport_event');
+				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
+				$ai_v{'clear_aiQueue'} = 1;
+#				ai_clientSuspend(0, 1);
+
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
+
+				ai_stopByTele(1);
+
+#				my $ai_index = binFind(\@ai_seq, "take");
+#
+#				if ($ai_index ne "" && $ai_seq_args[$ai_index]{'mode'}) {
+#					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
+#				}
+			}
+		} else {
+			$sc_v{'ai'}{'onHit'} = $damage if ($damage);
+
+			timeOutStart('ai_event_onHit');
+
+			undef $sc_v{'ai'}{'temp'}{'teleported'};
+			undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
+
+			$sc_v{'ai'}{'temp'}{'tele_lock'} = ($map_control{lcCht($field{'name'})}{'teleport_allow'} < 0)?1:0;
+
+			if (!$sc_v{'ai'}{'temp'}{'tele_lock'}) {
+				if($config{'teleportAuto_deadly'} && $damage >= $chars[$config{'char'}]{'hp'}){
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 遭受致命傷害 $damage\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($config{'teleportAuto_deadly'} && $chars[$config{'char'}]{'hp'} <= 1) {
+	#				$tele_verbose = "[Act] Next $damage dmg could kill you. Teleporting...\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 下一次的攻擊將使你遭受致命傷害\n";
+					$sc_v{'ai'}{'temp'}{'teleported'} = 2;
+				} elsif ($damage > 0 && !$sc_v{'temp'}{'itemsImportantAutoMode'}){
+					if ($config{'teleportAuto_whenDmgToYou'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you $damage dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 不明人物[".getID($ID1)."] 對你造成 $damage 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					} elsif ($config{'teleportAuto_maxDmg'} && $damage >= $config{'teleportAuto_maxDmg'}){
+	#					$tele_verbose = "[Act] $monsters{$ID1}{'name'} attack you more than $config{'teleportAuto_maxDmg'} dmg. Teleporting...\n";
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "△自動瞬移 - 不明人物[".getID($ID1)."] 對你造成超過 $config{'teleportAuto_maxDmg'} 傷害\n";
+						$sc_v{'ai'}{'temp'}{'teleported'} = 1;
+					}
+				}
+			}
+
+			if ($chars[$config{'char'}]{'hp'} > $damage) {
+				$chars[$config{'char'}]{'hp'} -= $damage;
+			} elsif ($chars[$config{'char'}]{'hp'} <= $damage) {
+				$chars[$config{'char'}]{'hp'} = 1;
+			}
+
+			if ($sc_v{'ai'}{'temp'}{'teleported'} && !($sc_v{'temp'}{'teleOnEvent'} && $ai_v{'temp'}{'teleOnEvent'})){
+				$ai_v{'temp'}{'teleOnEvent'} = 1;
+				timeOutStart('ai_teleport_event');
+				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
+				$ai_v{'clear_aiQueue'} = 1;
+#				ai_clientSuspend(0, 1);
+
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
+
+				ai_stopByTele(1);
+
+#				my $ai_index = binFind(\@ai_seq, "take");
+#
+#				if ($ai_index ne "" && $ai_seq_args[$ai_index]{'mode'}) {
+#					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
+#				}
+			} elsif ($sc_v{'ai'}{'temp'}{'teleported'} > 1) {
+				$ai_v{'temp'}{'teleOnEvent'} = 1;
+				timeOutStart('ai_teleport_event');
+				$sc_v{'temp'}{'teleOnEvent'} = useTeleport(1);
+				$ai_v{'clear_aiQueue'} = 1;
+#				ai_clientSuspend(0, 1);
+
+				printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele");
 
 				ai_stopByTele(1);
 
@@ -533,6 +717,16 @@ sub updateDamageTables {
 			}
 
 #			print "getPlayerType $players{$accountID}{'name'} = ".getPlayerType($accountID, -1, 0, 2)."\n";
+		} elsif (%{$players{$ID2}}) {
+			$players{$ID2}{'dmgTo'} += $damage;
+			$players{$ID2}{'dmgFromPlayer'}{$ID1} += $damage;
+			$players{$ID1}{'dmgToPlayer'}{$ID2} += $damage;
+			if ($damage == 0) {
+				$players{$ID1}{'missedToPlayer'}{$ID2}++;
+				$players{$ID2}{'missedFromPlayer'}{$ID1}++;
+			} elsif ($players{$ID2}{'param1'}) {
+				$players{$ID2}{'param1'} = 0;
+			}
 		}
 	}
 }
@@ -750,17 +944,34 @@ sub avoidStuck {
 
 		ai_route_clear();
 
-		if ($isStuck == 3 || ($isStuck == 2 && $map_control{lc($field{'name'})}{'teleport_allow'} != 1)) {
-			print "◆可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！\n";
-#			chatLog("防卡", "可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！", "st");
-#			chatLog("防卡", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】", "st");
+		if ($isStuck == 3 || ($isStuck == 2 && $map_control{lcCht($field{'name'})}{'teleport_allow'} != 1)) {
 
-			sysLog("st", "防卡",
-				["可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！"
-				,"目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】"]
-			);
+			if ($config{'unstuckAuto_utcount_dll'} && $ai_v{'unstuckAuto_utcount_dll'} >= $config{'unstuckAuto_utcount_dll'}) {
+				print "◆可能卡點: 似乎無法以 重新載入DLL檔解決$config{'unstuckAuto_utcount_dll'}次, 採取最後手段 重新登入！\n";
+				sysLog("st", "防卡",
+					["可能卡點: 似乎無法以 重新載入DLL檔解決$config{'unstuckAuto_utcount_dll'}次, 採取最後手段 重新登入！"
+					,"目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】"]
+				);
 
-			importDynaLib();
+				undef $ai_v{'unstuckAuto_utcount_dll'};
+
+				relogWait("", 1);
+
+				ai_clientSuspend(0, 1.5);
+			} else {
+				print "◆可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！\n";
+#				chatLog("防卡", "可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！", "st");
+#				chatLog("防卡", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】", "st");
+
+				sysLog("st", "防卡",
+					["可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！"
+					,"目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】"]
+				);
+
+				importDynaLib();
+
+				$ai_v{'unstuckAuto_utcount_dll'}++;
+			}
 		} elsif ($isStuck == 2) {
 			print "◆可能卡點: 無法移動前往目的地, 嘗試以 瞬間移動解決！\n";
 #			chatLog("防卡", "可能卡點: 無法移動前往目的地, 嘗試以 瞬間移動解決！", "st");
@@ -811,7 +1022,7 @@ sub getImportantItems {
 	my $name	= $items{$ID}{'name'};
 	my $nameID	= $items{$ID}{'nameID'};
 	my $tmpVal	= $record{'importantItems'}{$nameID};
-	my $tmpPick	= $itemsPickup{lc($name)};
+	my $tmpPick	= $itemsPickup{lcCht($name)};
 
 	if ($tmpPick >= 3) {
 #		$found = 3;
@@ -834,7 +1045,7 @@ sub getImportantItems {
 	if ($config{'itemsImportantAutoMode'}){
 		if ($sc_v{'temp'}{'itemsImportantAutoMode'} && $found < 5) {
 
-		} elsif ($found) {
+		} elsif ($found > 0) {
 			if ($ai_v2{'ImportantItem'}{'attackAuto'} eq "") {
 				$ai_v2{'ImportantItem'}{'attackAuto'} = $config{'attackAuto'};
 			}
@@ -1170,7 +1381,7 @@ sub resetTimeout {
 #		undef $ai_v{"attackSkillSlot_$i"."_time"};
 #		$i++;
 #	}
-	my @arg = ("useSelf_item_", "useSelf_skill_", "attackSkillSlot_", "useParty_skill_");
+	my @arg = ("useSelf_item_", "useSelf_skill_", "attackSkillSlot_", "useParty_skill_", "useGuild_skill_");
 
 	foreach (@arg) {
 		$i = 0;
@@ -1182,19 +1393,41 @@ sub resetTimeout {
 }
 
 sub respawnUndefine {
+
+#	return 0;
+
 	my $map_string = shift;
-	if ($config{'respawnAuto_undef'} && $map_control{lc($map_string)}{'restrict_map'} ne "1"
-		&& $map_string ne "" && $map_string ne $config{'lockMap'} && $map_string ne $config{'saveMap'}) {
+	if (
+		$config{'respawnAuto_undef'}
+		&& $map_control{lcCht($map_string)}{'restrict_map'} ne "1"
+		&& $map_string ne ""
+		&& $map_string ne $config{'lockMap'}
+		&& $map_string ne $config{'saveMap'}
+	) {
+
+		if ($ai_seq[0] eq "route") {
+			sysLog("event", "危險", "你出現在非限定地圖($map_string) - 清除路徑計算！", 1);
+
+			aiRemove("move");
+			aiRemove("route");
+			aiRemove("route_getRoute");
+			aiRemove("route_getMapRoute");
+		}
+
+		return 0;
+
 		print "◆限定地圖: 你出現在非限定地圖($map_string)！\n";
 		print "◆啟動 respawnAuto_undef - 瞬間移動回儲存點！\n";
 #		chatLog("危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！", "d");
-		sysLog("event", "危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！");
-		if ($map_control{lc($map_string)}{'teleport_allow'} >= 1) {
+#		sysLog("event", "危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！");
+		if ($map_control{lcCht($map_string)}{'teleport_allow'} >= 1) {
+			sysLog("event", "危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！");
+
 			useTeleport(2);
 			$ai_v{'clear_aiQueue'} = 1;
 		} else {
 #			chatLog("危險", "限定地圖: 你無法從目前的地圖($map_string)瞬移回儲存點, 立即登出！", "d");
-			sysLog("event", "危險", "限定地圖: 你無法從目前的地圖($map_string)瞬移回儲存點, 立即登出！");
+			sysLog("event", "危險", "限定地圖: 你無法從目前的地圖($map_string)瞬移回儲存點, 立即登出！", 1);
 #			$quit = 1;
 
 			quit(1, 1);
