@@ -1,6 +1,6 @@
 
 sub ai_route {
-	my ($r_ret, $x, $y, $map, $maxRouteDistance, $maxRouteTime, $attackOnRoute, $avoidPortals, $distFromGoal, $checkInnerPortals) = @_;
+	my ($r_ret, $x, $y, $map, $maxRouteDistance, $maxRouteTime, $attackOnRoute, $avoidPortals, $distFromGoal, $checkInnerPortals, $tag, $ID, $dist) = @_;
 	my %args;
 	$x = int($x) if ($x ne "");
 	$y = int($y) if ($y ne "");
@@ -14,6 +14,11 @@ sub ai_route {
 	$args{'avoidPortals'} = $avoidPortals;
 	$args{'distFromGoal'} = $distFromGoal;
 	$args{'checkInnerPortals'} = $checkInnerPortals;
+
+	$args{'npcData'}{'tag'} = $tag;
+	$args{'npcData'}{'ID'} = $ID;
+	$args{'npcData'}{'dist'} = $dist;
+
 	undef %{$args{'returnHash'}};
 	unshift @ai_seq, "route";
 	unshift @ai_seq_args, \%args;
