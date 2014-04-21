@@ -770,7 +770,7 @@ sub event_map {
 
 		$sc_v{'parseMsg'}{'map'} = $ai_v{'temp'}{'map'};
 
-		if ($ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "") {
+		if ($ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "" || !$field{'name'}) {
 			getField("$sc_v{'path'}{'fields'}/$ai_v{'temp'}{'map'}.fld", \%field);
 
 			$sc_v{'parseMsg'}{'map'} = $ai_v{'temp'}{'map'};
@@ -837,7 +837,7 @@ sub event_map {
 		$map_ip = makeIP(substr($msg, 22, 4));
 		$map_port = unpack("S1", substr($msg, 26, 2));
 
-		if ($ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "") {
+		if ($ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "" || !$field{'name'}) {
 			getField("$sc_v{'path'}{'fields'}/$ai_v{'temp'}{'map'}.fld", \%field);
 			sysLog("map", "$switch", "Map: $field{'name'} IP: $map_ip Port: $map_port");
 		}
@@ -1115,9 +1115,15 @@ sub event_takenBy {
 
 	if (%{$items{$ID}}) {
 		print "Item Disappeared: $items{$ID}{'name'} ($items{$ID}{'binID'})\n" if ($config{'debug'});
+#		%{$items_old{$ID}} = %{$items{$ID}};
+#		$items_old{$ID}{'disappeared'} = 1;
+#		$items_old{$ID}{'gone_time'} = time;
+
+		$items{$ID}{'disappeared'} = 1;
+		$items{$ID}{'gone_time'} = time;
+
 		%{$items_old{$ID}} = %{$items{$ID}};
-		$items_old{$ID}{'disappeared'} = 1;
-		$items_old{$ID}{'gone_time'} = time;
+
 		# Important item fail
 		if ($ai_v2{'ImportantItem'}{'attackAuto'} ne "" && binFind(\@{$ai_v2{'ImportantItem'}{'targetID'}}, $ID) ne "") {
 			binRemoveAndShift(\@{$ai_v2{'ImportantItem'}{'targetID'}}, $ID);
@@ -1227,6 +1233,7 @@ sub event_takenBy {
 				sysLog("ii", "不明", "重要物品: $items{$ID}{'name'} ($items{$ID}{'binID'}) x $items{$ID}{'amount'} 消失於 ($items{$ID}{'pos'}{'x'}, $items{$ID}{'pos'}{'y'})", 1);
 			}
 		}
+		%{$items_old{$ID}} = %{$items{$ID}};
 		undef %{$items{$ID}};
 		binRemove(\@itemsID, $ID);
 	}
