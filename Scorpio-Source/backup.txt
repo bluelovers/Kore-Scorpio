@@ -41,12 +41,12 @@ backup_File Scorpio-Backup.pl {
 
 backup_File Scorpio.exe {
 	size	1.13 MB (1187906 bytes)
-	MD5	02ba7b6c9868780576c1efdc31f7177d
+	MD5	6fbeec3bea41f851577a44f34cbf140b
 }
 
 backup_File Scorpio.pl {
-	size	51.88 KB (53129 bytes)
-	MD5	e534c8fed74ddb7adb4a720cf1c906dc
+	size	52.48 KB (53740 bytes)
+	MD5	d3ce2a6db5cb4169a36d44a946fd04f6
 }
 
 backup_File Scorpio_update.pl {
@@ -55,8 +55,8 @@ backup_File Scorpio_update.pl {
 }
 
 backup_File Scorpio_version.pl {
-	size	436 bytes (436 bytes)
-	MD5	408f9d120a83c394c1b229afaffa6199
+	size	437 bytes (437 bytes)
+	MD5	bb191a0d9b98fe8c6484237e7f752900
 }
 
 backup_File ai_cmd.pl {
@@ -150,13 +150,13 @@ backup_File version-old.txt {
 }
 
 backup_File version.txt {
-	size	145 bytes (145 bytes)
-	MD5	c44017e6c8cfdb411747fbe0207a445f
+	size	146 bytes (146 bytes)
+	MD5	1f4b5eeead481b2dc023ee6b66be3e7d
 }
 
 backup_File version_data.txt {
-	size	376 bytes (376 bytes)
-	MD5	6639db26f0f148bf1e03a8e9ee750821
+	size	377 bytes (377 bytes)
+	MD5	8facce251d5b9550c046630dc6f674d0
 }
 
 backup_Files 32
