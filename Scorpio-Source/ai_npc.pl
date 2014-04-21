@@ -34,7 +34,7 @@ sub ai_event_npc_autoBuy {
 		}
 		if (!($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1) && $ai_v{'temp'}{'found'}) {
 			unshift @ai_seq, "talkAuto";
-			unshift @ai_seq_args, {};
+			unshift @ai_seq_args, {'reset' => 1};
 		}
 		timeOutStart('ai_buyAuto');
 	}
@@ -92,10 +92,13 @@ sub ai_event_npc_autoBuy {
 #
 #		print "buyAuto_$ai_seq_args[0]{'index'} - do_route : $ai_v{'temp'}{'do_route'}\n";
 
-		if ($field{'name'} ne $npcs_lut{$config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"}}{'map'}) {
+		ai_getNpc(\%{$ai_v{'temp'}{'npcData'}}, $config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"});
+
+		if ($field{'name'} ne $ai_v{'temp'}{'npcData'}{'map'}) {
 			$ai_v{'temp'}{'do_route'} = 1;
 		} else {
-			$ai_v{'temp'}{'distance'} = distance(\%{$npcs_lut{$config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"}}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}});
+#			$ai_v{'temp'}{'distance'} = distance(\%{$npcs_lut{$config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"}}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}});
+			$ai_v{'temp'}{'distance'} = distance(\%{$ai_v{'temp'}{'npcData'}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}});
 			if ($ai_v{'temp'}{'distance'} > 14) {
 				$ai_v{'temp'}{'do_route'} = 1;
 			}
@@ -145,7 +148,7 @@ sub ai_event_npc_autoBuy {
 			$ai_seq_args[0]{'lastIndex'} = $ai_seq_args[0]{'index'};
 			if ($ai_seq_args[0]{'itemID'} eq "") {
 				foreach (keys %items_lut) {
-					if (lc($items_lut{$_}) eq lc($config{"buyAuto_$ai_seq_args[0]{'index'}"})) {
+					if (lcCht($items_lut{$_}) eq lcCht($config{"buyAuto_$ai_seq_args[0]{'index'}"})) {
 						$ai_seq_args[0]{'itemID'} = $_;
 					}
 				}
@@ -216,7 +219,7 @@ sub ai_event_npc_autoSell {
 		&& $config{'sellAuto'}
 		&& $config{'sellAuto_npc'} ne ""
 #		&& percent_weight(\%{$chars[$config{'char'}]}) >= $config{'itemsMaxWeight'}
-		&& &getItemsMaxWeight()
+		&& getItemsMaxWeight()
 		&& (
 			!$config{"sellAuto_inNpcMapOnly"}
 			|| (
@@ -232,7 +235,7 @@ sub ai_event_npc_autoSell {
 		}
 		if (!($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1) && ai_sellAutoCheck()) {
 			unshift @ai_seq, "talkAuto";
-			unshift @ai_seq_args, {};
+			unshift @ai_seq_args, {'reset' => 1};
 
 			$sc_v{'temp'}{'ai'}{'itemsMaxWeight'} = 1;
 		}
@@ -339,8 +342,8 @@ sub ai_event_npc_autoSell {
 			for ($i = 0; $i < @{$chars[$config{'char'}]{'inventory'}};$i++) {
 				next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "" || $chars[$config{'char'}]{'inventory'}[$i]{'borned'});
 				if (
-					$items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'sell'}
-					&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
+					$items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'sell'}
+					&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
 				) {
 					if (
 						$ai_seq_args[0]{'lastIndex'} ne ""
@@ -356,7 +359,7 @@ sub ai_event_npc_autoSell {
 					}
 					undef $ai_seq_args[0]{'done'};
 					$ai_seq_args[0]{'lastIndex'} = $chars[$config{'char'}]{'inventory'}[$i]{'index'};
-					sendSell(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$i]{'index'}, $chars[$config{'char'}]{'inventory'}[$i]{'amount'} - $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'});
+					sendSell(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$i]{'index'}, $chars[$config{'char'}]{'inventory'}[$i]{'amount'} - $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'});
 					timeOutStart('ai_sellAuto');
 					last AUTOSELL;
 				}
@@ -369,24 +372,25 @@ sub ai_event_npc_autoSell {
 
 sub ai_event_npc_autoStorage {
 
-
-
 #storageAuto - chobit aska 20030128
 #####AUTO STORAGE#####
 
 	AUTOSTORAGE: {
 
 	if ($config{'storageAuto'} && $config{'storageAuto_npc'} ne "") {
+#		print "storagegetAuto_$i\n";
 
 #		if (switchInput($ai_seq[0], "", "route") && percent_weight(\%{$chars[$config{'char'}]}) >= $config{'itemsMaxWeight'}) {
-		if (switchInput($ai_seq[0], "", "route") && &getItemsMaxWeight()) {
+		if (switchInput($ai_seq[0], "", "route") && getItemsMaxWeight()) {
 			$ai_v{'temp'}{'ai_route_index'} = binFind(\@ai_seq, "route");
 			if ($ai_v{'temp'}{'ai_route_index'} ne "") {
 				$ai_v{'temp'}{'ai_route_attackOnRoute'} = $ai_seq_args[$ai_v{'temp'}{'ai_route_index'}]{'attackOnRoute'};
 			}
 			if (!($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1) && ai_storageAutoCheck()) {
 				unshift @ai_seq, "talkAuto";
-				unshift @ai_seq_args, {};
+				unshift @ai_seq_args, {'reset' => 1};
+
+#				print "storagegetAuto_$i\n";
 
 				$sc_v{'temp'}{'ai'}{'itemsMaxWeight'} = 1;
 			}
@@ -395,12 +399,19 @@ sub ai_event_npc_autoStorage {
 			undef $ai_v{'temp'}{'found'};
 			my $inNpcMap = checkNpcMap($field{'name'}, $config{"storageAuto_npc"});
 
+#			print "AI: @ai_seq | $stuff\n";
+
+#			print "storagegetAuto_$i\n";
+
 			$i = 0;
 			while (1) {
 				last if (!$config{"storagegetAuto_$i"});
+
+#				print "storagegetAuto_$i\n";
+
 				$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"storagegetAuto_$i"});
 				if (
-					!$stockVoid{'storage'}[$i]
+					!$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$i]
 					&& (
 						$ai_v{'temp'}{'invIndex'} eq ""
 						|| mathInNum($chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'}, $config{"storagegetAuto_$i"."_minAmount"}, $config{"storagegetAuto_$i"."_maxAmount"}, 2)
@@ -419,17 +430,21 @@ sub ai_event_npc_autoStorage {
 			}
 			if (!($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1) && $ai_v{'temp'}{'found'}) {
 				unshift @ai_seq, "talkAuto";
-				unshift @ai_seq_args, {};
+				unshift @ai_seq_args, {'reset' => 1};
 			}
 			timeOutStart(
 				'ai_storageAuto'
 			);
+		} else {
+#			print "ai_storageAuto = $timeout{ai_storageAuto}{'timeout'} = ".checkTimeOut('ai_storageAuto')."\n";
 		}
 
 	}
 #storagegetAuto End - Ayon 20030421
 
 	return 0 if ($ai_seq[0] ne "storageAuto");
+
+#	print "AI: @ai_seq | $stuff\n" if ($sc_v{'ai'}{'temp'}{'last_AI'} ne $ai_seq[0]);
 
 	if ($ai_seq_args[0]{'done'}) {
 		undef %{$ai_v{'temp'}{'ai'}};
@@ -449,6 +464,9 @@ sub ai_event_npc_autoStorage {
 #		}
 		if (!$config{'storageAuto'} || ai_npc_check($config{'storageAuto_npc'})) {
 			$ai_seq_args[0]{'done'} = 1;
+
+			print "storageAuto $config{'storageAuto_npc'}\n";
+
 			last AUTOSTORAGE;
 		}
 
@@ -564,10 +582,12 @@ sub ai_event_npc_autoStorage {
 			$ai_seq_args[0]{'done'} = 1 ;
 #Karasu End
 			if (!$ai_seq_args[0]{'storagegetStart'}) {
+				undef @{$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}};
+
 				for ($i = 0; $i < @{$chars[$config{'char'}]{'inventory'}};$i++) {
 					next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "" || $chars[$config{'char'}]{'inventory'}[$i]{'borned'});
-					if ($items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
-						&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}) {
+					if ($items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
+						&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}) {
 						if ($ai_seq_args[0]{'lastIndex'} ne "" && $ai_seq_args[0]{'lastIndex'} == $chars[$config{'char'}]{'inventory'}[$i]{'index'}
 							&& checkTimeOut('ai_storageAuto_giveup')) {
 							last AUTOSTORAGE;
@@ -576,7 +596,7 @@ sub ai_event_npc_autoStorage {
 						}
 						undef $ai_seq_args[0]{'done'};
 						$ai_seq_args[0]{'lastIndex'} = $chars[$config{'char'}]{'inventory'}[$i]{'index'};
-						sendStorageAdd(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$i]{'index'}, $chars[$config{'char'}]{'inventory'}[$i]{'amount'} - $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'});
+						sendStorageAdd(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$i]{'index'}, $chars[$config{'char'}]{'inventory'}[$i]{'amount'} - $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'});
 						timeOutStart('ai_storageAuto');
 						last AUTOSTORAGE;
 					}
@@ -594,9 +614,15 @@ sub ai_event_npc_autoStorage {
 			while (1) {
 				last if (!$config{"storagegetAuto_$i"});
 				$ai_seq_args[0]{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"storagegetAuto_$i"});
-				if (!$ai_seq_args[0]{'index_failed'}{$i} && $config{"storagegetAuto_$i"."_maxAmount"} ne "" && !$stockVoid{'storage'}[$i]
-					&& ($ai_seq_args[0]{'invIndex'} eq ""
-					|| $chars[$config{'char'}]{'inventory'}[$ai_seq_args[0]{'invIndex'}]{'amount'} < $config{"storagegetAuto_$i"."_maxAmount"})) {
+				if (
+					!$ai_seq_args[0]{'index_failed'}{$i}
+					&& $config{"storagegetAuto_$i"."_maxAmount"} ne ""
+					&& !$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$i]
+					&& (
+						$ai_seq_args[0]{'invIndex'} eq ""
+						|| $chars[$config{'char'}]{'inventory'}[$ai_seq_args[0]{'invIndex'}]{'amount'} < $config{"storagegetAuto_$i"."_maxAmount"}
+					)
+				) {
 					$ai_seq_args[0]{'index'} = $i;
 					last;
 				}
@@ -629,7 +655,7 @@ sub ai_event_npc_autoStorage {
 			$ai_seq_args[0]{'lastIndex'} = $ai_seq_args[0]{'index'};
 			$ai_seq_args[0]{'storageInvIndex'} = findIndexString_lc(\@{$storage{'inventory'}}, "name", $config{"storagegetAuto_$ai_seq_args[0]{'index'}"});
 			if ($ai_seq_args[0]{'storageInvIndex'} eq "") {
-				$stockVoid{'storage'}[$ai_seq_args[0]{'index'}] = 1;
+				$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$ai_seq_args[0]{'index'}] = 1;
 				last AUTOSTORAGE;
 			} else {
 				$storagegetAmount = ($ai_seq_args[0]{'invIndex'} ne "")
@@ -637,7 +663,9 @@ sub ai_event_npc_autoStorage {
 					: $config{"storagegetAuto_$ai_seq_args[0]{'index'}"."_maxAmount"};
 				if ($storagegetAmount > $storage{'inventory'}[$ai_seq_args[0]{'storageInvIndex'}]{'amount'}) {
 					$storagegetAmount = $storage{'inventory'}[$ai_seq_args[0]{'storageInvIndex'}]{'amount'};
-					$stockVoid{'storage'}[$ai_seq_args[0]{'index'}] = 1;
+					$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$ai_seq_args[0]{'index'}] = 1;
+#				} elsif ($sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$ai_seq_args[0]{'index'}]) {
+#					$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$ai_seq_args[0]{'index'}] = 0;
 				}
 			}
 
@@ -675,6 +703,8 @@ sub ai_event_npc_autoTalk_data {
 		$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'}			= $tdo;
 		$sc_v{'temp'}{'ai'}{'talkAuto'}{'index'}		= $i;
 
+		$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}			= "talkAuto${tmp}";
+
 		$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}			= $config{"talkAuto${tmp}_npc"};
 		$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc_dist'}		= $config{"talkAuto${tmp}_npc_dist"};
 		$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc_steps'}		= $config{"talkAuto${tmp}_npc_steps"};
@@ -702,57 +732,187 @@ sub ai_event_npc_autoTalk {
 
 	AUTOTALK: {
 
-	if (switchInput($ai_seq[0], "", "route", "sitAuto", "attack") && $config{'talkAuto'}) {
+	if (switchInput($ai_seq[0], "", "route", "sitAuto", "attack") && $config{'talkAuto'} && checkTimeOut('ai_talkAuto')) {
 
 		undef $sc_v{'temp'}{'ai'}{'talkAuto'}{'do'};
 
+		undef $sc_v{'ai'}{'temp'}{'talkAuto'};
+		$sc_v{'ai'}{'temp'}{'first'} = 1;
+
+		if (ai_event_npc_autoTalk_data($i, 1) eq "") {
+			scModify('config', 'talkAuto', 0, 1);
+		}
+
 		while (!$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} && ai_event_npc_autoTalk_data($i, 1) ne "") {
+
+			if ($config{'talkAuto'} > 1) {
+				$i = int($i);
+
+				$sc_v{'ai'}{'temp'}{'talkAuto'} = "_${i}";
+
+#				$sc_v{'ai'}{'temp'}{'talkAuto'} = "talkAuto${tmp}";
+			}
 
 #			last if (ai_event_npc_autoTalk_data($i, 1) eq "");
 
-			ai_event_npc_autoTalk_data($i);
+#			ai_event_npc_autoTalk_data($i);
+
+#			print "$ai_seq[0] - $sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}\n";
 
 #			$ai_v{'temp'}{'inNpcMap'} = inTargetMap($field{'name'}, $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
-			$ai_v{'temp'}{'inNpcMap'} = inTargetNpcMap($field{'name'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+#			$ai_v{'temp'}{'inNpcMap'} = inTargetNpcMap($field{'name'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+			$ai_v{'temp'}{'inNpcMap'} = inTargetNpcMap($field{'name'}, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_npc"}, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_inNpcMapOnly"});
 
 			if (
 				(
 					switchInput($ai_seq[0], "", "route", "sitAuto")
 					|| (
 						$ai_seq[0] eq "attack"
-						&& !$sc_v{'temp'}{'ai'}{'autoTalk'}{'peace'}
+#						&& !$sc_v{'temp'}{'ai'}{'autoTalk'}{'peace'}
+						&& !$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_peace"}
 					)
 				)
 #				&& %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}}
-				&& !ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
+#				&& !ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
+				&& !ai_npc_check($config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_npc"})
 				&& (
 					(
-						!$sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'}
-						|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'} && percent_hp(\%{$chars[$config{'char'}]}) <= $sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'})
+#						!$sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'}
+#						|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'} && percent_hp(\%{$chars[$config{'char'}]}) <= $sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'})
+						!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_hp"}
+						|| ($config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_hp"} && percent_hp(\%{$chars[$config{'char'}]}) <= $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_hp"})
 					) && (
-						!$sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'}
-						|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'} && percent_sp(\%{$chars[$config{'char'}]}) <= $sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'})
+#						!$sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'}
+#						|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'} && percent_sp(\%{$chars[$config{'char'}]}) <= $sc_v{'temp'}{'ai'}{'autoTalk'}{'sp'})
+						!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_sp"}
+						|| ($config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_sp"} && percent_sp(\%{$chars[$config{'char'}]}) <= $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_sp"})
 					)
 				)
 				&& (
-					!$sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'}
+#					!$sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'}
+#					|| (
+#						$sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'}
+#						&&
+#						$ai_v{'temp'}{'inNpcMap'}
+#					)
+					!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_inNpcMapOnly"}
 					|| (
-						$sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'}
+						$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_inNpcMapOnly"}
 						&&
 						$ai_v{'temp'}{'inNpcMap'}
 					)
 				)
 				&& (
-					!$sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'}
-					|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'} && getBrokenItems(\@{$chars[$config{'char'}]{'inventory'}}) >= $sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'})
+#					!$sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'}
+#					|| ($sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'} && getBrokenItems(\@{$chars[$config{'char'}]{'inventory'}}) >= $sc_v{'temp'}{'ai'}{'autoTalk'}{'broken'})
+					!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_broken"}
+					|| ($config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_broken"} && getBrokenItems(\@{$chars[$config{'char'}]{'inventory'}}) >= $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_broken"})
 				)
-				&& ai_checkZeny($sc_v{'temp'}{'ai'}{'autoTalk'}{'zeny'})
+#				&& ai_checkZeny($sc_v{'temp'}{'ai'}{'autoTalk'}{'zeny'})
+				&& ai_checkZeny($config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_zeny"})
 			) {
 				undef $ai_v{'temp'}{'found'};
 
-				if (!$ai_v{'temp'}{'found'} && $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItem'}) {
+#				if (!$ai_v{'temp'}{'found'} && $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItem'}) {
+#					undef @array;
+#					splitUseArray(\@array, $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItem'}, ",");
+#					foreach (@array) {
+#						next if (!$_);
+#						if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) eq "") {
+#							$ai_v{'temp'}{'found'} = 1;
+#							last;
+#						}
+#					}
+#				}
+#
+#				if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_0"}) {
+#					undef @array;
+#					undef $ai_v{'temp'}{'index'};
+#					undef $ai_v{'temp'}{'invIndex'};
+#
+#					$ai_v{'temp'}{'index'} = 0;
+#
+#					while (1) {
+#						last if (!$config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_$ai_v{'temp'}{'index'}"});
+#
+#						splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_$ai_v{'temp'}{'index'}"}, ",");
+#
+#						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+#
+#						if (
+#							$ai_v{'temp'}{'invIndex'} eq ""
+#							|| (
+#								$array[1] ne ""
+#								&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $array[1]
+#							)
+#						) {
+#							$ai_v{'temp'}{'found'} = 1;
+#							last;
+#						}
+#
+#						$ai_v{'temp'}{'index'}++;
+#					}
+#				}
+#
+#				if (!$ai_v{'temp'}{'found'} && $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItemEx'}) {
+#						undef @array;
+#						undef $ai_v{'temp'}{'foundEx'};
+#						splitUseArray(\@array, $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItemEx'}, ",");
+#						foreach (@array) {
+#							next if (!$_);
+#
+#							if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+#								$ai_v{'temp'}{'foundEx'} = 1;
+#								last;
+#							}
+#						}
+#						$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
+#					}
+#
+#				if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot"}) {
+#					undef @array;
+#					splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot"}, ",");
+#					foreach (@array) {
+#						next if (!$_);
+#						if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+#							$ai_v{'temp'}{'found'} = 1;
+#							last;
+#						}
+#					}
+#				}
+#
+#				if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_0"}) {
+#					undef @array;
+#					undef $ai_v{'temp'}{'index'};
+#					undef $ai_v{'temp'}{'invIndex'};
+#
+#					$ai_v{'temp'}{'index'} = 0;
+#
+#					while (1) {
+#						last if (!$config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_$ai_v{'temp'}{'index'}"});
+#
+#						splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_$ai_v{'temp'}{'index'}"}, ",");
+#
+#						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+#
+#						if (
+#							$ai_v{'temp'}{'invIndex'} ne ""
+#							&& (
+#								$array[1] eq ""
+#								|| $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} >= $array[1]
+#							)
+#						) {
+#							$ai_v{'temp'}{'found'} = 1;
+#							last;
+#						}
+#
+#						$ai_v{'temp'}{'index'}++;
+#					}
+#				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItem"}) {
 					undef @array;
-					splitUseArray(\@array, $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItem'}, ",");
+					splitUseArray(\@array, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItem"}, ",");
 					foreach (@array) {
 						next if (!$_);
 						if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) eq "") {
@@ -762,19 +922,89 @@ sub ai_event_npc_autoTalk {
 					}
 				}
 
-				if (!$ai_v{'temp'}{'found'} && $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItemEx'}) {
+				if (!$ai_v{'temp'}{'found'} && $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItem_0"}) {
 					undef @array;
-					undef $ai_v{'temp'}{'foundEx'};
-					splitUseArray(\@array, $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItemEx'}, ",");
+					undef $ai_v{'temp'}{'index'};
+					undef $ai_v{'temp'}{'invIndex'};
+
+					$ai_v{'temp'}{'index'} = 0;
+
+					while (1) {
+						last if (!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItem_$ai_v{'temp'}{'index'}"});
+
+						splitUseArray(\@array, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItem_$ai_v{'temp'}{'index'}"}, ",");
+
+						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+						if (
+							$ai_v{'temp'}{'invIndex'} eq ""
+							|| (
+								$array[1] ne ""
+								&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $array[1]
+							)
+						) {
+							$ai_v{'temp'}{'found'} = 1;
+							last;
+						}
+
+						$ai_v{'temp'}{'index'}++;
+					}
+				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemEx"}) {
+						undef @array;
+						undef $ai_v{'temp'}{'foundEx'};
+						splitUseArray(\@array, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemEx"}, ",");
+						foreach (@array) {
+							next if (!$_);
+
+							if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+								$ai_v{'temp'}{'foundEx'} = 1;
+								last;
+							}
+						}
+						$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
+					}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemNot"}) {
+					undef @array;
+					splitUseArray(\@array, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemNot"}, ",");
 					foreach (@array) {
 						next if (!$_);
-
 						if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
-							$ai_v{'temp'}{'foundEx'} = 1;
+							$ai_v{'temp'}{'found'} = 1;
 							last;
 						}
 					}
-					$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
+				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemNot_0"}) {
+					undef @array;
+					undef $ai_v{'temp'}{'index'};
+					undef $ai_v{'temp'}{'invIndex'};
+
+					$ai_v{'temp'}{'index'} = 0;
+
+					while (1) {
+						last if (!$config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemNot_$ai_v{'temp'}{'index'}"});
+
+						splitUseArray(\@array, $config{"talkAuto$sc_v{'ai'}{'temp'}{'talkAuto'}_checkItemNot_$ai_v{'temp'}{'index'}"}, ",");
+
+						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+						if (
+							$ai_v{'temp'}{'invIndex'} ne ""
+							&& (
+								$array[1] eq ""
+								|| $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} >= $array[1]
+							)
+						) {
+							$ai_v{'temp'}{'found'} = 1;
+							last;
+						}
+
+						$ai_v{'temp'}{'index'}++;
+					}
 				}
 
 				if (!$ai_v{'temp'}{'found'}) {
@@ -788,14 +1018,20 @@ sub ai_event_npc_autoTalk {
 
 						$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
 						$sc_v{'temp'}{'ai'}{'talkAuto'}{'index'} = $i;
+
+						ai_event_npc_autoTalk_data($i);
+						last;
 					}
 				}
 			}
 			$i++;
 		}
+		timeOutStart('ai_talkAuto');
 	}
 
 	return 0 if ($ai_seq[0] ne "talkAuto");
+
+#	print "AI: @ai_seq | $stuff\n" if ($sc_v{'ai'}{'temp'}{'last_AI'} ne $ai_seq[0]);
 
 	if ($ai_seq_args[0]{'done'}) {
 
@@ -805,11 +1041,41 @@ sub ai_event_npc_autoTalk {
 		%{$ai_v{'temp'}{'ai'}{'completedAI'}} = %{$ai_seq_args[0]{'completedAI'}};
 		shift @ai_seq;
 		shift @ai_seq_args;
-		if (!$ai_v{'temp'}{'ai'}{'completedAI'}{'sellAuto'}) {
+
+#		printC "talkAuto_$sc_v{'temp'}{'ai'}{'talkAuto'}{'index'}_checkItem $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItem'}\n";
+
+		$sc_v{'temp'}{'ai'}{'talkAuto'}{'index_next'} = $sc_v{'temp'}{'ai'}{'talkAuto'}{'index'} + 1;
+
+		if ($sc_v{'temp'}{'ai'}{'autoTalk'}{'loop'} && $sc_v{'temp'}{'ai'}{'talkAuto'}{'do'}) {
+			unshift @ai_seq, "talkAuto";
+#			unshift @ai_seq_args, {};
+			unshift @ai_seq_args, {%{$ai_v{'temp'}{'ai'}}};
+
+			timeOutStart(-1
+				, 'ai_route_npcTalk'
+				, 'ai_talkAuto'
+			);
+
+#			print "[EVENT] talkAuto_loop 迴圈模式\n";
+		} elsif ($config{'talkAuto'} > 1 && $config{"talkAuto_$sc_v{'temp'}{'ai'}{'talkAuto'}{'index_next'}_npc"} ne "") {
+			unshift @ai_seq, "talkAuto";
+#			unshift @ai_seq_args, {};
+			unshift @ai_seq_args, {%{$ai_v{'temp'}{'ai'}}};
+
+			ai_event_npc_autoTalk_data($sc_v{'temp'}{'ai'}{'talkAuto'}{'index_next'});
+
+#			print "[EVENT] talkAuto 2 檢查模式\n";
+
+			timeOutStart(-1
+				, 'ai_route_npcTalk'
+				, 'ai_talkAuto'
+			);
+
+		} elsif (!$ai_v{'temp'}{'ai'}{'completedAI'}{'sellAuto'}) {
 
 			if ($sc_v{'temp'}{'ai'}{'talkAuto'}{'do'}) {
 				if ($sc_v{'temp'}{'ai'}{'autoTalk'}{'end_warpedToSave'} && $field{'name'} ne $config{'saveMap'}) {
-					printC("[EVENT] talkAuto: end_warpedToSave 啟動順移回城\n", "event");
+					printC("[EVENT] $sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_end_warpedToSave 啟動順移回城\n", "event");
 
 					delete $sc_v{'temp'}{'ai'}{'talkAuto'};
 
@@ -818,7 +1084,7 @@ sub ai_event_npc_autoTalk {
 					delete $sc_v{'temp'}{'ai'}{'talkAuto'};
 				}
 				$ai_v{'temp'}{'ai'}{'completedAI'}{'talkAuto'} = 1;
-				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
+#				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
 			} else {
 				$ai_v{'temp'}{'ai'}{'completedAI'}{'talkAuto'} = -1;
 			}
@@ -828,9 +1094,13 @@ sub ai_event_npc_autoTalk {
 			timeOutStart('ai_sellAuto');
 		}
 
-	} elsif (checkTimeOut('ai_route_npcTalk') && !%{$sc_v{'temp'}{'ai'}{'autoTalk'}}) {
+	} elsif (checkTimeOut('ai_route_npcTalk') && (!%{$sc_v{'temp'}{'ai'}{'autoTalk'}} || $ai_seq_args[0]{'reset'})) {
+
+#		print "i = $i\ntalkAuto_index = $sc_v{'temp'}{'ai'}{'talkAuto'}{'index'}\n";
 
 		$i = $sc_v{'temp'}{'ai'}{'talkAuto'}{'index'} if ($sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} > 0);
+
+		$i = 0 if ($ai_seq_args[0]{'reset'});
 
 		ai_event_npc_autoTalk_data($i);
 
@@ -839,6 +1109,10 @@ sub ai_event_npc_autoTalk {
 #		$ai_seq_args[0]{'done'} = 1 if (!%{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}});
 
 		timeOutStart('ai_route_npcTalk');
+
+#		print "[reset] $sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}\n";
+
+		undef $ai_seq_args[0]{'reset'};
 
 	} elsif (checkTimeOut('ai_route_npcTalk')) {
 
@@ -881,6 +1155,35 @@ sub ai_event_npc_autoTalk {
 				}
 			}
 
+			if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_0"}) {
+				undef @array;
+				undef $ai_v{'temp'}{'index'};
+				undef $ai_v{'temp'}{'invIndex'};
+
+				$ai_v{'temp'}{'index'} = 0;
+
+				while (1) {
+					last if (!$config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_$ai_v{'temp'}{'index'}"});
+
+					splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItem_$ai_v{'temp'}{'index'}"}, ",");
+
+					$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+					if (
+						$ai_v{'temp'}{'invIndex'} eq ""
+						|| (
+							$array[1] ne ""
+							&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $array[1]
+						)
+					) {
+						$ai_v{'temp'}{'found'} = 1;
+						last;
+					}
+
+					$ai_v{'temp'}{'index'}++;
+				}
+			}
+
 			if (!$ai_v{'temp'}{'found'} && $sc_v{'temp'}{'ai'}{'autoTalk'}{'checkItemEx'}) {
 				undef @array;
 				undef $ai_v{'temp'}{'foundEx'};
@@ -896,13 +1199,58 @@ sub ai_event_npc_autoTalk {
 				$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
 			}
 
+			if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot"}) {
+				undef @array;
+				splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot"}, ",");
+				foreach (@array) {
+					next if (!$_);
+					if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+						$ai_v{'temp'}{'found'} = 1;
+						last;
+					}
+				}
+			}
+
+			if (!$ai_v{'temp'}{'found'} && $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_0"}) {
+				undef @array;
+				undef $ai_v{'temp'}{'index'};
+				undef $ai_v{'temp'}{'invIndex'};
+
+				$ai_v{'temp'}{'index'} = 0;
+
+				while (1) {
+					last if (!$config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_$ai_v{'temp'}{'index'}"});
+
+					splitUseArray(\@array, $config{"$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}_checkItemNot_$ai_v{'temp'}{'index'}"}, ",");
+
+					$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+					if (
+						$ai_v{'temp'}{'invIndex'} ne ""
+						&& (
+							$array[1] eq ""
+							|| $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} >= $array[1]
+						)
+					) {
+						$ai_v{'temp'}{'found'} = 1;
+						last;
+					}
+
+					$ai_v{'temp'}{'index'}++;
+				}
+			}
+
 			if (!$ai_v{'temp'}{'found'}) {
 				$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
-				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
+#				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
 			} else {
-				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
+#				delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
 
+				$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 0;
 				$ai_seq_args[0]{'done'} = 1;
+
+#				print "$sc_v{'temp'}{'ai'}{'talkAuto'}{'key'}\n";
+
 				last AUTOTALK;
 			}
 		} elsif ($sc_v{'temp'}{'ai'}{'itemsMaxWeight'} && $config{'saveMap'} ne $field{'name'} && $config{'saveMap'} ne "" && $config{'saveMap_warpToBuyOrSell'} && !$ai_seq_args[0]{'warpedToSave'} && !$indoors_lut{$field{'name'}.'.rsw'}) {
@@ -912,7 +1260,7 @@ sub ai_event_npc_autoTalk {
 			timeOutStart('ai_route_npcTalk');
 			last AUTOTALK;
 		} else {
-			delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
+#			delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
 
 			$ai_seq_args[0]{'done'} = 1;
 
@@ -950,7 +1298,9 @@ sub ai_event_npc_autoTalk {
 
 			undef $ai_v{'temp'}{'found'};
 
-			$ai_v{'temp'}{'found'} = 1 if ($field{'name'} eq $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'});
+#			$ai_v{'temp'}{'found'} = 1 if ($field{'name'} eq $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'});
+
+			$ai_v{'temp'}{'found'} = checkNpcMap($field{'name'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'});
 
 			if (!$ai_v{'temp'}{'found'} && @{$record{'warp'}{'memo'}}) {
 				undef %{$sc_v{'ai'}{'warpTo'}};
@@ -971,7 +1321,10 @@ sub ai_event_npc_autoTalk {
 					for ($i=0; $i<@{$record{'warp'}{'memo'}}; $i++) {
 						next if ($record{'warp'}{'memo'}[$i] eq "" || $field{'name'} eq $record{'warp'}{'memo'}[$i] || $record{'warp'}{'memo'}[$i] eq $config{'saveMap'});
 
-						if ($record{'warp'}{'memo'}[$i] eq $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}) {
+						if (
+#							$record{'warp'}{'memo'}[$i] eq $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}
+							checkNpcMap($record{'warp'}{'memo'}[$i], $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
+						) {
 
 							$sc_v{'ai'}{'warpTo'}{'map'} = $record{'warp'}{'memo'}[$i];
 
@@ -1096,6 +1449,9 @@ sub ai_route_npc {
 #		$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
 #		$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
 #	}
+
+#	print "$ID - $dist\n";
+#	print "map: $tmpNpc{'map'}\n";
 
 	if ($dist) {
 #		getField("$sc_v{'path'}{'fields'}/$npcs_lut{$config{'storageAuto_npc'}}{'map'}.fld", \%{$ai_seq_args[0]{'dest_field'}});
@@ -1315,8 +1671,14 @@ sub ai_npc_autoTalk {
 
 			$ID = $npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'nameID'};
 			$$tmpNpc{'ID'} = $ID;
+		} elsif ($sc_v{'ai'}{'temp'}{'npcError'} > 5) {
+			useTeleport(1);
+
+			undef $sc_v{'ai'}{'temp'}{'npcError'};
 		} else {
 			printC("[ERROR] 錯誤: 找不到 NPC 接近 ".getFormattedCoords($$tmpNpc{'pos'}{'x'}, $$tmpNpc{'pos'}{'y'})." 該 NPC 可能被移除\n", "alert");
+
+			$sc_v{'ai'}{'temp'}{'npcError'}++;
 		}
 	} else {
 		$ID = $$tmpNpc{'ID'};
@@ -1332,7 +1694,7 @@ sub ai_npc_autoTalk {
 					# Equip arrow related
 					next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "0");
 
-					print "[EVENT] 開倉前自動卸下箭矢\n";
+					print "[EVENT] 啟動 storagegetAuto_uneqArrow 開倉前自動卸下箭矢\n";
 
 					parseInput("uneq 0");
 
@@ -1353,7 +1715,7 @@ sub ai_npc_autoTalk {
 			if ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /c/i) {
 				sendTalkContinue(\$remote_socket, pack("L1", $ID));
 			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
-#					sendTalkCancel(\$remote_socket, pack("L1", $ID));
+					sendTalkCancel(\$remote_socket, pack("L1", $ID));
 			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
 				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
 				if ($ai_v{'temp'}{'arg'} ne "") {
@@ -1408,7 +1770,7 @@ sub ai_npc_autoTalk {
 			$val = 1;
 		}
 	} elsif ($key eq "talkAuto") {
-		$ID = $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'} if (!$config{'parseNpcAuto'} || 1);
+		$ID = $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'} if (!$config{'parseNpcAuto'});
 
 		if (!$ai_seq_args[0]{'npc'}{'sentTalk'}) {
 #			undef $ai_v{'temp'}{'pos'};
@@ -1453,7 +1815,7 @@ sub ai_npc_autoTalk {
 			sendTalkContinue(\$remote_socket, pack("L1", $ID));
 			$ai_seq_args[0]{'npc'}{'step'}++;
 		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
-			#sendTalkCancel(\$remote_socket, pack("L1", $ID));
+			sendTalkCancel(\$remote_socket, pack("L1", $ID));
 			$ai_seq_args[0]{'npc'}{'step'}++;
 		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
 			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
@@ -1500,6 +1862,76 @@ sub inTargetNpcMap {
 	$map_def = getMapID($map_def);
 
 	return (($map_now eq $map_def) || ($map_list ne "" && existsInList($map_list, $map_now)))?1:0;
+}
+
+sub ai_event_cartToStorage {
+	return 0 if (!$cart{'weight_max'} || !@{$cart{'inventory'}} || !$config{'cartAuto'});
+
+
+}
+
+sub ai_event_itemToStorage {
+	return 0 if (!$cart{'weight_max'} || !@{$cart{'inventory'}} || !$config{'cartAuto'});
+
+	my $i;
+
+	if ($config{'cartAuto'} > 1){
+		for ($i = 0; $i < @{$cart{'inventory'}}; $i++) {
+			next if (!%{$cart{'inventory'}[$i]});
+			if (
+				$items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'storage'}
+				&& $cart{'inventory'}[$i]{'amount'} > $items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'keep'}
+			) {
+				if (
+					$ai_seq_args[0]{'lastIndex'} ne ""
+					&& $ai_seq_args[0]{'lastIndex'} == $cart{'inventory'}[$i]{'index'}
+					&& checkTimeOut('ai_storageAuto_giveup')
+				) {
+					return 1;
+				} elsif (
+					$ai_seq_args[0]{'lastIndex'} eq ""
+					|| $ai_seq_args[0]{'lastIndex'} != $cart{'inventory'}[$i]{'index'}
+				) {
+					timeOutStart('ai_storageAuto_giveup');
+				}
+				undef $ai_seq_args[0]{'done'};
+				$ai_seq_args[0]{'lastIndex'} = $cart{'inventory'}[$i]{'index'};
+				sendCartGetToStorage(\$remote_socket, $i, $cart{'inventory'}[$i]{'amount'} - $items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'keep'});
+#				parseInput("cart get $i storage");
+				timeOutStart('ai_storageAuto');
+				return 1;
+			}
+		}
+	} elsif ($config{'cartAuto'} > 0){
+		for ($i = 0; $i < @{$cart{'inventory'}}; $i++) {
+			next if (!%{$cart{'inventory'}[$i]});
+			if (
+				$items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'storage'} > 1
+				&& $cart{'inventory'}[$i]{'amount'} > $items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'keep'}
+			) {
+				if (
+					$ai_seq_args[0]{'lastIndex'} ne ""
+					&& $ai_seq_args[0]{'lastIndex'} == $cart{'inventory'}[$i]{'index'}
+					&& checkTimeOut('ai_storageAuto_giveup')
+				) {
+					return 1;
+				} elsif (
+					$ai_seq_args[0]{'lastIndex'} eq ""
+					|| $ai_seq_args[0]{'lastIndex'} != $cart{'inventory'}[$i]{'index'}
+				) {
+					timeOutStart('ai_storageAuto_giveup');
+				}
+				undef $ai_seq_args[0]{'done'};
+				$ai_seq_args[0]{'lastIndex'} = $cart{'inventory'}[$i]{'index'};
+				sendCartGetToStorage(\$remote_socket, $i, $cart{'inventory'}[$i]{'amount'} - $items_control{lcCht($cart{'inventory'}[$i]{'name'})}{'keep'});
+#				parseInput("cart get $i storage");
+				timeOutStart('ai_storageAuto');
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }
 
 1;
