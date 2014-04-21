@@ -1234,9 +1234,11 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 					&& $ai_index ne ""
 					&& %{$monsters{$ai_seq_args[$ai_index]{'ID'}}}
 					&& $ai_seq_args[$ai_index]{'ID'} ne $ID1
+					&& !$ai_seq_args[$ai_index]{'takenBy'}
 					&& !(
 						$config{'attackAuto_notMode'} > 1
-						&& $mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} < 0
+#						&& $mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} < 0
+						&& sc_getVal($mon_control{lc($monsters{$ID1}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1) < 0
 					)
 					&& !$ai_v{'temp'}{'castWait'}
 #					&& checkTimeOut('ai_attackCounter')
@@ -5923,6 +5925,8 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			$sc_v{'friend'}{'member'}[$index]{'CID'} = $CID;
 			($sc_v{'friend'}{'member'}[$index]{'name'}) = substr($msg, $i + 8, 24) =~ /([\s\S]*?)\000/;
 			print "朋友 ($sc_v{'friend'}{'member'}[$index]{'name'}) 載入好友名單。\n" if ($config{'debug'});
+
+			undef $charID_lut{$CID};
 
 			$charID_lut{$CID} = $sc_v{'friend'}{'member'}[$index]{'name'};
 			$charID_lut{$CID}{'online'} = 0;
