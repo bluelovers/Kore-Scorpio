@@ -1537,6 +1537,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			}
 		} elsif (%{$npcs{$ID}}) {
 			($npcs{$ID}{'name'}) = $name;
+			$npcs{$ID}{'map'} = $field{'name'};
 			if ($config{'debug'} >= 2) {
 				$binID = binFind(\@npcsID, $ID);
 				print "NPC Info: $npcs{$ID}{'name'} ($binID)\n";
@@ -1557,7 +1558,15 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 						sysLog("update", "重要", "◆重要訊息: 自動更新 $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} 的編號, $_ -> $npcs{$ID}{'nameID'}！", 1);
 
-						updateNPCLUTIntact("$sc_v{'path'}{'tables'}/npcs.txt", $_, $npcs{$ID}{'nameID'});
+#						updateNPCLUTIntact("$sc_v{'path'}{'tables'}/npcs.txt", $_, $npcs{$ID}{'nameID'});
+#						updatePortalLUTIntact("$sc_v{'path'}{'tables'}/portals.txt", $_, $npcs{$ID}{'nameID'});
+
+						if ($config{'updateNPC'} > 1) {
+							updateNPCLUTIntactEx("$sc_v{'path'}{'tables'}/npcs.txt", $ID);
+						} else {
+							updateNPCLUTIntact("$sc_v{'path'}{'tables'}/npcs.txt", $_, $npcs{$ID}{'nameID'});
+						}
+
 						updatePortalLUTIntact("$sc_v{'path'}{'tables'}/portals.txt", $_, $npcs{$ID}{'nameID'});
 
 						if ($config{'talkAuto_npc'} eq $_) {
@@ -1599,7 +1608,14 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				$npcs_lut{$npcs{$ID}{'nameID'}}{'name'} = $npcs{$ID}{'name'};
 				$npcs_lut{$npcs{$ID}{'nameID'}}{'map'} = $field{'name'};
 				%{$npcs_lut{$npcs{$ID}{'nameID'}}{'pos'}} = %{$npcs{$ID}{'pos'}};
-				updateNPCLUT("$sc_v{'path'}{'tables'}/npcs.txt", $npcs{$ID}{'nameID'}, $field{'name'}, $npcs{$ID}{'pos'}{'x'}, $npcs{$ID}{'pos'}{'y'}, $npcs{$ID}{'name'});
+
+				if ($config{'updateNPC'} > 1) {
+					updateNPCLUTIntactEx("$sc_v{'path'}{'tables'}/npcs.txt", $ID);
+				} else {
+					updateNPCLUT("$sc_v{'path'}{'tables'}/npcs.txt", $npcs{$ID}{'nameID'}, $field{'name'}, $npcs{$ID}{'pos'}{'x'}, $npcs{$ID}{'pos'}{'y'}, $npcs{$ID}{'name'});
+				}
+
+#				updateNPCLUT("$sc_v{'path'}{'tables'}/npcs.txt", $npcs{$ID}{'nameID'}, $field{'name'}, $npcs{$ID}{'pos'}{'x'}, $npcs{$ID}{'pos'}{'y'}, $npcs{$ID}{'name'});
 			}
 		} elsif (%{$pets{$ID}}) {
 			($pets{$ID}{'name_given'}) = $name;
