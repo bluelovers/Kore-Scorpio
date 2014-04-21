@@ -79,7 +79,7 @@ sub mathPercent {
 sub distance {
 	my $r_hash1 = shift;
 	my $r_hash2 = shift;
-	my $mode;
+	my $mode = shift;
 	my $val;
 	my %line;
 	if ($r_hash2) {
