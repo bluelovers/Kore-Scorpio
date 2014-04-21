@@ -35,6 +35,8 @@ sub initConnectVars {
 
 	# Reset attackSkillslot/useSelf_skill/useSelf_item timeout
 	resetTimeout();
+
+	timeOutStart(-1, 'ai_warpTo_wait');
 #Ayon End
 }
 
@@ -45,6 +47,8 @@ sub initMapChangeVars {
 	undef $chars[$config{'char'}]{'sitting'};
 	undef $chars[$config{'char'}]{'dead'};
 	undef $chars[$config{'char'}]{'autoSwitch'};
+
+	undef %{$ai_v{'temp'}{'npcData'}};
 
 	timeOutStart(
 		'play',
