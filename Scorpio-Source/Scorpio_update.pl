@@ -11,6 +11,7 @@ use Net::FTP;
 # $history_file = "items.txt";
 # $html_file = "items.html";
 $ftp_host = "ftp.myweb.hinet.net";
+$ftp_host = "upload.myweb.hinet.net";
 $ftp_username = "bluelovers";
 $ftp_password = "gemini";
 $ftp_location = "/kore";
