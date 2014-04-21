@@ -1723,6 +1723,7 @@ sub parseDataFile2_new {
 sub updateDataFile2_new {
 	my $file = shift;
 	my $r_hash = shift;
+#	my $mode = shift;
 	my ($data, $key, $value, $result, $inBlock, $commentBlock, %blocks, %hash_temp);
 	$result = 0;
 
@@ -1765,6 +1766,8 @@ sub updateDataFile2_new {
 			}
 			$hash_temp{$inBlock} = $value;
 			if (exists $$r_hash{$inBlock} && $value ne $$r_hash{$inBlock}) {
+				$hash_temp{$inBlock} = $$r_hash{$inBlock};
+				
 				if ($_ =~ /^(\s*\S+)\s*?(\s+{\s*)$/) {
 					$_ = "$1 $$r_hash{$inBlock}$2";
 #					print "000 $_\n";
@@ -1790,11 +1793,27 @@ sub updateDataFile2_new {
 
 			$hash_temp{$key} = $value;
 			if (exists $$r_hash{$key} && $value ne $$r_hash{$key}) {
+#				getString(\$_, 1);
+				
+#				print "$_\n";
+#				print "$key - $value - $$r_hash{$key}\n";
+				
+				$hash_temp{$key} = $$r_hash{$key};
+				
 				if ($_ =~ /^(\s*\S+)\s*?([\r\n]*)$/) {
 					$_ = "$1 $$r_hash{$key}$2";
+					
+#					print "[0] $_\n";
+#				} elsif ($value eq "") {
+#					$_ = "$key $$r_hash{$key}";
+#					
+#					print "[1] $_\n";
 				} else {
 					$_ =~ s/^(\s*\S+)(\s+)(?:.*?)([\r\n]*)$/$1$2$$r_hash{$key}$3/;
 				}
+				
+#				print "$_\n";
+				
 				$result = 1;
 			}
 
@@ -1809,6 +1828,8 @@ sub updateDataFile2_new {
 	close FILE;
 
 	if ($result) {
+#		print "Change File: $file\n";
+		
 		if (!$option{'delete_fileDesc'}) {
 
 			open(FILE, "> $file");
