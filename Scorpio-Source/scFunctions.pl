@@ -15,15 +15,86 @@ sub swrite {
 	return $result;
 }
 
-sub getPlayerType {
+sub getID {
 	my $ID = shift;
-	my $val = 0;
+	return unpack("L1", $ID);
+}
 
-	if (binFind(\@partyUsersID, $ID) ne "") {
-		$val = 1;
+sub toHex {
+	my $raw = shift;
+	my @raw;
+	my $msg;
+	@raw = split / /, $raw;
+	foreach (@raw) {
+		$msg .= pack("H2", $_);
+	}
+	return $msg;
+}
+
+sub getHexEx {
+	my $data = shift;
+	my $i;
+	my $return;
+	for ($i = 0; $i < length($data); $i++) {
+		$return .= pack("L*", substr($data, $i, 1));
+	}
+	return $return;
+}
+
+sub getPlayerType {
+	my $ID		= shift;
+	my $type	= shift;
+	my $mode	= shift;
+	my $mode2	= shift;
+	my $mode3	= shift;
+	my $val = 0;
+	my $val2 = 0;
+	my $val3 = 0;
+
+	if (
+		binFind(\@partyUsersID, $ID) ne ""
+		|| (
+			($mode >= 0 || $chars[$config{'char'}]{'party'}{'users'}{$ID}{'hp_max'})
+			&& $chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} ne ""
+		)
+	) {
+		$val = $val + 1;
+#		print "in party\n";
+	}
+	if (
+		$chars[$config{'char'}]{'guild'}{'users'}{$ID}{'ID'} ne ""
+		|| ($mode2 > 1 && ($guildUsers{'AID'}{$ID} || $guildUsers{'CID'}{$ID}))
+	) {
+		$val = $val + 2;
+#		print "in guild\n";
+	}
+	if ($friendUsers{'AID'}{$ID} || $friendUsers{'CID'}{$ID}) {
+		$val = $val + 4;
+#		print "in friend\n";
+	}
+#	if ($friends_lut{$ID}) {
+#		$val += 8;
+#	}
+
+	if ($val && $type > 0) {
+#		$val3 = $val;
+		$val2 = existsInList2($val, $type, "and");
+
+#		print "getPlayerType ".getID($ID)." - $type - $val = $val2\n";
+
+#		if ($val2) {
+#			print "getPlayerType ".getID($ID)." - $type - $val = $val2\n";
+#		}
+	} elsif ($type < 0) {
+		$val2 = $val;
 	}
 
-	return $val;
+#	print "getPlayerType ".getID($ID).", type=$type, mode=$mode, mode2=$mode2, mode3=$mode3\n";
+#	print "$players{$ID}{'name'} - $val3 = $val = $val2\n";
+
+	return $val2;
+
+#	(0=無、1=對友、2=工會、4=朋友)
 }
 
 sub sc_srand {
@@ -33,6 +104,7 @@ sub sc_srand {
 sub ai_takenBy {
 	my $ID = shift;
 	my $targetID = shift;
+	my $ai_index;
 
 	if ($ID ne "" && $targetID ne "") {
 		$monsters{$ID}{'takenBy'} = 1;
@@ -50,20 +122,35 @@ sub ai_takenBy {
 #			}
 #		}
 
-		ai_removeByKey("take", "ID", $targetID);
+#		ai_removeByKey("take", "ID", $targetID);
+
+#		return 0 if (
+#			switchInput($ai_seq[0]
+#				"route"
+#				, "route_getRoute"
+#				, "route_getMapRoute"
+#			)
+#		);
 
 		$ai_index = binFind(\@ai_seq, "attack");
-		attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'}) if ($ai_index ne "" && $ai_seq_args[$ai_index]{'ID'} ne $ID);
-		if (
-			$ai_index eq ""
-			|| (
-#				$monsters{$ID}{'attack_failed'} <= 1
-#				&&
-				$ai_seq_args[$ai_index]{'ID'} ne $ID
-			)
-		) {
+#		attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'}) if ($ai_index ne "" && $ai_seq_args[$ai_index]{'ID'} ne $ID);
+		attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'}) if ($ai_index ne "");
+
+#		if (
+#			$ai_index eq ""
+#			|| (
+##				$monsters{$ID}{'attack_failed'} <= 1
+##				&&
+#				$ai_seq_args[$ai_index]{'ID'} ne $ID
+#			)
+#		) {
+#			aiRemove("route");
+#			aiRemove("attack");
+
+#			ai_setSuspend(0);
 			attack($ID, 1);
-		}
+			ai_setSuspend(0);
+#		}
 	}
 }
 
@@ -94,204 +181,14 @@ sub getRand_sc {
 	return $t;
 }
 
-sub ai_getNpcTalk_warpedToSave_reset {
-	if ($ai_seq_args[0]{'warpedToSave'} && (!$ai_seq_args[0]{'mapChanged'} || $field{'name'} ne $config{'saveMap'})) {
-		undef $ai_seq_args[0]{'warpedToSave'};
-	}
-
-#	if ($ai_seq_args[0]{'warpedToSave'} && !$ai_seq_args[0]{'mapChanged'} && $field{'name'} ne $config{'saveMap'}) {
-#		undef $ai_seq_args[0]{'warpedToSave'};
-#	}
-}
-
-sub ai_getNpcTalk_warpedToSave {
-	my $ID = shift;
-
-	return (
-		$config{'saveMap'} ne ""
-		&& $config{'saveMap_warpToBuyOrSell'}
-		&& !$ai_seq_args[0]{'warpedToSave'}
-		&&  (1 || !$cities_lut{$field{'name'}.'.rsw'})
-		&& !$indoors_lut{$field{'name'}.'.rsw'}
-		&& $field{'name'} ne $config{'saveMap'}
-		&& $field{'name'} ne $npcs_lut{$ID}{'map'}
-	)?1:0;
-}
-
-sub ai_npc_autoTalk {
-	my $key = shift;
-	my $ID;
-	my $val;
-
-	if ($key eq "storageAuto") {
-		$ID = $config{'storageAuto_npc'};
-
-		if (!$ai_seq_args[0]{'npc'}{'sentStorage'}) {
-
-			if ($config{'storagegetAuto_uneqArrow'}){
-				for ($i = 0; $i < @{$chars[$config{'char'}]{'inventory'}}; $i++) {
-					# Equip arrow related
-					next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "0");
-
-					print "[EVENT] 開倉前自動卸下箭矢\n";
-
-					parseInput("uneq 0");
-
-					sleep(0.1);
-
-					last;
-				}
-			}
-
-			sendTalk(\$remote_socket, pack("L1", $ID));
-			@{$ai_seq_args[0]{'npc'}{'steps'}} = split(/ /, $config{'storageAuto_npc_steps'});
-			$ai_seq_args[0]{'npc'}{'sentStorage'} = 1;
-			timeOutStart('ai_storageAuto');
-
-			$val = 1;
-
-		} elsif (defined(@{$ai_seq_args[0]{'npc'}{'steps'}})) {
-			if ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /c/i) {
-				sendTalkContinue(\$remote_socket, pack("L1", $ID));
-			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
-#					sendTalkCancel(\$remote_socket, pack("L1", $ID));
-			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
-				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
-				if ($ai_v{'temp'}{'arg'} ne "") {
-					sendTalkAnswerNum(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-				}
-			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i) {
-				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i;
-				if ($ai_v{'temp'}{'arg'} ne "") {
-					sendTalkAnswerWord(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-				}
-			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i) {
-				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i;
-				if ($ai_v{'temp'}{'arg'} ne "") {
-					$ai_v{'temp'}{'arg'}++;
-					sendTalkResponse(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-				}
-			} else {
-				undef @{$ai_seq_args[0]{'npc'}{'steps'}};
-			}
-			$ai_seq_args[0]{'npc'}{'step'}++;
-			timeOutStart('ai_storageAuto');
-
-			$val = 1;
-
-		}
-	} elsif ($key eq "sellAuto") {
-		$ID = $config{'sellAuto_npc'};
-
-		if ($ai_seq_args[0]{'sentSell'} <= 1) {
-			sendTalk(\$remote_socket, pack("L1", $ID)) if !$ai_seq_args[0]{'sentSell'};
-			sendGetSellList(\$remote_socket, pack("L1", $ID)) if $ai_seq_args[0]{'sentSell'};
-			$ai_seq_args[0]{'sentSell'}++;
-			timeOutStart('ai_sellAuto');
-
-			$val = 1;
-
-		}
-	} elsif ($key eq "buyAuto") {
-		$ID = $config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"};
-
-		if ($ai_seq_args[0]{'sentBuy'} <= 1) {
-			if (!$ai_seq_args[0]{'sentBuy'} && $config{'buyAuto_smartEquip'} ne "") {
-				ai_equip_special($config{'buyAuto_smartEquip'});
-				sleep(0.5);
-			}
-			sendTalk(\$remote_socket, pack("L1", $ID)) if !$ai_seq_args[0]{'sentBuy'};
-			sendGetStoreList(\$remote_socket, pack("L1", $ID)) if $ai_seq_args[0]{'sentBuy'};
-			$ai_seq_args[0]{'sentBuy'}++;
-			timeOutStart('ai_buyAuto_wait');
-
-			$val = 1;
-		}
-	} elsif ($key eq "talkAuto") {
-		$ID = $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'};
-
-		if (!$ai_seq_args[0]{'npc'}{'sentTalk'}) {
-#			undef $ai_v{'temp'}{'pos'};
-#			undef $ai_v{'temp'}{'nearest_npc_id'};
-#			$ai_v{'temp'}{'nearest_distance'} = 9999;
-#
-#			%{$ai_v{'temp'}{'pos'}} = %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'pos'}};
-#
-#			for ($i = 0; $i < @npcsID; $i++) {
-#				next if ($npcsID[$i] eq "");
-#
-#				if (
-#					$npcs{$npcsID[$i]}{'pos'}{'x'} == $ai_v{'temp'}{'pos'}{'x'}
-#					&& $npcs{$npcsID[$i]}{'pos'}{'x'} == $ai_v{'temp'}{'pos'}{'x'}
-#				) {
-##								$ai_v{'temp'}{'nearest_npc_id'} = $npcs{$npcsID[$i]}{'nameID'};
-#
-#					$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
-#
-#					last;
-#				}
-#			}
-#
-#			if ($ai_v{'temp'}{'nearest_npc_id'} eq "") {
-#				for ($i = 0; $i < @npcsID; $i++) {
-#					next if ($npcsID[$i] eq "");
-#					$ai_v{'temp'}{'distance'} = distance(\%{$npcs{$npcsID[$i]}{'pos'}}, \%{$ai_v{'temp'}{'pos'}});
-#					if ($ai_v{'temp'}{'distance'} < $ai_v{'temp'}{'nearest_distance'}) {
-#						$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
-#						$ai_v{'temp'}{'nearest_distance'} = $ai_v{'temp'}{'distance'};
-#					}
-#				}
-#			}
-
-			sendTalk(\$remote_socket, pack("L1", $ID));
-			@{$ai_seq_args[0]{'npc'}{'steps'}} = split(/ /, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc_steps'});
-			$ai_seq_args[0]{'npc'}{'sentTalk'} = 1;
-
-			$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
-
-		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /c/i) {
-			sendTalkContinue(\$remote_socket, pack("L1", $ID));
-			$ai_seq_args[0]{'npc'}{'step'}++;
-		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
-			#sendTalkCancel(\$remote_socket, pack("L1", $ID));
-			$ai_seq_args[0]{'npc'}{'step'}++;
-		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
-			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
-			if ($ai_v{'temp'}{'arg'} ne "") {
-				sendTalkAnswerNum(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-			}
-			$ai_seq_args[0]{'npc'}{'step'}++;
-		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i) {
-			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i;
-			if ($ai_v{'temp'}{'arg'} ne "") {
-				sendTalkAnswerWord(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-			}
-			$ai_seq_args[0]{'npc'}{'step'}++;
-		} else {
-			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i;
-			if ($ai_v{'temp'}{'arg'} ne "") {
-				$ai_v{'temp'}{'arg'}++;
-				sendTalkResponse(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
-			}
-			$ai_seq_args[0]{'npc'}{'step'}++;
-		}
-
-		if ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] eq "") {
-			$ai_seq_args[0]{'done'} = 1;
-			$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
-		}
-	}
-
-	return $val;
-}
-
 sub ai_getTempVariable {
-
-	my $ai_index = binFind(\@ai_seq, "attack");
+	undef $ai_v{'temp'}{'ai_attack_index'};
 	undef $ai_v{'ai_attack_ID'};
 
-	if ($ai_index ne "") {
-		$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_index]{'ID'};
+	$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
+
+	if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
+		$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
 	}
 
 	$ai_v{'temp'}{'inLockMap'}	= (($field{'name'} eq $config{'lockMap'} || $config{'lockMap'} eq "")?1:0);
@@ -300,7 +197,7 @@ sub ai_getTempVariable {
 	$ai_v{'temp'}{'inCity'}		= $cities_lut{$field{'name'}.'.rsw'} || $ai_v{'temp'}{'inDoor'};
 	$ai_v{'temp'}{'inTake'}		= ((binFind(\@ai_seq, "take") ne "" || binFind(\@ai_seq, "items_take") ne "" || binFind(\@ai_seq, "items_gather") ne "")?1:0);
 	$ai_v{'temp'}{'onHit'}		= $sc_v{'ai'}{'onHit'} or ai_getMonstersHitMe();
-	$ai_v{'temp'}{'inAttack'}	= ($ai_index ne "")?1:0;
+	$ai_v{'temp'}{'inAttack'}	= ($ai_v{'temp'}{'ai_attack_index'} ne "")?1:0;
 	$ai_v{'temp'}{'getAggressives'}	= ai_getAggressives();
 	$ai_v{'temp'}{'getAggressives'}	= $ai_v{'temp'}{'getAggressives'}?$ai_v{'temp'}{'getAggressives'}:$ai_v{'temp'}{'onHit'};
 }
@@ -341,6 +238,9 @@ sub ai_checkToUseSkill {
 #	undef $ai_v{'temp'}{'found'} if ($mode);
 
 	if ($mode) {
+#		my $ai_index = binFind(\@ai_seq, "attack");
+		my $ai_index = $ai_v{'temp'}{'ai_attack_index'};
+
 		my $val = (
 			$config{"${key}_${i}_lvl"} > 0
 			&& mathInNum(percent_hp(\%{$chars[$config{'char'}]}), $config{"${key}_${i}_hp_upper"}, $config{"${key}_${i}_hp_lower"}, 1)
@@ -355,10 +255,14 @@ sub ai_checkToUseSkill {
 
 			&& (!$config{"${key}_${i}_waitAfterKill"} || timeOut(\%{$timeout{'ai_skill_use_waitAfterKill'}}))
 			&& (
-				isMonk($chars[$config{'char'}]{'jobID'})
+				!isMonk($chars[$config{'char'}]{'jobID'})
 				|| (
-					$chars[$config{'char'}]{'spirits'} <= $config{"${key}_${i}_spirits_upper"}
-					&& $chars[$config{'char'}]{'spirits'} >= $config{"${key}_${i}_spirits_lower"}
+					(
+						$config{"${key}_${i}_spirits_upper"} eq ""
+					) || (
+						$chars[$config{'char'}]{'spirits'} <= $config{"${key}_${i}_spirits_upper"}
+						&& $chars[$config{'char'}]{'spirits'} >= $config{"${key}_${i}_spirits_lower"}
+					)
 				)
 			)
 
@@ -367,9 +271,22 @@ sub ai_checkToUseSkill {
 			&& ($config{"${key}_${i}_inCity"} || !$ai_v{'temp'}{'inCity'})
 			&& (!$config{"${key}_${i}_inLockOnly"} || (($config{"${key}_${i}_inLockOnly"} ne "2" && $config{"${key}_${i}_inLockOnly"} && $ai_v{'temp'}{'inLockMap'}) || ($config{"${key}_${i}_inLockOnly"} eq "2" && $config{"${key}_${i}_inLockOnly"} && $ai_v{'temp'}{'inLockPos'})))
 			&& (!$config{"${key}_${i}_unLockOnly"} || ($config{"${key}_${i}_unLockOnly"} && !$ai_v{'temp'}{'inLockMap'}))
+
+			&& (!$config{"${key}_${i}_afterSkill"} || $config{"${key}_${i}_afterSkill"} eq getName("skillsID_lut", $chars[$config{'char'}]{'last_skill_used'}))
+
+			&& (!$config{"${key}_${i}_maxUses"} || $r_hash2 < $config{"${key}_${i}_maxUses"})
+
+			&& (!$config{"${key}_${i}_monsters"} || ($ai_index ne "" && existsInList($config{"${key}_${i}_monsters"}, $monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})))
+			&& (!$config{"${key}_${i}_monstersNot"} || ($ai_index eq "" || !existsInList($config{"${key}_${i}_monstersNot"}, $monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})))
+
+			&& (!$config{"${key}_${i}_unSteal"} || ($ai_index ne "" && !$monsters{$ai_seq_args[$ai_index]{'ID'}}{'beSteal'}))
 		)?1:0;
 
 #		print "${key}_${i} : $val\n" if ($key eq "useParty_skill");
+
+#		print "isMonk: ".isMonk($chars[$config{'char'}]{'jobID'})."\n";
+
+#		print "val: $val - last_skill_used: ".getName("skillsID_lut", $chars[$config{'char'}]{'last_skill_used'})."\n" if ($config{"${key}_${i}_afterSkill"});
 
 		return $val;
 	} else {
@@ -459,7 +376,10 @@ sub ai_checkToUseSkill {
 				$s_cDist = distance(\%{$r_hash2{'pos_to'}}, \%{$spells{$_}{'pos'}});
 
 				if (
-					existsInList($config{"${key}_${i}_spells"}, $spells{$_}{'type'})
+#					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}, "noand")
+#					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} <= $s_cDist)
+					existsInList2($config{"${key}_${i}_spells"}, $spells{$_}{'type'}, "and")
+#					&& (!$config{"${key}_${i}_spells_dist"} || $s_cDist <= $config{"${key}_${i}_spells_dist"})
 					&& (!$config{"${key}_${i}_spells_dist"} || $config{"${key}_${i}_spells_dist"} <= $s_cDist)
 				) {
 					$ai_v{'temp'}{'found'} = 1;
@@ -479,6 +399,8 @@ sub ai_checkToUseSkill {
 #			$ai_v{'temp'}{'found'} = 1;
 #			scModify("config", "${key}_${i}_lvl", 0, 1) if ($config{"useSkill_smartCheck"});
 #		}
+
+		print "val: $ai_v{'temp'}{'found'} - last_skill_used: ".getName("skillsID_lut", $chars[$config{'char'}]{'last_skill_used'})."\n" if ($config{"${key}_${i}_afterSkill"});
 
 		return $ai_v{'temp'}{'found'};
 	}
@@ -1070,6 +992,13 @@ sub parseSkill {
 				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
 				undef $chars[$config{'char'}]{'time_cast'};
 				undef $ai_v{'temp'}{'castWait'};
+
+				if (
+					$ai_seq[0] eq "skill_use"
+					&& $ai_seq_args[0]{'skill_use_id'} eq $skillID
+				) {
+					$ai_seq_args[0]{'skill_success'} = 1;
+				}
 			}
 
 			$miss = ($exception == 0x8AD0) ? 1 : 0;
@@ -1115,9 +1044,19 @@ sub parseSkill {
 #				}
 #			}
 			if ($castBy == 1) {
+				$chars[$config{'char'}]{'last_skill_used'} = $skillID;
+				$chars[$config{'char'}]{'last_skill_target'} = $targetID;
+
 				$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
 				undef $chars[$config{'char'}]{'time_cast'};
 				undef $ai_v{'temp'}{'castWait'};
+
+				if (
+					$ai_seq[0] eq "skill_use"
+					&& $ai_seq_args[0]{'skill_use_id'} eq $skillID
+				) {
+					$ai_seq_args[0]{'skill_success'} = 1;
+				}
 			}
 
 			$miss = ($exception == -30000) ? 1 : 0;
@@ -1208,9 +1147,19 @@ sub parseSkill {
 			}
 		}
 		if ($castBy == 1) {
+			$chars[$config{'char'}]{'last_skill_used'} = $skillID;
+			$chars[$config{'char'}]{'last_skill_target'} = $targetID;
+
 			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
 			undef $chars[$config{'char'}]{'time_cast'};
 			undef $ai_v{'temp'}{'castWait'};
+
+			if (
+				$ai_seq[0] eq "skill_use"
+				&& $ai_seq_args[0]{'skill_use_id'} eq $skillID
+			) {
+				$ai_seq_args[0]{'skill_success'} = 1;
+			}
 		}
 		if (switchInput($skillID, 28, 334, 231)) {
 			$wait = " - 回復 $exception HP";
@@ -1245,7 +1194,7 @@ sub parseSkill {
 		printC("${display}${display_ex}\n", $printC);
 	}
 
-	if (switchInput($switch, "013E", "0117") && !$sc_v{'temp'}{'itemsImportantAutoMode'}) {
+	if (switchInput($switch, "013E", "0117") && !$sc_v{'temp'}{'itemsImportantAutoMode'} && $config{'teleportAuto_skill'}) {
 		my $i = 0;
 #		my inCity = $cities_lut{$field{'name'}.'.rsw'};
 		my $inCity = getMapName($field{'name'}, 0, 1);
@@ -1281,11 +1230,11 @@ sub parseSkill {
 					move($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'});
 
 					printC(
-						"◆發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}！\n"
+						"◆發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}！ - Dist: $dist 格\n"
 						."◆啟動 teleportAuto_skill - 隨機移動！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 隨機移動！");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 隨機移動！ - Dist: $dist 格");
 
 					last;
 				} else {
@@ -1296,11 +1245,11 @@ sub parseSkill {
 					$ai_v{'clear_aiQueue'} = 1;
 
 					printC(
-						"◆發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}！\n"
+						"◆發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}！ - Dist: $dist 格\n"
 						."◆啟動 teleportAuto_skill - 瞬間移動！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 瞬間移動！");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 瞬間移動！ - Dist: $dist 格");
 
 					last;
 				}
@@ -1319,6 +1268,8 @@ sub getName {
 
 	if (switchInput($switch, "job", "jobs", "jobs_lut")) {
 		$val = $jobs_lut{$ID};
+	} elsif (switchInput($switch, "sex_lut")) {
+		$val = $sex_lut{$ID};
 	} elsif (switchInput($switch, "skill", "skills", "skillsID_lut")) {
 		$val = $skillsID_lut{$ID};
 	} elsif (switchInput($switch, "skills_lut", "skills_nameID")) {
@@ -1433,6 +1384,18 @@ sub Trim {
 	return $s;
 }
 
+sub getString {
+	my $s		= shift;
+	my $mode	= shift;
+
+	s/\s+/ /g if ($mode);
+
+	$$s =~ s/\s+$//g;
+	$$s =~ s/^\s+//g;
+	$$s =~ s/[\r\n]//g;
+
+	return $$s;
+}
 
 sub switchInput {
 	my @array = @_;
@@ -1570,6 +1533,8 @@ sub getLogFile {
 
 	if ($switch eq 's') {
 		$filename = 'Sys';
+	} elsif ($switch eq 'n') {
+		$filename = 'Sys_npc';
 	} elsif ($switch eq 'p') {
 		$filename = 'Party';
 	} elsif ($switch eq 'g') {
@@ -1901,10 +1866,354 @@ sub sc_isTrue {
 	return $val;
 }
 
+sub sc_isTrue2 {
+	my ($r_val, $r_all) = @_;
+
+#	$r_chk = 1 if ($r_chk eq "");
+
+	my $val = (($r_val eq "")?$r_all:$r_val);
+
+#	print "sc_isTrue2( $r_val , $r_all ) = $val\n";
+	return $val;
+}
+
+sub ai_route_npc {
+	my ($tag, $ID, $dist) = @_;
+	my @parseNpc = split /\s/, $ID;
+	my %tmpNpc;
+
+	if (switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+		$tmpNpc{'map'}		= $parseNpc[1];
+		$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
+		$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
+	} else {
+		$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
+		$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
+		$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
+	}
+
+	if ($dist) {
+#		getField("$sc_v{'path'}{'fields'}/$npcs_lut{$config{'storageAuto_npc'}}{'map'}.fld", \%{$ai_seq_args[0]{'dest_field'}});
+		getFieldNPC($ID);
+		do {
+			$ai_v{'temp'}{'randX'} = $tmpNpc{'pos'}{'x'} + int(rand() * ($dist * 2 + 1)) - $dist;
+			$ai_v{'temp'}{'randY'} = $tmpNpc{'pos'}{'y'} + int(rand() * ($dist * 2 + 1)) - $dist;
+		} while (
+			ai_route_getOffset(\%{$ai_seq_args[0]{'dest_field'}}, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
+			|| $ai_v{'temp'}{'randX'} == $tmpNpc{'pos'}{'x'}
+			&& $ai_v{'temp'}{'randY'} == $tmpNpc{'pos'}{'y'}
+		);
+		print "計算路徑前往自動${tag}地點 - $maps_lut{$tmpNpc{'map'}.'.rsw'}($tmpNpc{'map'}): ".getFormattedCoords($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})."\n";
+		ai_route(\%{$ai_v{'temp'}{'returnHash'}}, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'}, $tmpNpc{'map'}, 0, 0, 1, 0, 0, 1);
+#Karasu End
+	} else {
+		print "計算路徑前往自動${tag}地點 - $maps_lut{$tmpNpc{'map'}.'.rsw'}($tmpNpc{'map'}): ".getFormattedCoords($tmpNpc{'pos'}{'x'}, $tmpNpc{'pos'}{'y'})."\n";
+		ai_route(\%{$ai_v{'temp'}{'returnHash'}}, $tmpNpc{'pos'}{'x'}, $tmpNpc{'pos'}{'y'}, $tmpNpc{'map'}, 0, 0, 1, 0, 0, 1);
+	}
+}
+
+sub getFieldNPC {
+	my $ID = shift;
+	my $npcMap;
+	my @parseNpc = split /\s/, $ID;
+
+	if (switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+		$npcMap = $parseNpc[1];
+	} else {
+		$npcMap = $npcs_lut{$ID}{'map'};
+	}
+	$npcMap = $sc_v{'parseMsg'}{'map'} if ($npcMap eq "");
+
+	getField(qq~$sc_v{'path'}{'fields'}/${npcMap}.fld~, \%{$ai_seq_args[0]{'dest_field'}});
+}
+
 sub checkNpcMap {
 	my ($name, $npc) = @_;
+	my $val;
 
-	my $val = (getMapID($name) eq getMapID($npcs_lut{$npc}{'map'}));
+#	my @parseNpc = split(/ /, $npc);
+	my @parseNpc = split /\s/, $npc;
+
+	if (switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+		$val = (getMapID($name) eq getMapID($parseNpc[1]));
+	} else {
+		$val = (getMapID($name) eq getMapID($npcs_lut{$npc}{'map'}));
+	}
+
+#	print "checkNpcMap ( $name , $npc ) = $val\n";
+
+	return $val;
+}
+
+sub ai_getNpcTalk_warpedToSave_reset {
+	if ($ai_seq_args[0]{'warpedToSave'} && (!$ai_seq_args[0]{'mapChanged'} || $field{'name'} ne $config{'saveMap'})) {
+		undef $ai_seq_args[0]{'warpedToSave'};
+	}
+
+#	if ($ai_seq_args[0]{'warpedToSave'} && !$ai_seq_args[0]{'mapChanged'} && $field{'name'} ne $config{'saveMap'}) {
+#		undef $ai_seq_args[0]{'warpedToSave'};
+#	}
+}
+
+sub ai_getNpcTalk_warpedToSave {
+	my $ID = shift;
+
+	return (
+		$config{'saveMap'} ne ""
+		&& $config{'saveMap_warpToBuyOrSell'}
+		&& !$ai_seq_args[0]{'warpedToSave'}
+		&&  (1 || !$cities_lut{$field{'name'}.'.rsw'})
+		&& !$indoors_lut{$field{'name'}.'.rsw'}
+		&& $field{'name'} ne $config{'saveMap'}
+		&& !checkNpcMap($field{'name'}, $ID)
+#		&& $field{'name'} ne $npcs_lut{$ID}{'map'}
+	)?1:0;
+}
+
+sub ai_npc_check {
+	my $ID = shift;
+	my @parseNpc = split /\s/, $ID;
+	my $val;
+
+	$val = (!%{$npcs_lut{$ID}} && !switchInput($parseNpc[0], "<npc>", "<auto>", "auto"));
+
+#	print "ai_npc_check ( $ID ) = $val\n";
+
+	return $val;
+}
+
+sub ai_getNpc {
+	my ($tmpNpc, $ID) = @_;
+	my @parseNpc = split /\s/, $ID;
+
+	if (switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+		$$tmpNpc{'ID'}		= $parseNpc[0] if (
+			!$$tmpNpc{'init'}
+			|| $$tmpNpc{'map'} ne $parseNpc[1]
+			|| $$tmpNpc{'pos'}{'x'} ne $parseNpc[2]
+			|| $$tmpNpc{'pos'}{'y'} ne $parseNpc[3]
+		);
+		$$tmpNpc{'map'}		= $parseNpc[1];
+		$$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
+		$$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
+		$$tmpNpc{'init'}	= 1;
+	} else {
+		$$tmpNpc{'ID'}		= $ID;
+		$$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
+		$$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
+		$$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
+		$$tmpNpc{'init'}	= 1;
+	}
+}
+
+sub ai_npc_autoTalk {
+	my $key = shift;
+	my $tmpNpc = shift;
+	my $ID;
+	my $val;
+
+	if (switchInput($$tmpNpc{'ID'}, "<npc>", "<auto>", "auto")) {
+		undef $ai_v{'temp'}{'nearest_npc_id'};
+
+		$ai_v{'temp'}{'nearest_distance'} = 9999;
+
+		for ($i = 0; $i < @npcsID; $i++) {
+			next if ($npcsID[$i] eq "");
+			$ai_v{'temp'}{'distance'} = distance(\%{$npcs{$npcsID[$i]}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}}, 1);
+
+			if (
+				$npcs{$npcsID[$i]}{'pos'}{'x'} == $$tmpNpc{'pos'}{'x'}
+				&& $npcs{$npcsID[$i]}{'pos'}{'y'} == $$tmpNpc{'pos'}{'y'}
+			) {
+				$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
+
+				last;
+			}
+		}
+
+		if ($ai_v{'temp'}{'nearest_npc_id'} eq "") {
+			for ($i = 0; $i < @npcsID; $i++) {
+				next if ($npcsID[$i] eq "");
+
+				$ai_v{'temp'}{'distance'} = distance(\%{$npcs{$npcsID[$i]}{'pos'}}, \%{$$tmpNpc{'pos'}}, 1);
+
+				if ($ai_v{'temp'}{'distance'} < $ai_v{'temp'}{'nearest_distance'}) {
+					$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
+					$ai_v{'temp'}{'nearest_distance'} = $ai_v{'temp'}{'distance'};
+				}
+			}
+		}
+
+		if ($ai_v{'temp'}{'nearest_npc_id'} ne "") {
+#			printC("$$tmpNpc{'ID'} Target NPC Pos: ".getFormattedCoords($$tmpNpc{'pos'}{'x'}, $$tmpNpc{'pos'}{'y'})."\n", "white");
+#			printC("Found nearest NPC: $npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'nameID'} $npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'name'} ($npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'binID'}) ".getFormattedCoords($npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'pos'}{'x'}, $npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'pos'}{'y'})." - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'pos'}}, 1)."\n", "white");
+
+			$ID = $npcs{$ai_v{'temp'}{'nearest_npc_id'}}{'nameID'};
+			$$tmpNpc{'ID'} = $ID;
+		} else {
+			printC("[ERROR] 錯誤: 找不到 NPC 接近 ".getFormattedCoords($$tmpNpc{'pos'}{'x'}, $$tmpNpc{'pos'}{'y'})." 該 NPC 可能被移除\n", "alert");
+		}
+	} else {
+		$ID = $$tmpNpc{'ID'};
+	}
+
+	if ($key eq "storageAuto") {
+		if (!$ai_seq_args[0]{'npc'}{'sentStorage'}) {
+
+			if ($config{'storagegetAuto_uneqArrow'}){
+				for ($i = 0; $i < @{$chars[$config{'char'}]{'inventory'}}; $i++) {
+					# Equip arrow related
+					next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "0");
+
+					print "[EVENT] 開倉前自動卸下箭矢\n";
+
+					parseInput("uneq 0");
+
+					sleep(0.1);
+
+					last;
+				}
+			}
+
+			sendTalk(\$remote_socket, pack("L1", $ID));
+			@{$ai_seq_args[0]{'npc'}{'steps'}} = split(/ /, $config{'storageAuto_npc_steps'});
+			$ai_seq_args[0]{'npc'}{'sentStorage'} = 1;
+#			timeOutStart('ai_storageAuto');
+
+			$val = 1;
+
+		} elsif (defined(@{$ai_seq_args[0]{'npc'}{'steps'}})) {
+			if ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /c/i) {
+				sendTalkContinue(\$remote_socket, pack("L1", $ID));
+			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
+#					sendTalkCancel(\$remote_socket, pack("L1", $ID));
+			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
+				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
+				if ($ai_v{'temp'}{'arg'} ne "") {
+					sendTalkAnswerNum(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+				}
+			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i) {
+				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i;
+				if ($ai_v{'temp'}{'arg'} ne "") {
+					sendTalkAnswerWord(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+				}
+			} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i) {
+				($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i;
+				if ($ai_v{'temp'}{'arg'} ne "") {
+					$ai_v{'temp'}{'arg'}++;
+					sendTalkResponse(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+				}
+			} else {
+				undef @{$ai_seq_args[0]{'npc'}{'steps'}};
+			}
+			$ai_seq_args[0]{'npc'}{'step'}++;
+#			timeOutStart('ai_storageAuto');
+
+			$val = 1;
+		}
+
+		timeOutStart('ai_storageAuto') if $val;
+	} elsif ($key eq "sellAuto") {
+#		$ID = $config{'sellAuto_npc'};
+
+		if ($ai_seq_args[0]{'sentSell'} <= 1) {
+			sendTalk(\$remote_socket, pack("L1", $ID)) if !$ai_seq_args[0]{'sentSell'};
+			sendGetSellList(\$remote_socket, pack("L1", $ID)) if $ai_seq_args[0]{'sentSell'};
+			$ai_seq_args[0]{'sentSell'}++;
+			timeOutStart('ai_sellAuto');
+
+			$val = 1;
+
+		}
+	} elsif ($key eq "buyAuto") {
+		$ID = $config{"buyAuto_$ai_seq_args[0]{'index'}"."_npc"};
+
+		if ($ai_seq_args[0]{'sentBuy'} <= 1) {
+			if (!$ai_seq_args[0]{'sentBuy'} && $config{'buyAuto_smartEquip'} ne "") {
+				ai_equip_special($config{'buyAuto_smartEquip'});
+				sleep(0.5);
+			}
+			sendTalk(\$remote_socket, pack("L1", $ID)) if !$ai_seq_args[0]{'sentBuy'};
+			sendGetStoreList(\$remote_socket, pack("L1", $ID)) if $ai_seq_args[0]{'sentBuy'};
+			$ai_seq_args[0]{'sentBuy'}++;
+			timeOutStart('ai_buyAuto_wait');
+
+			$val = 1;
+		}
+	} elsif ($key eq "talkAuto") {
+		$ID = $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'};
+
+		if (!$ai_seq_args[0]{'npc'}{'sentTalk'}) {
+#			undef $ai_v{'temp'}{'pos'};
+#			undef $ai_v{'temp'}{'nearest_npc_id'};
+#			$ai_v{'temp'}{'nearest_distance'} = 9999;
+#
+#			%{$ai_v{'temp'}{'pos'}} = %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'pos'}};
+#
+#			for ($i = 0; $i < @npcsID; $i++) {
+#				next if ($npcsID[$i] eq "");
+#
+#				if (
+#					$npcs{$npcsID[$i]}{'pos'}{'x'} == $ai_v{'temp'}{'pos'}{'x'}
+#					&& $npcs{$npcsID[$i]}{'pos'}{'x'} == $ai_v{'temp'}{'pos'}{'x'}
+#				) {
+##								$ai_v{'temp'}{'nearest_npc_id'} = $npcs{$npcsID[$i]}{'nameID'};
+#
+#					$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
+#
+#					last;
+#				}
+#			}
+#
+#			if ($ai_v{'temp'}{'nearest_npc_id'} eq "") {
+#				for ($i = 0; $i < @npcsID; $i++) {
+#					next if ($npcsID[$i] eq "");
+#					$ai_v{'temp'}{'distance'} = distance(\%{$npcs{$npcsID[$i]}{'pos'}}, \%{$ai_v{'temp'}{'pos'}});
+#					if ($ai_v{'temp'}{'distance'} < $ai_v{'temp'}{'nearest_distance'}) {
+#						$ai_v{'temp'}{'nearest_npc_id'} = $npcsID[$i];
+#						$ai_v{'temp'}{'nearest_distance'} = $ai_v{'temp'}{'distance'};
+#					}
+#				}
+#			}
+
+			sendTalk(\$remote_socket, pack("L1", $ID));
+			@{$ai_seq_args[0]{'npc'}{'steps'}} = split(/ /, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc_steps'});
+			$ai_seq_args[0]{'npc'}{'sentTalk'} = 1;
+
+			$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
+
+		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /c/i) {
+			sendTalkContinue(\$remote_socket, pack("L1", $ID));
+			$ai_seq_args[0]{'npc'}{'step'}++;
+		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /n/i) {
+			#sendTalkCancel(\$remote_socket, pack("L1", $ID));
+			$ai_seq_args[0]{'npc'}{'step'}++;
+		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i) {
+			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a(\d+)/i;
+			if ($ai_v{'temp'}{'arg'} ne "") {
+				sendTalkAnswerNum(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+			}
+			$ai_seq_args[0]{'npc'}{'step'}++;
+		} elsif ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i) {
+			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /a"([\s\S]*?)"$/i;
+			if ($ai_v{'temp'}{'arg'} ne "") {
+				sendTalkAnswerWord(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+			}
+			$ai_seq_args[0]{'npc'}{'step'}++;
+		} else {
+			($ai_v{'temp'}{'arg'}) = $ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] =~ /r(\d+)/i;
+			if ($ai_v{'temp'}{'arg'} ne "") {
+				$ai_v{'temp'}{'arg'}++;
+				sendTalkResponse(\$remote_socket, pack("L1", $ID), $ai_v{'temp'}{'arg'});
+			}
+			$ai_seq_args[0]{'npc'}{'step'}++;
+		}
+
+		if ($ai_seq_args[0]{'npc'}{'steps'}[$ai_seq_args[0]{'npc'}{'step'}] eq "") {
+			$ai_seq_args[0]{'done'} = 1;
+			$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
+		}
+	}
 
 	return $val;
 }
@@ -2116,6 +2425,8 @@ sub ai_getCaseID {
 	my ($pos_x, $pos_y) = @_;
 	my ($name, $castBy, $dist);
 
+	$dist = 99;
+
 	if (%{$players{$ID}}) {
 		$name = "$players{$ID}{'name'} ($players{$ID}{'binID'}) ";
 		$castBy = 4;
@@ -2123,9 +2434,16 @@ sub ai_getCaseID {
 	} elsif ($ID eq $accountID) {
 		$name = "你";
 		$castBy = 1;
+
+		if ($mode && $mode ne $ID) {
+			$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$mode}{'pos_to'}}) if (%{$monsters{$mode}});
+			$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$mode}{'pos_to'}}) if (%{$players{$mode}});
+		}
 	} elsif ($ID eq "floor" || $pos_x || $pos_y) {
 		$name = "座標: ".getFormattedCoords($pos_x, $pos_y);
 		$castBy = 16;
+		$coords{'x'} = $pos_x;
+		$coords{'y'} = $pos_y;
 		$dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%coords);
 	} elsif (%{$monsters{$ID}}) {
 		$name = "$monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) ";
@@ -2408,7 +2726,7 @@ sub isMonk {
 # 用來檢查是否擁有氣球 spirits
 	my $jobID = shift;
 
-	return switchInput($jobID, 15, 39, 176, 4016);
+	return switchInput($jobID, 15, 39, 176, 4016, 4038);
 }
 
 sub inTargetMap {
@@ -2632,15 +2950,316 @@ sub isAttackAble {
 	return 1;
 }
 
-sub getFieldNPC {
-	my $ID = shift;
-	my $npcMap;
+sub checkExpire {
+	my @expire = @_;
+#	@expire = ($sec,$min,$hour,$mday,$mon,$year)
 
-	$npcMap = $npcs_lut{$ID}{'map'};
+	my @month = (
+		"January"
+		, "Febuary"
+		, "March"
+		, "April"
+		, "May"
+		, "June"
+		, "July"
+		, "August"
+		, "September"
+		, "October"
+		, "November"
+		, "December"
+		,
+	);
 
-	$npcMap = $sc_v{'parseMsg'}{'map'} if ($npcMap eq "");
+	$expire[4] = 0 if (!mathInNum($expire[4], 11, 0, 1));
+	$expire[3] = 1 if (!mathInNum($expire[3], 28, 1, 1));
 
-	getField(qq~$sc_v{'path'}{'fields'}/${npcMap}.fld~, \%{$ai_seq_args[0]{'dest_field'}});
+	my $useragent = new HTTP::Lite;
+	$useragent->proxy("$config{'proxy_host'}:$config{'proxy_port'}") if ($config{'proxy_host'} ne "" && $config{'proxy_host'} !~ /127\.0\.0\.1/ && $config{'proxy_host'} !~ /localhost/);
+	$useragent->add_req_header('Cache-Control', 'nocache');
+	my $request = $useragent->request("http://nist.time.gov/timezone.cgi?/s");
+	if ($request != 200) { die "Could not obtain time information\n" }
+	my ($hour, $min, $sec) = $useragent->body() =~ m|<font size="7" color="white"><b>(\d+):(\d+):(\d+)<br>|m;
+	my ($mon, $mday, $year) = $useragent->body() =~ m|<font size="5" color="white">\w+, (\w+) (\d+), (\d{4})<br>|m;
+	if ($hour eq "" || $min eq "" || $sec eq "" || $mon eq "" || $mday eq "" || $year eq "") { die "Bad time information\n" }
+	$mon = binFind(\@month, $mon);
+	my $current = timegm($sec,$min,$hour,$mday,$mon,$year);
+	my $basetime = timegm(0,0,0,1,5,2005);
+	my $expire = timegm(@expire);
+	print "系統時間: ", scalar(localtime(time)), " (", getFormattedDate(time), ")\n";
+	print "現在時間: ", scalar(localtime($current)), " (", getFormattedDate($current), ")\n";
+	print "到期時間: ", scalar(localtime($expire)), " (", getFormattedDate($expire),  ")\n";
+
+#	print "基準時間: ", scalar(localtime($basetime)), " (", getFormattedDate($basetime),  ")\n";
+
+	if ($current > $expire || time > $expire) {
+#		printC("I0Y","程式已過期，請更新程式。\n");
+#		print "$sc_v{'kore'}{'exeName'}版本已過期，無法更新程式。\n";
+#		sleep;
+		return 1;
+	} elsif ($basetime > $current || $basetime > time) {
+#		print "惡意的使用者\n";
+		return 2;
+	}
+	return 0;
+}
+
+#-----------------------------------------------
+
+##
+# makeDistMap(data, width, height)
+# data: the raw field data.
+# width: the field's width.
+# height: the field's height.
+# Returns: the raw data of the distance map.
+#
+# Create a distance map from raw field data. This distance map data is used by pathfinding
+# for wall avoidance support.
+#
+# This function is used internally by getField(). You shouldn't have to use this directly.
+sub makeDistMap {
+	my $data = shift;
+	my $width = shift;
+	my $height = shift;
+
+	# Simplify the raw map data. Each byte in the raw map data
+	# represents a block on the field, but only some bytes are
+	# interesting to pathfinding.
+	for (my $i = 0; $i < length($data); $i++) {
+		my $v = ord(substr($data, $i, 1));
+		# 0 is open, 3 is walkable water
+		if ($v == 0 || $v == 3) {
+			$v = 255;
+		} else {
+			$v = 0;
+		}
+		substr($data, $i, 1, chr($v));
+	}
+
+	my $done = 0;
+	until ($done) {
+		$done = 1;
+		#'push' wall distance right and up
+		for (my $y = 0; $y < $height; $y++) {
+			for (my $x = 0; $x < $width; $x++) {
+				my $i = $y * $width + $x;
+				my $dist = ord(substr($data, $i, 1));
+				if ($x != $width - 1) {
+					my $ir = $y * $width + $x + 1;
+					my $distr = ord(substr($data, $ir, 1));
+					my $comp = $dist - $distr;
+					if ($comp > 1) {
+						my $val = $distr + 1;
+						$val = 255 if $val > 255;
+						substr($data, $i, 1, chr($val));
+						$done = 0;
+					} elsif ($comp < -1) {
+						my $val = $dist + 1;
+						$val = 255 if $val > 255;
+						substr($data, $ir, 1, chr($val));
+						$done = 0;
+					}
+				}
+				if ($y != $height - 1) {
+					my $iu = ($y + 1) * $width + $x;
+					my $distu = ord(substr($data, $iu, 1));
+					my $comp = $dist - $distu;
+					if ($comp > 1) {
+						my $val = $distu + 1;
+						$val = 255 if $val > 255;
+						substr($data, $i, 1, chr($val));
+						$done = 0;
+					} elsif ($comp < -1) {
+						my $val = $dist + 1;
+						$val = 255 if $val > 255;
+						substr($data, $iu, 1, chr($val));
+						$done = 0;
+					}
+				}
+			}
+		}
+		#'push' wall distance left and down
+		for (my $y = $height - 1; $y >= 0; $y--) {
+			for (my $x = $width - 1; $x >= 0; $x--) {
+				my $i = $y * $width + $x;
+				my $dist = ord(substr($data, $i, 1));
+				if ($x != 0) {
+					my $il = $y * $width + $x - 1;
+					my $distl = ord(substr($data, $il, 1));
+					my $comp = $dist - $distl;
+					if ($comp > 1) {
+						my $val = $distl + 1;
+						$val = 255 if $val > 255;
+						substr($data, $i, 1, chr($val));
+						$done = 0;
+					} elsif ($comp < -1) {
+						my $val = $dist + 1;
+						$val = 255 if $val > 255;
+						substr($data, $il, 1, chr($val));
+						$done = 0;
+					}
+				}
+				if ($y != 0) {
+					my $id = ($y - 1) * $width + $x;
+					my $distd = ord(substr($data, $id, 1));
+					my $comp = $dist - $distd;
+					if ($comp > 1) {
+						my $val = $distd + 1;
+						$val = 255 if $val > 255;
+						substr($data, $i, 1, chr($val));
+						$done = 0;
+					} elsif ($comp < -1) {
+						my $val = $dist + 1;
+						$val = 255 if $val > 255;
+						substr($data, $id, 1, chr($val));
+						$done = 0;
+					}
+				}
+			}
+		}
+	}
+	return $data;
+}
+
+sub sendPasswordEp10 {
+	my $mode = shift;
+	my $text = shift;
+	my $newmsg = pack("C*", 0x3B, 0x02) . ($mode?pack("C*", 0x03, 0x00):pack("C*", 0x00, 0x00)) . toHex($text) . toHex('EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8');
+	encrypt(\$remote_socket, $newmsg);
+	print "Sent Password Ep-10: $text\n" if ($config{'debug'} >= 2);
+}
+
+#	mKore-2.05.04
+
+sub ai_getRandPosInCenter {
+	my ($r_ret, $map, $centerPos, $randScope, $maxCount, $mode) = @_;
+	my ($dest_field, $count, $dist);
+
+	if (!$mode) {
+		if (exists $$randScope{'dist'}) {
+			$$randScope{'dist'} = 0 if ($$randScope{'dist'} < 0);
+			$$randScope{'x'} = int(($$randScope{'dist'}+1)/1.42);
+			$$randScope{'y'} = int(($$randScope{'dist'}+1)/1.42);
+
+			$$randScope{'min'} = $$randScope{'dist'} if ($$randScope{'min'} > $$randScope{'dist'});
+			$$randScope{'min'} = 0 if ($$randScope{'min'} < 0);
+			$$randScope{'min_x'} = int(($$randScope{'min'}+1)/1.42);
+			$$randScope{'min_y'} = int(($$randScope{'min'}+1)/1.42);
+		}
+		$$randScope{'x'} = 0 if ($$randScope{'x'} < 0);
+		$$randScope{'y'} = 0 if ($$centerPos{'y'} < 0);
+		$$randScope{'min_x'} = 0 if ($$randScope{'min_x'} <= 0);
+		$$randScope{'min_y'} = 0 if ($$randScope{'min_y'} <= 0);
+
+		if (!$$randScope{'x'} && !$$randScope{'y'}) {
+			$$r_ret{'x'} = $$centerPos{'x'};
+			$$r_ret{'y'} = $$centerPos{'y'};
+			return !ai_route_getOffset($dest_field, $$r_ret{'x'}, $$r_ret{'y'});
+		}
+
+	} else {
+		if (!exists $$randScope{'dist'}) {
+			$$randScope{'dist'} = distance(\%{$randScope});
+			$$randScope{'min'} = distance({'x' => $$randScope{'min_x'}, 'y' => $$randScope{'min_y'}});
+		}
+		$$randScope{'min'} = $$randScope{'dist'} if ($$randScope{'min'} > $$randScope{'dist'});
+		$$randScope{'min'} = 0 if ($$randScope{'min'} <= 0);
+
+		if ($$randScope{'dist'} <= 0) {
+			$$r_ret{'x'} = $$centerPos{'x'};
+			$$r_ret{'y'} = $$centerPos{'y'};
+			return !ai_route_getOffset($dest_field, $$r_ret{'x'}, $$r_ret{'y'});
+		}
+	}
+
+	if ($field{'name'} ne $map) {
+		getField(modifingPath('field', $map.".fld"), \%{$ai_v{'temp'}{'field'}});
+		$dest_field = \%{$ai_v{'temp'}{'field'}};
+	} else {
+		$dest_field = \%field;
+	}
+
+	$count = 0;
+	while (!$count || ai_route_getOffset($dest_field, $$r_ret{'x'}, $$r_ret{'y'})) {
+		if (!$mode) {
+			$$r_ret{'x'} = $$centerPos{'x'} - $$randScope{'x'} + int rand(2 * $$randScope{'x'} + 1);
+			$$r_ret{'y'} = $$centerPos{'y'} - $$randScope{'y'} + int rand(2 * $$randScope{'y'} + 1);
+		} else {
+			$$r_ret{'x'} = $$centerPos{'x'} - $$randScope{'dist'} + int rand(2 * $$randScope{'dist'} + 1);
+			$$r_ret{'y'} = $$centerPos{'y'} - $$randScope{'dist'} + int rand(2 * $$randScope{'dist'} + 1);
+		}
+
+		$count++;
+		return 0 if ($maxCount > 0 && $count > $maxCount);
+
+		if (!$mode) {
+			if ($$randScope{'x'} == $$randScope{'min_x'} && $$randScope{'y'} == $$randScope{'min_y'}) {
+				redo if (abs($$r_ret{'x'} - $$centerPos{'x'}) < $$randScope{'min_x'} && abs($$r_ret{'y'} - $$centerPos{'y'}) < $$randScope{'min_y'});
+			} else {
+				redo if (abs($$r_ret{'x'} - $$centerPos{'x'}) < $$randScope{'min_x'} || abs($$r_ret{'y'} - $$centerPos{'y'}) < $$randScope{'min_y'});
+			}
+		} else {
+			$dist = int distance(\%{$centerPos}, \%{$r_ret});
+			redo if ($dist > $$randScope{'dist'} || $dist < $$randScope{'min'});
+		}
+
+		redo if ($$r_ret{'x'} < 0 || $$r_ret{'x'} >= $$dest_field{'width'} || $$r_ret{'y'} < 0 || $$r_ret{'y'} >= $$dest_field{'height'});
+	}
+	return 1;
+}
+
+sub ai_route_clear {
+	aiRemove("move");
+	aiRemove("route");
+	aiRemove("route_getRoute");
+	aiRemove("route_getMapRoute");
+	ai_clientSuspend(0, 5);
+}
+
+sub ai_attack_clear {
+	sendAttackStop(\$remote_socket);
+
+	undef $ai_v{'temp'}{'ai_attack_index'};
+	undef $ai_v{'ai_attack_ID'};
+
+	$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
+
+	if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
+		$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
+
+		if (!%{$monsters{$ai_v{'ai_attack_ID'}}} || $monsters{$ai_v{'ai_attack_ID'}}{'dead'}) {
+			$ai_v{'ai_attack_ID_old'} = $ai_v{'ai_attack_ID'};
+
+			my $display;
+			my $val = mathPercent($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgTo'}, 0, 0, 0);
+
+			$display = "目標陣亡: $monsters_old{$ai_v{'ai_attack_ID_old'}}{'name'} ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'binID'})";
+			$display .= " (Total: ${val}%)" if (!$config{'hideMsg_attackDmgFromYou'} && $val > 0);
+#Karasu Start
+			# Defeated monster record
+			$record{'monsters'}{$monsters_old{$ai_v{'ai_attack_ID_old'}}{'nameID'}}++ if ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0 || $monsters_old{$ai_v{'ai_attack_ID_old'}}{'missedFromYou'} > 0);
+#Karasu End
+			if (
+				$config{'itemsTakeAuto'}
+				&& $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0
+				&& (
+				 	!$config{'itemsTakeDamage'}
+				 	|| $val >= $config{'itemsTakeDamage'}
+				)
+			) {
+				ai_items_take($monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'y'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'y'});
+			}
+
+			print "$display\n";
+
+			timeOutStart(
+				 'ai_teleport_search'
+				,'ai_teleport_idle'
+			);
+		}
+	}
+
+	aiRemove("attack");
+	aiRemove("skill_use");
 }
 
 1;
