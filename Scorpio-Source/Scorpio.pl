@@ -886,6 +886,7 @@ EOM
 #			print "請重新執行 ${f_now}\n";
 			print <<"EOM";
 請重新執行 ${f_new}
+或者執行 koreSc.bat
 EOM
 ;
 #			print "請重新執行 ${f_new}\n";
@@ -911,7 +912,8 @@ EOM
 				close FILE;
 			}
 
-			kore_close($sc_v{'kore'}{'delay'});
+#			kore_close($sc_v{'kore'}{'delay'});
+			kore_close(30);
 		} else {
 			sleep (2);
 		}
