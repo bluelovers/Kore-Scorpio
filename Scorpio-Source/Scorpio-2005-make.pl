@@ -174,6 +174,8 @@ EOM
 
 close(FILE);
 
+print `perl Scorpio-Backup.pl`;
+
 print "\t§¹¦¨.";
 
 sub getMD5File {
