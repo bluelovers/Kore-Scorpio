@@ -424,11 +424,12 @@ sub getFormattedDate {
 
 sub getHex {
 	my $data = shift;
+	my $mode = shift;
 	my $i;
 	my $return;
 	for ($i = 0; $i < length($data); $i++) {
 		$return .= uc(unpack("H2",substr($data, $i, 1)));
-		if ($i + 1 < length($data)) {
+		if (!$mode && $i + 1 < length($data)) {
 			$return .= " ";
 		}
 	}
