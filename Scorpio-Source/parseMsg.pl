@@ -211,15 +211,34 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 	#				print "◆嚴重錯誤: $config{'server'} 號登入伺服器($servers[$config{'server'}]{'name'})不符設定, ";
 					$chatLog_string = "嚴重錯誤: $config{'server'} 號登入伺服器($servers[$config{'server'}]{'name'})不符設定, ";
 					undef $found;
-					for ($num = 0; $num < @servers; $num++) {
-						if (lcCht($servers[$num]{'name'}) eq lcCht($config{'server_name'})) {
-							$found = 1;
-							$config{'server'} = $num;
-#							writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
-							scUpdate("config");
-							last;
+#					for ($num = 0; $num < @servers; $num++) {
+#						
+#						if (lcCht($servers[$num]{'name'}) eq lcCht($config{'server_name'})) {
+#							$found = 1;
+#							$config{'server'} = $num;
+##							writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#							scUpdate("config");
+#							last;
+#						}
+#						
+##						print "$servers[$num]{'name'} $config{'server_name'} $found\n";
+#					}
+					
+					undef @array;
+					splitUseArray(\@array, $config{'server_name'}, ",");
+					
+					foreach (@array) {
+						for ($num = 0; $num < @servers; $num++) {
+							if (lcCht($servers[$num]{'name'}) eq lcCht($_)) {
+								$found = 1;
+								$config{'server'} = $num;
+								scUpdate("config");
+								last;
+							}
 						}
+						last if $found;
 					}
+
 					if (!$found) {
 	#					print "搜尋其他登入伺服器失敗！\n\n";
 						$chatLog_string .= "搜尋其他登入伺服器失敗！";
@@ -320,7 +339,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$sc_v{'input'}{'conState'} = 3;
 		undef $sc_v{'input'}{'conState_tries'};
 		$msg_size = unpack("S1", substr($msg, 2, 2));
-		if ($config{"master_version_$config{'master'}"} == 0) {
+		if ($config{"master_version_$config{'master'}"} == 0 || 1) {
 			$startVal = 24;
 		} else {
 			$startVal = 4;
@@ -367,27 +386,27 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			$chars[$num]{'int'} = unpack("C1", substr($msg, $i + 101, 1));
 #			$chars[$num]{'dex'} = unpack("C1", substr($msg, $i + 102, 1));
 #			$chars[$num]{'luk'} = unpack("C1", substr($msg, $i + 103, 1));
-##			($chars[$num]{'exp'},
-##				$chars[$num]{'zenny'},
-##				$chars[$num]{'exp_job'},
-##				$chars[$num]{'lv_job'}) = unpack("x4 L3 C", substr($msg, $i, 106));
-##			($chars[$num]{'hp_max'},
-##				$chars[$num]{'sp_max'},
-##				$chars[$num]{'jobID'},
-##				$chars[$num]{'lv'}) = unpack("x42 x2 S x2 S x2 S x4 C", substr($msg, $i, 106));
-##			($chars[$num]{'name'},
-##				$chars[$num]{'str'},
-##				$chars[$num]{'agi'},
-##				$chars[$num]{'vit'},
-##				$chars[$num]{'int'},
-##				$chars[$num]{'dex'},
-##				$chars[$num]{'luk'}) = unpack("x74 Z24 C6", substr($msg, $i, 106));
-##			$chars[$num]{'sex'} = $sc_v{'input'}{'accountSex2'};
-##			calPercent(\%{$chars[$num]}, "hp", unpack("S1", substr($msg, $i + 42, 2)));
-##			calPercent(\%{$chars[$num]}, "sp", unpack("S1", substr($msg, $i + 46, 2)));
+#			($chars[$num]{'exp'},
+#				$chars[$num]{'zenny'},
+#				$chars[$num]{'exp_job'},
+#				$chars[$num]{'lv_job'}) = unpack("x4 L3 C", substr($msg, $i, 106));
+#			($chars[$num]{'hp_max'},
+#				$chars[$num]{'sp_max'},
+#				$chars[$num]{'jobID'},
+#				$chars[$num]{'lv'}) = unpack("x42 x2 S x2 S x2 S x4 C", substr($msg, $i, 106));
+#			($chars[$num]{'name'},
+#				$chars[$num]{'str'},
+#				$chars[$num]{'agi'},
+#				$chars[$num]{'vit'},
+#				$chars[$num]{'int'},
+#				$chars[$num]{'dex'},
+#				$chars[$num]{'luk'}) = unpack("x74 Z24 C6", substr($msg, $i, 106));
+#			$chars[$num]{'sex'} = $sc_v{'input'}{'accountSex2'};
+#			calPercent(\%{$chars[$num]}, "hp", unpack("S1", substr($msg, $i + 42, 2)));
+#			calPercent(\%{$chars[$num]}, "sp", unpack("S1", substr($msg, $i + 46, 2)));
 #			
-#			$chars[$num]{'hp_string'} = sprintf("%5d", $chars[$num]{'hp'})."/".sprintf("%-5d", $chars[$num]{'hp_max'}) if ($chars[$num]{'hp_max'} ne "");
-#			$chars[$num]{'sp_string'} = sprintf("%5d", $chars[$num]{'sp'})."/".sprintf("%-5d", $chars[$num]{'sp_max'}) if ($chars[$num]{'sp_max'} ne "");
+			$chars[$num]{'hp_string'} = sprintf("%5d", $chars[$num]{'hp'})."/".sprintf("%-5d", $chars[$num]{'hp_max'}) if ($chars[$num]{'hp_max'} ne "");
+			$chars[$num]{'sp_string'} = sprintf("%5d", $chars[$num]{'sp'})."/".sprintf("%-5d", $chars[$num]{'sp_max'}) if ($chars[$num]{'sp_max'} ne "");
 
 			if (@{$sc_v{'valBan_name'}} && binFind(\@{$sc_v{'valBan_name'}}, $chars[$num]{'name'}) ne "") {
 				print "拒絕使用: $chars[$num]{'name'}\n";
