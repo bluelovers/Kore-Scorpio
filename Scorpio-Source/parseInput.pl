@@ -15,6 +15,7 @@ sub parseInput {
 	my @params;
 	my $inputparam;
 	my %tmpVal;
+	my ($i, $j);
 
 	@params = parseCmdLine($input);
 
@@ -47,7 +48,10 @@ sub parseInput {
 			$config{'server'} = $input;
 			$config{'server_name'} = $servers[$input]{'name'};
 
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+			scUpdate("config");
 
 			$sc_v{'input'}{'waitingForInput'} = 0;
 		} elsif ($sc_v{'input'}{'conState'} == 3) {
@@ -66,7 +70,10 @@ sub parseInput {
 
 			scMapJump($config{"map_host_$config{'master'}"."_$config{'server'}"."_$config{'mapserver'}"}, $config{'map_port'});
 
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+			scUpdate("config");
 
 			$sc_v{'input'}{'waitingForInput'} = 0;
 		}
@@ -791,21 +798,35 @@ $i, $chars[$config{'char'}]{'inventory'}[$identifyID[$i]]{'name'}
 			}
 		}
 
-	} elsif ($switch eq "il") {
-		$~ = "ILIST";
-		print "------------------ 物品列表 ------------------\n";
-		print "#   名稱                                      \n";
-		for ($i = 0; $i < @itemsID; $i++) {
-			next if ($itemsID[$i] eq "");
-			$display = $items{$itemsID[$i]}{'name'};
-			$display .= " x $items{$itemsID[$i]}{'amount'}";
-			format ILIST =
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-$i, $display
-.
-			write;
-		}
-		print "----------------------------------------------\n";
+#	} elsif ($switch eq "il") {
+##		$~ = "ILIST";
+##		print "------------------ 物品列表 ------------------\n";
+##		print "#   名稱                                      \n";
+##		for ($i = 0; $i < @itemsID; $i++) {
+##			next if ($itemsID[$i] eq "");
+##			$display = $items{$itemsID[$i]}{'name'};
+##			$display .= " x $items{$itemsID[$i]}{'amount'}";
+##			format ILIST =
+##@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+##$i, $display
+##.
+##			write;
+##		}
+##		print "----------------------------------------------\n";
+#
+#		$tmpVal{'il'} = "@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
+#
+#		print subStrLine(0, "物品列表").swrite($tmpVal{'il'}, ["\#", "名稱"]);
+#
+#		for ($i = 0; $i < @itemsID; $i++) {
+#			next if ($itemsID[$i] eq "");
+#			$display = $items{$itemsID[$i]}{'name'};
+#			$display .= " x $items{$itemsID[$i]}{'amount'}";
+#
+#			print swrite($tmpVal{'il'}, [$i, $display]);
+#		}
+#
+#		print subStrLine();
 
 #	} elsif ($switch eq "im") {
 #		($arg1) = $input =~ /^[\s\S]*? (\d+)/;
@@ -1048,21 +1069,21 @@ $i, $monsters{$monstersID[$i]}{'lv'}, $monsters{$monstersID[$i]}{'name'}, $dmgTo
 			}
 		}
 
-	} elsif ($switch eq "nl") {
-		# Add ID information to the list
-		$~ = "NLIST";
-		print "------------------ NPC 列表 ------------------\n";
-		print "#   ID     名稱                       座   標 \n";
-		for ($i = 0; $i < @npcsID; $i++) {
-			next if ($npcsID[$i] eq "");
-			$nlcoords = getFormattedCoords($npcs{$npcsID[$i]}{'pos'}{'x'}, $npcs{$npcsID[$i]}{'pos'}{'y'});
-			format NLIST =
-@<< @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<
-$i, $npcs{$npcsID[$i]}{'nameID'}, $npcs{$npcsID[$i]}{'name'}, $nlcoords
-.
-			write;
-		}
-		print "----------------------------------------------\n";
+#	} elsif ($switch eq "nl") {
+#		# Add ID information to the list
+#		$~ = "NLIST";
+#		print "------------------ NPC 列表 ------------------\n";
+#		print "#   ID     名稱                       座   標 \n";
+#		for ($i = 0; $i < @npcsID; $i++) {
+#			next if ($npcsID[$i] eq "");
+#			$nlcoords = getFormattedCoords($npcs{$npcsID[$i]}{'pos'}{'x'}, $npcs{$npcsID[$i]}{'pos'}{'y'});
+#			format NLIST =
+#@<< @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<
+#$i, $npcs{$npcsID[$i]}{'nameID'}, $npcs{$npcsID[$i]}{'name'}, $nlcoords
+#.
+#			write;
+#		}
+#		print "----------------------------------------------\n";
 
 	} elsif ($switch eq "party") {
 		($arg1) = $input =~ /^[\s\S]*? (\w*)/;
@@ -1120,19 +1141,21 @@ $i, $admin_string, $online_string, $name_string, $map_string, $coord_string, $hp
 
 			} elsif ($params[2] eq "" && $config{'partyAutoCreate'}) {
 
-				sendPartyOrganize(\$remote_socket, vocalString(14));
+				splitUseArray(\@{$sc_v{'ai'}{'temp'}{'array'}}, $config{"partyAutoParam"}, ",");
+
+				sendPartyOrganize(\$remote_socket, vocalString(14), $sc_v{'ai'}{'temp'}{'array'}[0], $sc_v{'ai'}{'temp'}{'array'}[1]);
 				# Party created by self
-				$createPartyBySelf = 1;
+				$sc_v{'ai'}{'temp'}{'createPartyBySelf'} = 1;
 
 			} elsif ($params[2] eq "") {
 #				print	"語法錯誤 'party create' (Organize Party)\n"
 #				,qq~使用方法: party create "<隊伍名稱>"\n~;
 
-				printErr('party create', 'Organize Party', '"<隊伍名稱>"', 1);
+				printErr('party create', 'Organize Party', '"<隊伍名稱> <物品均分> <隨機分配>"', 1);
 			} else {
-				sendPartyOrganize(\$remote_socket, $params[2]);
+				sendPartyOrganize(\$remote_socket, $params[2], $params[3], $params[4]);
 				# Party created by self
-				$createPartyBySelf = 1;
+				$sc_v{'ai'}{'temp'}{'createPartyBySelf'} = 1;
 			}
 
 		} elsif ($arg1 eq "join" && $arg2 ne "1" && $arg2 ne "0") {
@@ -1271,63 +1294,92 @@ $i, $pets{$petsID[$i]}{'name'}, $pets{$petsID[$i]}{'name_given'}
 		print "已將傳送密語時重複顯示之話語刪除\n";
 
 	} elsif ($switch eq "pml") {
-		$~ = "PMLIST";
-		print "------------------ 密語列表 ------------------\n";
-		print "#   名稱                                      \n";
-		for ($i = 1; $i <= @privMsgUsers; $i++) {
-			format PMLIST =
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-$i, $privMsgUsers[$i - 1]
-.
-			write;
-		}
-		print "----------------------------------------------\n";
+#		$~ = "PMLIST";
+#		print "------------------ 密語列表 ------------------\n";
+#		print "#   名稱                                      \n";
+#		for ($i = 1; $i <= @privMsgUsers; $i++) {
+#			format PMLIST =
+#@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#$i, $privMsgUsers[$i - 1]
+#.
+#			write;
+#		}
+#		print "----------------------------------------------\n";
 
+		$tmpVal{'pml'} = "@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
+
+		print subStrLine(0, "密語列表").swrite($tmpVal{'pml'}, ["", "名稱"]);
+		for ($i = 1; $i <= @privMsgUsers; $i++) {
+			print swrite($tmpVal{'pml'}, [$i, $privMsgUsers[$i - 1]]);
+		}
+		print subStrLine();
 
 	} elsif ($switch eq "pl") {
-		$~ = "PLIST";
-		$mycoords = getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'});
-		print "---------------------------------- 玩家列表 ---------------------$mycoords----\n";
-		print "#   Lv 職業 性別 名稱                   所屬公會                  座   標 距離\n";
+#		$~ = "PLIST";
+#		$mycoords = getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'});
+#		print "---------------------------------- 玩家列表 ---------------------$mycoords----\n";
+#		print "#   Lv 職業 性別 名稱                   所屬公會                  座   標 距離\n";
+#		for ($i = 0; $i < @playersID; $i++) {
+#			next if ($playersID[$i] eq "");
+#			$plcoords = getFormattedCoords($players{$playersID[$i]}{'pos_to'}{'x'}, $players{$playersID[$i]}{'pos_to'}{'y'});
+#			$dPDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$playersID[$i]}{'pos_to'}}));
+#			$job_string = ($jobs_lut{$players{$playersID[$i]}{'jobID'}}) ? $jobs_lut{$players{$playersID[$i]}{'jobID'}} : $players{$playersID[$i]}{'jobID'};
+#			$guild_string = ($players{$playersID[$i]}{'guild'}{'name'}) ? "[$players{$playersID[$i]}{'guild'}{'name'}]" : "";
+#			format PLIST =
+#@<<@>> @<<< @<<< @<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<< @>>
+#$i, $players{$playersID[$i]}{'lv'}, $job_string, $sex_lut{$players{$playersID[$i]}{'sex'}}, $players{$playersID[$i]}{'name'}, $guild_string, $plcoords, $dPDist
+#.
+#			write;
+#		}
+#		print "------------------------------------------------------------------------------\n";
+
+		$tmpVal{'line'} = "@<<@>> @<<< @<<< @<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<< @>>";
+
+		print subStrLine(0, "玩家列表 ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'}));
+		print swrite($tmpVal{'line'}, ["\#", "Lv", "職業", "性別", "名稱", "所屬公會", "座   標", "距離"]);
+
 		for ($i = 0; $i < @playersID; $i++) {
 			next if ($playersID[$i] eq "");
-			$plcoords = getFormattedCoords($players{$playersID[$i]}{'pos_to'}{'x'}, $players{$playersID[$i]}{'pos_to'}{'y'});
-			$dPDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$playersID[$i]}{'pos_to'}}));
-			$job_string = ($jobs_lut{$players{$playersID[$i]}{'jobID'}}) ? $jobs_lut{$players{$playersID[$i]}{'jobID'}} : $players{$playersID[$i]}{'jobID'};
-			$guild_string = ($players{$playersID[$i]}{'guild'}{'name'}) ? "[$players{$playersID[$i]}{'guild'}{'name'}]" : "";
-			format PLIST =
-@<<@>> @<<< @<<< @<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<< @>>
-$i, $players{$playersID[$i]}{'lv'}, $job_string, $sex_lut{$players{$playersID[$i]}{'sex'}}, $players{$playersID[$i]}{'name'}, $guild_string, $plcoords, $dPDist
-.
-			write;
+			$tmpVal{'plcoords'}	= getFormattedCoords($players{$playersID[$i]}{'pos_to'}{'x'}, $players{$playersID[$i]}{'pos_to'}{'y'});
+			$tmpVal{'dPDist'}	= distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$playersID[$i]}{'pos_to'}});
+			$tmpVal{'job_string'}	= ($jobs_lut{$players{$playersID[$i]}{'jobID'}}) ? $jobs_lut{$players{$playersID[$i]}{'jobID'}} : $players{$playersID[$i]}{'jobID'};
+			$tmpVal{'guild_string'}	= ($players{$playersID[$i]}{'guild'}{'name'}) ? "[$players{$playersID[$i]}{'guild'}{'name'}]" : "";
+
+			print swrite($tmpVal{'line'}, [$i, $players{$playersID[$i]}{'lv'}, $tmpVal{'job_string'}, $sex_lut{$players{$playersID[$i]}{'sex'}}, $players{$playersID[$i]}{'name'}, $tmpVal{'guild_string'}, $tmpVal{'plcoords'}, $tmpVal{'dPDist'}]);
+
+			if ($params[1]) {
+				print swrite($tmpVal{'line'}, ["", "", $players{$playersID[$i]}{'jobID'}, "", getID($playersID[$i]), getID($players{$playersID[$i]}{'guild'}{'ID'})]);
+			}
 		}
-		print "------------------------------------------------------------------------------\n";
+
+		print subStrLine();
 
 	} elsif (switchInput($switch, "portals", "ptl", "portal")) {
 		# Add ID information to the list
 #		$~ = "PORTALLIST";
 #		print "----------------- 傳送點列表 -----------------\n";
 
-		my $tmpLine = "@>> @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<< @>>>>>>>";
+		$tmpVal{'line'} = "@>> @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<< @>>>>>>> @>>>";
 
-		print	subStrLine($tmpLine, "Portals List")
-			.swrite($tmpLine, ["No", "ID", "Name.", "Coords"]);
+		print	subStrLine($tmpVal{'line'}, "Portals List")
+			.swrite($tmpVal{'line'}, ["No", "ID", "Name.", "Coords", "Dist"]);
 
 		for ($i = 0; $i < @portalsID; $i++) {
 			next if ($portalsID[$i] eq "");
 
-			$portalscoords = getFormattedCoords($portals{$portalsID[$i]}{'pos'}{'x'}, $portals{$portalsID[$i]}{'pos'}{'y'});
+			$tmpVal{'portalscoords'} = getFormattedCoords($portals{$portalsID[$i]}{'pos'}{'x'}, $portals{$portalsID[$i]}{'pos'}{'y'});
+			$tmpVal{'dist'} = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$portals{$portalsID[$i]}{'pos'}});
 #			format PORTALLIST =
 #@<< @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<@<<<<<<<<
 #$i, $portals{$portalsID[$i]}{'nameID'}, $portals{$portalsID[$i]}{'name'}, $portalscoords
 #.
 #			write;
 
-			print swrite($tmpLine, [$i, $portals{$portalsID[$i]}{'nameID'}, $portals{$portalsID[$i]}{'name'}, $portalscoords]);
+			print swrite($tmpVal{'line'}, [$i, $portals{$portalsID[$i]}{'nameID'}, $portals{$portalsID[$i]}{'name'}, $tmpVal{'portalscoords'}, $tmpVal{'dist'}]);
 
 		}
 
-		print subStrLine($tmpLine);
+		print subStrLine($tmpVal{'line'});
 
 	} elsif (switchInput($switch, "quit", "close", "end", "logout")) {
 
@@ -1534,8 +1586,8 @@ $i, $skills_lut{$skillsID[$i]}, $chars[$config{'char'}]{'skills'}{$skillsID[$i]}
 			my @temp;
 			my @output;
 			foreach (keys %skillsID_lut) {
-				my $msg = $skills_rlut{lc($skillsID_lut{$_})}."#".$skillsID_lut{$_}."#".$_."#";
-				if (binFind(\@skillsID, $skills_rlut{lc($skillsID_lut{$_})}) ne "") {
+				my $msg = $skills_rlut{lcCht($skillsID_lut{$_})}."#".$skillsID_lut{$_}."#".$_."#";
+				if (binFind(\@skillsID, $skills_rlut{lcCht($skillsID_lut{$_})}) ne "") {
 					$temp[$_] = $msg;
 				}
 			}
@@ -2422,6 +2474,8 @@ $i, $items_lut{$makeID[$i]}
 			print "[$sc_v{'kore'}{'exeName'} $sc_v{'Scorpio'}{'version'}]\n";
 			close(EXPLOG);
 			logCommand(">> $sc_v{'path'}{'def_logs'}"."ExpLog.txt", "exp");
+
+			parseInput("guild ebm");
 		} elsif (switchInput($params[1], "reset", "cls")) {
 			undef $sc_v{'exp'}{'base'};
 			undef $sc_v{'exp'}{'job'};
@@ -2516,11 +2570,11 @@ $i, $items_lut{$makeID[$i]}
 		$tmpVal{'tag'}		= $switch;
 		$tmpVal{'title'}	= "Guild Functions";
 
-		if (!switchInput($params[1], "join", "j") && !$chars[$config{'char'}]{'guild'}{'name'}) {
+		if (!switchInput($params[1], "join", "j", "ebm") && !$chars[$config{'char'}]{'guild'}{'name'}) {
 
 			$tmpVal{'text'} = "無法查詢公會資訊 - 你沒有公會";
 
-		} elsif (!switchInput($params[1], "join", "j", "u", "user", "users") && (!%{$guild{$ID}} || !$guild{$ID}{'name'})) {
+		} elsif (!switchInput($params[1], "join", "j", "u", "user", "users") && (!%{$guild{$ID}} || !$guild{$ID}{'name'} || !$guild{$ID}{'info'})) {
 
 			sendGuildInfoRequest(\$remote_socket);
 
@@ -2528,11 +2582,14 @@ $i, $items_lut{$makeID[$i]}
 				sendGuildRequest(\$remote_socket, $i);
 			}
 
+#			sendGuildEmblemRequest(\$remote_socket, $ID) if (!$guild{$ID}{'ebm2bmp'});
+
 		} elsif (switchInput($params[1], "i", "info", "", "information")) {
 
 			$tmpVal{'line'} = "@<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
 
-			print subStrLine($tmpVal{'line'}, "Guild Info (ID: ".getHex($ID)." )", -1);
+#			print subStrLine($tmpVal{'line'}, "Guild Info (ID: ".getHex($ID)." )", -1);
+			print subStrLine($tmpVal{'line'}, "Guild Info ( ".getID($ID)." )", -1);
 
 			print swrite(
 				 "公會名稱: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", [$guild{$ID}{'name'}]
@@ -2610,6 +2667,11 @@ $i, $items_lut{$makeID[$i]}
 			}
 
 			print subStrLine($tmpVal{'line'});
+
+#			my $newmsg = pack("C*", 0x51, 0x01).$ID;
+#			encrypt(\$remote_socket, $newmsg);
+
+			sendGuildEmblemRequest(\$remote_socket, $ID) if (!$guild{$ID}{'ebm2bmp'});
 
 			sendGuildInfoRequest(\$remote_socket);
 
@@ -2737,6 +2799,14 @@ $i, $items_lut{$makeID[$i]}
 				print swrite($tmpVal{'line'}, [$tmpVal{'idx'}++, ($chars[$config{'char'}]{'guild'}{'users'}{$_}{'onhere'}?"☆":""), "[".unpack("L1", $chars[$config{'char'}]{'guild'}{'users'}{$_}{'ID'})."] ".getName("player", $chars[$config{'char'}]{'guild'}{'users'}{$_}{'ID'}, 0, -1), posToCoordinate(\%{$chars[$config{'char'}]{'guild'}{'users'}{$_}{'pos'}}, 1)]);
 			}
 			print subStrLine();
+		} elsif (switchInput($params[1], "ebm")) {
+#			open $sc_v{'path'}{'plugin'}/
+
+#			unless (-e "$sc_v{'path'}{'plugin'}/$sc_v{'parseMsg'}{'server_name'}/") {
+#				mkdir("$sc_v{'path'}{'plugin'}/$sc_v{'parseMsg'}{'server_name'}/", 0777) or die '無法產生目錄';
+#			}
+
+			updateDataFile2_guild("$sc_v{'path'}{'tables'}/guilds.txt", \%guilds_lut) if (%guilds_lut && %guild);
 		}
 
 		printErr($tmpVal{'tag'}, $tmpVal{'title'}, $tmpVal{'text'}, $tmpVal{'type'});
@@ -3343,7 +3413,8 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 #			, $tmpVal{'line'}, ["level: $sc_v{'sense'}{'level'}", "size: $sc_v{'sense'}{'size'}"]
 #
 #		);
-	} elsif (switchInput($switch, "test")) {
+	} elsif (switchInput($switch, "bluelovers")) {
+		print "修正倉庫密碼..\n";
 #		print "傳送密碼 : $inputparam\n";
 #		print "傳送密碼 : ".getHex(pack("L1", $params[1]))." - ".getHex(pack("L1", $params[2]))."\n";
 #		print "傳送密碼 : ".getHexEx($params[1])." - ".getHexEx($params[2])."\n";
@@ -3359,6 +3430,36 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 		encrypt(\$remote_socket, $newmsg);
 
 		dumpData($newmsg, 1);
+
+		print "倉庫密碼已修正完成\n";
+	} elsif (switchInput($switch, "il", "nl")) {
+		if ($switch eq "il") {
+			$tmpVal{'line'} = "@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
+
+			print	subStrLine(0, "物品列表")
+				.swrite($tmpVal{'line'}, ["\#", "名稱"]);
+
+			for ($i = 0; $i < @itemsID; $i++) {
+				next if ($itemsID[$i] eq "");
+				$tmpVal{'display'} = $items{$itemsID[$i]}{'name'};
+				$tmpVal{'display'} .= " x $items{$itemsID[$i]}{'amount'}";
+
+				print swrite($tmpVal{'line'}, [$i, $tmpVal{'display'}]);
+			}
+
+			print subStrLine();
+		} elsif ($switch eq "nl") {
+			$tmpVal{'line'} = "@<< @<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<";
+
+			print	subStrLine(0, "NPC 列表")
+				.swrite($tmpVal{'line'}, ["\#", "ID", "名稱", "座   標"]);
+			for ($i = 0; $i < @npcsID; $i++) {
+				next if ($npcsID[$i] eq "");
+				print swrite($tmpVal{'line'}, [$i, $npcs{$npcsID[$i]}{'nameID'}, $npcs{$npcsID[$i]}{'name'}, getFormattedCoords($npcs{$npcsID[$i]}{'pos'}{'x'}, $npcs{$npcsID[$i]}{'pos'}{'y'})]);
+			}
+
+			print subStrLine();
+		}
 	} else {
 		print "錯誤的指令 : $switch \n";
 	}
