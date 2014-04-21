@@ -242,6 +242,7 @@ sub parseDataFile2 {
 
 	my $plus	= shift;
 	my @plus_file;
+	my $line;
 	@plus_file = glob $plus if ($plus ne "");
 
 	foreach $line ($file, @plus_file) {
@@ -383,6 +384,75 @@ sub parseMonControl {
 #	close FILE;
 #}
 
+#sub parsePortals {
+#	my $file = shift;
+#	my $r_hash = shift;
+#	undef %{$r_hash};
+#	my ($key, $value);
+#	my %IDs;
+#	my $i;
+#	my $j = 0;
+#	my $nameID;
+#	open(FILE, $file);
+#	foreach (<FILE>) {
+#		next if (/^#/);
+##		s/[\r\n]//g;
+##		s/\s+/ /g;
+##		s/\s+$//g;
+#
+#		getString(\$_, 1);
+#
+#		@args = split /\s/, $_;
+#		if (@args > 5) {
+##			my $portal = "$args[0] $args[1] $args[2]";
+##			my $dest = "$args[3] $args[4] $args[5]";
+##			$$r_hash{$portal}{'source'}{'ID'} = $portal;
+##			$$r_hash{$portal}{'source'}{'map'} = $args[0];
+##			$$r_hash{$portal}{'source'}{'pos'}{'x'} = $args[1];
+##			$$r_hash{$portal}{'source'}{'pos'}{'y'} = $args[2];
+##			$$r_hash{$portal}{'dest'}{$dest}{'ID'} = $dest;
+##			$$r_hash{$portal}{'dest'}{$dest}{'map'} = $args[3];
+##			$$r_hash{$portal}{'dest'}{$dest}{'pos'}{'x'} = $args[4];
+##			$$r_hash{$portal}{'dest'}{$dest}{'pos'}{'y'} = $args[5];
+###			$$r_hash{$portal}{'dest'}{$dest}{'cost'} = $args[6];
+###			$$r_hash{$portal}{'npc'}{'ID'} = $args[6];
+###			$$r_hash{$portal}{'dest'}{$dest}{'steps'} = $args[7];
+##
+##			if ($args[6] ne "" && $args[6] ne "<none>") {
+##				$$r_hash{$portal}{'npc'}{'ID'} = $args[6];
+##				for ($i = 7; $i < @args; $i++) {
+##					$$r_hash{$portal}{'npc'}{'steps'}[@{$$r_hash{$portal}{'npc'}{'steps'}}] = $args[$i];
+##				}
+##			}
+#
+#			$nameID = "$args[0] $args[1] $args[2]";
+#
+#			$nameID = "$args[0] $args[1] $args[2] $args[3] $args[4] $args[5]" if ($sc_v{'kore'}{'multiPortals'});
+#
+#			$$r_hash{$nameID}{'nameID'} = "$args[0] $args[1] $args[2]";
+#			$IDs{$args[0]}{$args[1]}{$args[2]} = $nameID;
+#			$$r_hash{$nameID}{'source'}{'ID'} = $nameID;
+#			$$r_hash{$nameID}{'source'}{'map'} = $args[0];
+#			$$r_hash{$nameID}{'source'}{'pos'}{'x'} = $args[1];
+#			$$r_hash{$nameID}{'source'}{'pos'}{'y'} = $args[2];
+#			$$r_hash{$nameID}{'dest'}{'map'} = $args[3];
+#			$$r_hash{$nameID}{'dest'}{'pos'}{'x'} = $args[4];
+#			$$r_hash{$nameID}{'dest'}{'pos'}{'y'} = $args[5];
+#			if ($args[6] ne "" && $args[6] ne "<none>") {
+#				$$r_hash{$nameID}{'npc'}{'ID'} = $args[6];
+#				for ($i = 7; $i < @args; $i++) {
+#					$$r_hash{$nameID}{'npc'}{'steps'}[@{$$r_hash{$nameID}{'npc'}{'steps'}}] = $args[$i];
+#				}
+#			}
+#		}
+#		$j++;
+#	}
+#	foreach (keys %{$r_hash}) {
+#		$$r_hash{$_}{'dest'}{'ID'} = $IDs{$$r_hash{$_}{'dest'}{'map'}}{$$r_hash{$_}{'dest'}{'pos'}{'x'}}{$$r_hash{$_}{'dest'}{'pos'}{'y'}};
+#	}
+#	close(FILE);
+#}
+
 sub parsePortals {
 	my $file = shift;
 	my $r_hash = shift;
@@ -392,64 +462,54 @@ sub parsePortals {
 	my $i;
 	my $j = 0;
 	my $nameID;
-	open(FILE, $file);
-	foreach (<FILE>) {
-		next if (/^#/);
-#		s/[\r\n]//g;
-#		s/\s+/ /g;
-#		s/\s+$//g;
 
-		getString(\$_, 1);
+	my $plus	= shift;
+	my @plus_file;
+	my $line;
+	@plus_file = glob $plus if ($plus ne "");
 
-		@args = split /\s/, $_;
-		if (@args > 5) {
-#			my $portal = "$args[0] $args[1] $args[2]";
-#			my $dest = "$args[3] $args[4] $args[5]";
-#			$$r_hash{$portal}{'source'}{'ID'} = $portal;
-#			$$r_hash{$portal}{'source'}{'map'} = $args[0];
-#			$$r_hash{$portal}{'source'}{'pos'}{'x'} = $args[1];
-#			$$r_hash{$portal}{'source'}{'pos'}{'y'} = $args[2];
-#			$$r_hash{$portal}{'dest'}{$dest}{'ID'} = $dest;
-#			$$r_hash{$portal}{'dest'}{$dest}{'map'} = $args[3];
-#			$$r_hash{$portal}{'dest'}{$dest}{'pos'}{'x'} = $args[4];
-#			$$r_hash{$portal}{'dest'}{$dest}{'pos'}{'y'} = $args[5];
-##			$$r_hash{$portal}{'dest'}{$dest}{'cost'} = $args[6];
-##			$$r_hash{$portal}{'npc'}{'ID'} = $args[6];
-##			$$r_hash{$portal}{'dest'}{$dest}{'steps'} = $args[7];
-#
-#			if ($args[6] ne "" && $args[6] ne "<none>") {
-#				$$r_hash{$portal}{'npc'}{'ID'} = $args[6];
-#				for ($i = 7; $i < @args; $i++) {
-#					$$r_hash{$portal}{'npc'}{'steps'}[@{$$r_hash{$portal}{'npc'}{'steps'}}] = $args[$i];
-#				}
-#			}
+	foreach $line ($file, @plus_file) {
 
-			$nameID = "$args[0] $args[1] $args[2]";
+#		print "\n$line\n";
 
-			$nameID = "$args[0] $args[1] $args[2] $args[3] $args[4] $args[5]" if ($sc_v{'kore'}{'multiPortals'});
+		next unless (-e "$line");
 
-			$$r_hash{$nameID}{'nameID'} = "$args[0] $args[1] $args[2]";
-			$IDs{$args[0]}{$args[1]}{$args[2]} = $nameID;
-			$$r_hash{$nameID}{'source'}{'ID'} = $nameID;
-			$$r_hash{$nameID}{'source'}{'map'} = $args[0];
-			$$r_hash{$nameID}{'source'}{'pos'}{'x'} = $args[1];
-			$$r_hash{$nameID}{'source'}{'pos'}{'y'} = $args[2];
-			$$r_hash{$nameID}{'dest'}{'map'} = $args[3];
-			$$r_hash{$nameID}{'dest'}{'pos'}{'x'} = $args[4];
-			$$r_hash{$nameID}{'dest'}{'pos'}{'y'} = $args[5];
-			if ($args[6] ne "" && $args[6] ne "<none>") {
-				$$r_hash{$nameID}{'npc'}{'ID'} = $args[6];
-				for ($i = 7; $i < @args; $i++) {
-					$$r_hash{$nameID}{'npc'}{'steps'}[@{$$r_hash{$nameID}{'npc'}{'steps'}}] = $args[$i];
+		open(FILE, $line);
+		foreach (<FILE>) {
+			next if (/^#/);
+
+			getString(\$_, 1);
+
+			@args = split /\s/, $_;
+			if (@args > 5) {
+				$nameID = "$args[0] $args[1] $args[2]";
+
+				$nameID = "$args[0] $args[1] $args[2] $args[3] $args[4] $args[5]" if ($sc_v{'kore'}{'multiPortals'});
+
+				$$r_hash{$nameID}{'nameID'} = "$args[0] $args[1] $args[2]";
+				$IDs{$args[0]}{$args[1]}{$args[2]} = $nameID;
+				$$r_hash{$nameID}{'source'}{'ID'} = $nameID;
+				$$r_hash{$nameID}{'source'}{'map'} = $args[0];
+				$$r_hash{$nameID}{'source'}{'pos'}{'x'} = $args[1];
+				$$r_hash{$nameID}{'source'}{'pos'}{'y'} = $args[2];
+				$$r_hash{$nameID}{'dest'}{'map'} = $args[3];
+				$$r_hash{$nameID}{'dest'}{'pos'}{'x'} = $args[4];
+				$$r_hash{$nameID}{'dest'}{'pos'}{'y'} = $args[5];
+				if ($args[6] ne "" && $args[6] ne "<none>") {
+					$$r_hash{$nameID}{'npc'}{'ID'} = $args[6];
+					for ($i = 7; $i < @args; $i++) {
+						$$r_hash{$nameID}{'npc'}{'steps'}[@{$$r_hash{$nameID}{'npc'}{'steps'}}] = $args[$i];
+					}
 				}
 			}
+			$j++;
 		}
-		$j++;
+		close(FILE);
 	}
+
 	foreach (keys %{$r_hash}) {
 		$$r_hash{$_}{'dest'}{'ID'} = $IDs{$$r_hash{$_}{'dest'}{'map'}}{$$r_hash{$_}{'dest'}{'pos'}{'x'}}{$$r_hash{$_}{'dest'}{'pos'}{'y'}};
 	}
-	close(FILE);
 }
 
 sub parsePortalsLOS {
@@ -801,7 +861,7 @@ sub updatePortalLUT {
 sub updateNPCLUT {
 	my ($file, $ID, $map, $x, $y, $name) = @_;
 	open(FILE, ">> $file");
-	print FILE "$ID $map $x $y $name\n";
+	print FILE "$ID $map $x $y $name \n";
 	close(FILE);
 }
 
@@ -1054,9 +1114,92 @@ sub updateNPCLUTIntact {
 			binRemove(\@npcsID, $ID);
 			undef %{$npcs{$ID}};
 			undef %{$npcs_lut{$ID}};
+
+			$data .= "$newID $npcs_lut{$newID}{'map'} $npcs_lut{$newID}{'pos'}{'x'} $npcs_lut{$newID}{'pos'}{'y'} $npcs_lut{$newID}{'name'} \n";
+		} else {
+			$data .= $_;
 		}
-		$data .= $_;
 	}
+	close(FILE);
+
+	open(FILE, "+> $file");
+	print FILE $data;
+	close(FILE);
+}
+
+# Update NPCs table
+sub updateNPCLUTIntactEx {
+	my ($file, $ID) = @_;
+	my $data;
+	my $key;
+	my $string;
+	open(FILE, $file);
+	foreach (<FILE>) {
+		if (/^#/ || $_ =~ /^\n/ || $_ =~ /^\r/) {
+			$data .= $_;
+			next;
+		}
+
+		getString(\$_, 1);
+
+		@args = split /\s/, $_;
+		if (@args > 4) {
+			$string = $args[4];
+			for ($i = 5; $i < @args; $i++) {
+				$string .= " $args[$i]";
+			}
+
+			if (
+				$npcs{$ID}{'nameID'} ne $args[0]
+				&& $npcs{$ID}{'map'} eq $args[1]
+				&& $npcs{$ID}{'pos'}{'x'} == $args[2]
+				&& $npcs{$ID}{'pos'}{'y'} == $args[3]
+			) {
+				print "$args[0] $args[1] $args[2] $args[3] $string \n";
+				print "= $npcs{$ID}{'nameID'} $npcs{$ID}{'map'} $npcs{$ID}{'pos'}{'x'} $npcs{$ID}{'pos'}{'y'} $npcs{$ID}{'name'} \n";
+
+				binRemove(\@npcsID, $args[0]);
+				undef %{$npcs{$args[0]}};
+				undef %{$npcs_lut{$args[0]}};
+
+				$args[0] = $npcs{$ID}{'nameID'};
+				$npcs_lut{$args[0]}{'map'} = $args[1];
+				$npcs_lut{$args[0]}{'pos'}{'x'} = $args[2];
+				$npcs_lut{$args[0]}{'pos'}{'y'} = $args[3];
+				$npcs_lut{$args[0]}{'name'} = $string;
+
+				$data .= "$npcs{$ID}{'nameID'} $args[1] $args[2] $args[3] $string";
+			} else {
+				$data .= $_;
+			}
+		} else {
+			$data .= $_;
+		}
+
+		$data .= "\n";
+
+
+#		if (/^#/ || $_ =~ /^\n/ || $_ =~ /^\r/) {
+#			$data .= $_;
+#			next;
+#		}
+#		($key) = $_ =~ /^(\d+)/;
+#		if ($key eq $ID) {
+#			$_ =~ s/^$ID\b/$newID/;
+#			$npcs_lut{$newID}{'map'} = $npcs_lut{$ID}{'map'};
+#			$npcs_lut{$newID}{'pos'}{'x'} = $npcs_lut{$ID}{'pos'}{'x'};
+#			$npcs_lut{$newID}{'pos'}{'y'} = $npcs_lut{$ID}{'pos'}{'y'};
+#			$npcs_lut{$newID}{'name'} = $npcs_lut{$ID}{'name'};
+#			binRemove(\@npcsID, $ID);
+#			undef %{$npcs{$ID}};
+#			undef %{$npcs_lut{$ID}};
+#
+#			$data .= "$newID $npcs_lut{$newID}{'map'} $npcs_lut{$newID}{'pos'}{'x'} $npcs_lut{$newID}{'pos'}{'y'} $npcs_lut{$newID}{'name'} \n";
+#		} else {
+#			$data .= $_;
+#		}
+	}
+
 	close(FILE);
 
 	open(FILE, "+> $file");
