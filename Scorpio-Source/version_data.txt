@@ -1,15 +1,15 @@
 #--------------------------
 
-version 5.11.2.3
-update 02/11/05 - 19:47:30
-regkey 9ded5ec03076d5169a9e145e1241b36d
-chkkey HlyAISaQcpQ9g
-MD5 9509d8975120d15b8af802f37a4cd790
+version 6.5.3.0
+update 03/05/06 - 16:01:36
+regkey 6c3cd46ac10c6952304b97e06bf525a0
+chkkey PZX/VYWDw1wOQ
+MD5 dfc4a7940b0df56ee0fd491fab492262
 
-old_version 5.11.2.2
-old_update 02/11/05 - 08:17:41
-old_regkey 693313ca04ee946d48c515631da1b941
-old_chkkey zgw2T9flI/r8I
-old_MD5 d7a706bae2c9197bff17f995a60c2b41
+old_version 5.11.2.3
+old_update 02/11/05 - 19:47:30
+old_regkey 9ded5ec03076d5169a9e145e1241b36d
+old_chkkey HlyAISaQcpQ9g
+old_MD5 9509d8975120d15b8af802f37a4cd790
 
 #--------------------------
