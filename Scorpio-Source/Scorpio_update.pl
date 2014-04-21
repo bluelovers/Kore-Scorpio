@@ -28,14 +28,18 @@ if ($use_ftp ne "No") {
 	$ftp->login("$ftp_username","$ftp_password");
 	print "cwd $ftp_location\n";
 	$ftp->cwd("$ftp_location");
-	print "ascii\n";
-	$ftp->ascii();
-	print "put version.txt\n";
-	$ftp->put("version.txt");
 	print "binary\n";
 	$ftp->binary();
 	print "put Scorpio.exe\n";
 	$ftp->put("Scorpio.exe");
+	print "ascii\n";
+	$ftp->ascii();
+	print "put version.txt\n";
+	$ftp->put("version.txt");
+#	print "binary\n";
+#	$ftp->binary();
+#	print "put Scorpio.exe\n";
+#	$ftp->put("Scorpio.exe");
 	print "quit\n";
 	$ftp->quit;
 }
