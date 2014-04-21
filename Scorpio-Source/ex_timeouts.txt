@@ -1,0 +1,103 @@
+
+#--------------------------------------------------------------------
+
+# [ 修正原有說明 ]
+
+# 所有 timeout 為 0 時、代表不啟動
+
+ai_items_gather_start 0.1
+# 偵測撿取無主物品延遲時間(秒)
+ai_items_gather_giveup 0.5
+# 偵測撿取無主物品放棄時間(秒)
+ai_items_gather_auto 2.5
+# 偵測撿取無主物品偵測間隔(秒)
+
+#--------------------------------------------------------------------
+
+# [ 新增設定說明 ]
+
+ai_skill_use_send 0.1
+# 發送技能最短時間
+ai_skill_cast_wait 1
+# 對應技能使用技能回應延遲時間
+
+ai_kore_sleepTime 10
+# 程式休眠檢查時間間隔
+
+ai_talkAuto 2
+# 自動對話偵測(間隔)時間(秒)
+
+ai_teleport_player 3
+# 自動順移逃離玩家或NPC間隔
+
+ai_storageAuto_auto 2
+# 自動存物偵測間隔時間(秒)
+
+ai_teleport_search_portal 1
+# 距離傳送點多少格以外就用瞬移間格時間
+
+ai_addAuto 5
+# 自動分配技能、素質點數間隔
+ai_attackCounter 1.5
+# 遭遇目標以外攻擊時反擊延遲間隔
+
+ai_unstuckAuto_indoor 3600
+# 於室內卡點後重登間隔
+
+ai_take_giveup_important 3
+# 撿取重要物品放棄時間(秒)
+ai_take_giveup_gather 0.5
+# 撿取無主物品放棄時間(秒)
+
+ai_resurrect 1
+# 自動復活間隔時間(秒)
+ai_resurrect_auto 5
+# 自動復活搜尋間隔時間(秒)
+ai_resurrect_wait 5
+# 自動復活失敗延遲時間(秒)
+
+ai_skill_party 1
+# 使用組隊技能間隔時間(秒)
+ai_skill_party_auto 5
+# 使用組隊技能搜尋間隔時間(秒)
+ai_skill_party_wait 5
+# 使用組隊技能失敗延遲時間(秒)
+
+ai_skill_guild 1
+# 使用工會技能間隔時間(秒)
+ai_skill_guild_auto 10
+# 使用工會技能搜尋間隔時間(秒)
+ai_skill_guild_wait 5
+# 使用工會技能失敗延遲時間(秒)
+
+ai_petAuto_play 120
+# 定時表演寵物間隔時間
+
+ai_partyAutoCreate 3600
+# 自動建立隊伍
+
+ai_dealAuto 3
+ai_partyAuto 3
+ai_guildAuto 3
+# 自動交易,組隊,工會
+
+ai_event_onHit 3
+# 清除被傷害的數值間隔
+ai_follow 1
+ai_guildAutoInfo 10
+# 接收工會資訊間隔
+ai_hitAndRun 0.5
+# 打帶跑間隔
+ai_item_use_check 0.5
+ai_look 0.5
+ai_parseInput 3
+ai_relog 3
+ai_skill_use_giveup 1
+# 使用技能放棄時間
+ai_teleport_event_check 1
+# 清除確認是否正確順移時間
+ai_teleport_prefer 1.5
+ai_useSelf_skill_auto 0.1
+# 對自己使用技能延遲時間
+ai_welcomeText 3
+cancelStatAdd_auto 5
