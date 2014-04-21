@@ -261,10 +261,10 @@ sub ai_event_npc_autoSell {
 			!$config{'sellAuto'}
 #			|| !%{$npcs_lut{$config{'sellAuto_npc'}}}
 			|| ai_npc_check($config{'sellAuto_npc'})
-#			|| (
-#				!$ai_seq_args[0]{'sentSell'}
-#				&& !ai_sellAutoCheck()
-#			)
+			|| (
+				!$ai_seq_args[0]{'sentSell'}
+				&& !ai_sellAutoCheck()
+			)
 		) {
 			$ai_seq_args[0]{'done'} = 1;
 			last AUTOSELL;
@@ -712,7 +712,8 @@ sub ai_event_npc_autoTalk {
 
 			ai_event_npc_autoTalk_data($i);
 
-			$ai_v{'temp'}{'inNpcMap'} = inTargetMap($field{'name'}, $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+#			$ai_v{'temp'}{'inNpcMap'} = inTargetMap($field{'name'}, $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+			$ai_v{'temp'}{'inNpcMap'} = inTargetNpcMap($field{'name'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
 
 			if (
 				(
@@ -722,7 +723,8 @@ sub ai_event_npc_autoTalk {
 						&& !$sc_v{'temp'}{'ai'}{'autoTalk'}{'peace'}
 					)
 				)
-				&& %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}}
+#				&& %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}}
+				&& !ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
 				&& (
 					(
 						!$sc_v{'temp'}{'ai'}{'autoTalk'}{'hp'}
@@ -796,6 +798,9 @@ sub ai_event_npc_autoTalk {
 	return 0 if ($ai_seq[0] ne "talkAuto");
 
 	if ($ai_seq_args[0]{'done'}) {
+
+#		print "結束自動對話\n";
+
 		undef %{$ai_v{'temp'}{'ai'}};
 		%{$ai_v{'temp'}{'ai'}{'completedAI'}} = %{$ai_seq_args[0]{'completedAI'}};
 		shift @ai_seq;
@@ -839,13 +844,14 @@ sub ai_event_npc_autoTalk {
 
 #		ai_event_npc_autoTalk_data();
 
-		$ai_v{'temp'}{'inNpcMap'} = inTargetMap($field{'name'}, $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+#		$ai_v{'temp'}{'inNpcMap'} = inTargetMap($field{'name'}, $npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}{'map'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
+		$ai_v{'temp'}{'inNpcMap'} = inTargetNpcMap($field{'name'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}, $sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'});
 
 		if (
 			$config{'talkAuto'}
 			&& $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'} ne ""
 #			&& %{$npcs_lut{$sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'}}}
-			&& ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
+			&& !ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})
 			&& (
 				!$sc_v{'temp'}{'ai'}{'autoTalk'}{'inNpcMapOnly'}
 				|| (
@@ -909,6 +915,9 @@ sub ai_event_npc_autoTalk {
 			delete $sc_v{'temp'}{'ai'}{'itemsMaxWeight'};
 
 			$ai_seq_args[0]{'done'} = 1;
+
+#			print "$config{'talkAuto'} 找不到對話npc $sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'} ".ai_npc_check($sc_v{'temp'}{'ai'}{'autoTalk'}{'npc'})."\n";
+
 			last AUTOTALK;
 		}
 
@@ -1067,15 +1076,26 @@ sub ai_route_npc {
 #	my @parseNpc = split /\s/, $ID;
 	my %tmpNpc;
 
-	if ($config{'parseNpcAuto'} && switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+	if ($config{'parseNpcAuto'} && !%{$npcs_lut{$ID}}) {
+		my @parseNpc = split /\s/, $ID;
 		$tmpNpc{'map'}		= $parseNpc[1];
 		$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
 		$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
-	} else {
+	} elsif (%{$npcs_lut{$ID}}) {
 		$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
 		$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
 		$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
 	}
+
+#	if ($config{'parseNpcAuto'} && switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+#		$tmpNpc{'map'}		= $parseNpc[1];
+#		$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
+#		$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
+#	} else {
+#		$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
+#		$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
+#		$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
+#	}
 
 	if ($dist) {
 #		getField("$sc_v{'path'}{'fields'}/$npcs_lut{$config{'storageAuto_npc'}}{'map'}.fld", \%{$ai_seq_args[0]{'dest_field'}});
@@ -1208,7 +1228,17 @@ sub ai_getNpc {
 	my ($tmpNpc, $ID) = @_;
 #	my @parseNpc = split /\s/, $ID;
 
-	if ($config{'parseNpcAuto'} && switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+	if ($npcs_lut{$ID}{'map'} ne "") {
+		$$tmpNpc{'ID'}		= $ID;
+		$$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
+		$$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
+		$$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
+		$$tmpNpc{'init'}	= 1;
+	} elsif ($config{'parseNpcAuto'}) {
+		my @parseNpc = split /\s/, $ID;
+
+		return 0 unless switchInput($parseNpc[0], "<npc>", "<auto>", "auto");
+
 		$$tmpNpc{'ID'}		= $parseNpc[0] if (
 			!$$tmpNpc{'init'}
 			|| $$tmpNpc{'map'} ne $parseNpc[1]
@@ -1219,13 +1249,26 @@ sub ai_getNpc {
 		$$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
 		$$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
 		$$tmpNpc{'init'}	= 1;
-	} else {
-		$$tmpNpc{'ID'}		= $ID;
-		$$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
-		$$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
-		$$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
-		$$tmpNpc{'init'}	= 1;
 	}
+
+#	if ($config{'parseNpcAuto'} && switchInput($parseNpc[0], "<npc>", "<auto>", "auto")) {
+#		$$tmpNpc{'ID'}		= $parseNpc[0] if (
+#			!$$tmpNpc{'init'}
+#			|| $$tmpNpc{'map'} ne $parseNpc[1]
+#			|| $$tmpNpc{'pos'}{'x'} ne $parseNpc[2]
+#			|| $$tmpNpc{'pos'}{'y'} ne $parseNpc[3]
+#		);
+#		$$tmpNpc{'map'}		= $parseNpc[1];
+#		$$tmpNpc{'pos'}{'x'}	= $parseNpc[2];
+#		$$tmpNpc{'pos'}{'y'}	= $parseNpc[3];
+#		$$tmpNpc{'init'}	= 1;
+#	} else {
+#		$$tmpNpc{'ID'}		= $ID;
+#		$$tmpNpc{'map'}		= $npcs_lut{$ID}{'map'};
+#		$$tmpNpc{'pos'}{'x'}	= $npcs_lut{$ID}{'pos'}{'x'};
+#		$$tmpNpc{'pos'}{'y'}	= $npcs_lut{$ID}{'pos'}{'y'};
+#		$$tmpNpc{'init'}	= 1;
+#	}
 }
 
 sub ai_npc_autoTalk {
@@ -1440,6 +1483,23 @@ sub ai_npc_autoTalk {
 	}
 
 	return $val;
+}
+
+sub inTargetNpcMap {
+	my ($map_now, $map_npc, $map_list) = @_;
+	my $map_def;
+
+	if ($npcs_lut{$map_npc}{'map'} ne "") {
+		$map_def = $npcs_lut{$map_npc}{'map'};
+	} elsif ($config{'parseNpcAuto'}) {
+		my @parseNpc = split /\s/, $ID;
+		$map_def = $parseNpc[1] if switchInput($parseNpc[0], "<npc>", "<auto>", "auto");
+	}
+
+	$map_now = getMapID($map_now);
+	$map_def = getMapID($map_def);
+
+	return (($map_now eq $map_def) || ($map_list ne "" && existsInList($map_list, $map_now)))?1:0;
 }
 
 1;
