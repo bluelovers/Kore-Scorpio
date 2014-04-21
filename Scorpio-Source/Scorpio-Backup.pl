@@ -32,6 +32,8 @@ require 'Scorpio_version.pl';
 
 $sc_v{time}{start} = time;
 
+&GetOptions('hide', \$sc_v{option}{hide});
+
 $sc_v{path}{source} = "Scorpio-Source";
 $sc_v{path}{source_now} = "$sc_v{path}{source}/$sc_v{'Scorpio'}{'version'}";
 
@@ -106,14 +108,14 @@ foreach (sort @{$sc_v{files}}) {
 	$sc_v{temp}{file_now} = $_;
 	$sc_v{temp}{file_new} = "$sc_v{path}{source_now}/$_";
 	
-	print "\tBackup File [ $sc_v{temp}{file_now} ]...";
+	print "\tBackup File [ $sc_v{temp}{file_now} ]..." if (!$sc_v{option}{hide});
 	copy($sc_v{temp}{file_now}, $sc_v{temp}{file_new});
 	
 	$sc_v{temp}{md5_now} = getMD5File($sc_v{temp}{file_now});
 	$sc_v{temp}{md5_new} = getMD5File($sc_v{temp}{file_new});
 	
 	unless (-e $sc_v{temp}{file_new}) {
-		print "\n\t-\tError: File Copy!!";
+		print "\n\t-\tError: File Copy!!" if (!$sc_v{option}{hide});
 	}
 	
 #	print "MD5: ";
@@ -121,7 +123,7 @@ foreach (sort @{$sc_v{files}}) {
 	if ($sc_v{temp}{md5_now} eq $sc_v{temp}{md5_new}) {
 #		print "OK";
 	} else {
-		print "\n\t-\tError: MD5!!";
+		print "\n\t-\tError: MD5!!" if (!$sc_v{option}{hide});
 	}
 	
 	undef %{$sc_v{new}{$sc_v{temp}{file_now}}};
@@ -131,7 +133,7 @@ foreach (sort @{$sc_v{files}}) {
 	
 #	print "$sc_v{new}{$sc_v{temp}{file_now}}{size} = ".getSize($sc_v{new}{$sc_v{temp}{file_now}}{size});
 	
-	print "\n";
+	print "\n" if (!$sc_v{option}{hide});
 	
 	$sc_v{temp}{i}++;
 }
@@ -176,8 +178,8 @@ close FILE;
 print "End Backup Info ($sc_v{temp}{i}) Files\n";
 
 my ($a, $b) = times;
-print qq"系統負荷 : ( $a usr \+ $b sys \= " . ($a + $b) . qq" CPU)\n";
-print qq"花費時間 : " . getSpend($sc_v{time}{start}, time) . "\n";
+print qq"系統負荷 : ( $a usr \+ $b sys \= " . ($a + $b) . qq" CPU)\n" if (!$sc_v{option}{hide});
+print qq"花費時間 : " . getSpend($sc_v{time}{start}, time) . "\n" if (!$sc_v{option}{hide});
 
 sub getMD5File {
 	my $file = shift;
