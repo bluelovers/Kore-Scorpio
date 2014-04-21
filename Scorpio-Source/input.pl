@@ -485,7 +485,7 @@ sub checkConnection {
 		relogWait("連線地圖伺服器逾時, 重新連線到主伺服器...", 1);
 		
 #		print "Packet Switch: $lastswitch + $switch\n";
-		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
+#		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
 	} elsif ($sc_v{'input'}{'conState'} == 5 && !($remote_socket && $remote_socket->connected())) {
 		$sc_v{'input'}{'conState'} = 1;
 		undef $sc_v{'input'}{'conState_tries'};
@@ -495,7 +495,7 @@ sub checkConnection {
 		relogWait("連線地圖伺服器逾時, 重新連線到主伺服器...", 1);
 		
 #		print "Packet Switch: $lastswitch + $switch\n";
-		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
+#		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
 	}
 
 	if (
