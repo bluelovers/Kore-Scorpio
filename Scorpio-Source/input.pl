@@ -212,6 +212,7 @@ sub checkConnection {
 			$array[1] = 3 if ($array[1] < 5);
 
 			$timeout{'connectServer_auto'}{'timeout'} = getRand($array[0], $array[1]);
+#			$timeout{'connectServer_auto'}{'timeout'} = 17;
 
 			scModify('config', 'waitRecon_noChoice', 1, 1) if (!$config{'waitRecon_noChoice'});
 
@@ -321,7 +322,13 @@ sub checkConnection {
 			$sc_v{'warpperMode'}{'done'} = 1 if ($config{'warpperMode'} && !$sc_v{'warpperMode'}{'done'});
 		}
 
-		sendMapLogin(\$remote_socket, $accountID, $sc_v{'input'}{'charID'}, $sessionID, $sc_v{'input'}{'accountSex2'});
+		if ($config{'serverType'}) {
+			sendMapLoginPK(\$remote_socket, $accountID, $sessionID, $sc_v{'input'}{'accountSex2'});
+		} else {
+			sendMapLogin(\$remote_socket, $accountID, $sc_v{'input'}{'charID'}, $sessionID, $sc_v{'input'}{'accountSex2'});
+		}
+
+#		sendMapLogin(\$remote_socket, $accountID, $sc_v{'input'}{'charID'}, $sessionID, $sc_v{'input'}{'accountSex2'});
 		timeOutStart('maplogin');
 
 	} elsif ($sc_v{'input'}{'conState'} == 4 && checkTimeOut('maplogin')) {
@@ -364,6 +371,34 @@ sub checkConnection {
 		quit(1, 1);
 	}
 #Karasu End
+}
+
+sub importDynaLib {
+	undef $CalcPath_init;
+	undef $CalcPath_pathStep;
+	undef $CalcPath_destroy;
+
+	if (!$config{'buildType'}) {
+		$CalcPath_init = new Win32::API("Tools", "CalcPath_init", "PPNNPPN", "N");
+		die "Could not locate Tools.dll" if (!$CalcPath_init);
+
+		$CalcPath_pathStep = new Win32::API("Tools", "CalcPath_pathStep", "N", "N");
+		die "Could not locate Tools.dll" if (!$CalcPath_pathStep);
+
+		$CalcPath_destroy = new Win32::API("Tools", "CalcPath_destroy", "N", "V");
+		die "Could not locate Tools.dll" if (!$CalcPath_destroy);
+	} elsif ($config{'buildType'} == 1) {
+		$ToolsLib = new C::DynaLib("./Tools.so");
+
+		$CalcPath_init = $ToolsLib->DeclareSub("CalcPath_init", "L", "p","p","L","L","p","p","L");
+		die "Could not locate Tools.so" if (!$CalcPath_init);
+
+		$CalcPath_pathStep = $ToolsLib->DeclareSub("CalcPath_pathStep", "L", "L");
+		die "Could not locate Tools.so" if (!$CalcPath_pathStep);
+
+		$CalcPath_destroy = $ToolsLib->DeclareSub("CalcPath_destroy", "", "L");
+		die "Could not locate Tools.so" if (!$CalcPath_destroy);
+	}
 }
 
 1;
