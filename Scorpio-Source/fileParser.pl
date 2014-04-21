@@ -1495,6 +1495,9 @@ sub getField {
 	$$r_hash{'rawMap'} = $data;
 	#$$r_hash{'binMap'} = pack('b*', $data);
 	$$r_hash{'field'} = [unpack("C*", $data)];
+	
+	return if (!$sys{'use_newPathDLL'});
+	
 	(my $dist_file = $file) =~ s/\.fld$/.dist/i;
 	# Load the associated .dist file (distance map)
 	if (-e $dist_file) {
