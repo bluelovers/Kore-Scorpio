@@ -73,7 +73,7 @@ $sc_v{'mode'} = $sc_v{'mode'}?1:0;
 
 if ($sc_v{'guildname'} eq "") {
 #	$sc_v{'guildname'} = '雙魚&雙子,☆妖靈魅影☆♀Scorpio,☆妖靈魅影☆,♀大無限ㄐㄐ團♂,*自由因子*,☆大無限喵喵團☆,♀☆初心者領域︿︿★♂,愛與夢飛翔I,↖~私人海灘~↘';
-	$sc_v{'guildname'} = '雙魚&雙子,☆妖靈魅影☆♀Scorpio,☆妖靈魅影☆,☆大無限喵喵團☆,↖~私人海灘~↘';
+	$sc_v{'guildname'} = '雙魚&雙子,☆妖靈魅影☆♀Scorpio,☆妖靈魅影☆,☆大無限喵喵團☆,↖~私人海灘~↘,⊙-DISHONEST-CLOTH-⊙';
 }
 
 my $mode = 'test';
