@@ -419,6 +419,7 @@ sub checkConnection {
 			print "啟動安全登入...\n";
 			undef $ai_v{'msg01DC'};
 			sendMasterCodeRequest(\$remote_socket);
+			sysLog("im", "重要", "重要訊息: 啟動安全登入...");
 #Karasu End
 		} else {
 			sendMasterLogin(\$remote_socket, $config{'username'}, $config{'password'});
@@ -431,6 +432,7 @@ sub checkConnection {
 	# Secure login
 	} elsif ($sc_v{'input'}{'conState'} == 1 && $config{'secureLogin'} >= 1 && $ai_v{'msg01DC'} ne "" && !checkTimeOut('master') && $sc_v{'input'}{'conState_tries'}) {
 		print "密碼加密中...\n";
+		sysLog("im", "重要", "重要訊息: 密碼加密中...");
 		sendMasterSecureLogin(\$remote_socket, $config{'username'}, $config{'password'}, $ai_v{'msg01DC'});
 		undef $ai_v{'msg01DC'};
 #Karasu End
@@ -479,14 +481,21 @@ sub checkConnection {
 		timeOutStart('maplogin');
 
 	} elsif ($sc_v{'input'}{'conState'} == 4 && checkTimeOut('maplogin')) {
+		sysLog("im", "連線", "連線地圖伺服器逾時[$sc_v{'input'}{'conState'}-$timeout{'maplogin'}{'timeout'}], 重新連線到主伺服器...");
 		relogWait("連線地圖伺服器逾時, 重新連線到主伺服器...", 1);
-
+		
+#		print "Packet Switch: $lastswitch + $switch\n";
+		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
 	} elsif ($sc_v{'input'}{'conState'} == 5 && !($remote_socket && $remote_socket->connected())) {
 		$sc_v{'input'}{'conState'} = 1;
 		undef $sc_v{'input'}{'conState_tries'};
 
 	} elsif ($sc_v{'input'}{'conState'} == 5 && checkTimeOut('play')) {
+		sysLog("im", "連線", "連線地圖伺服器逾時[$sc_v{'input'}{'conState'}-$timeout{'play'}{'timeout'}], 重新連線到主伺服器...");
 		relogWait("連線地圖伺服器逾時, 重新連線到主伺服器...", 1);
+		
+#		print "Packet Switch: $lastswitch + $switch\n";
+		dumpData($last_know_msg.$msg, 0, 0, "Debug: 連線地圖伺服器逾時, 重新連線到主伺服器...\n$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
 	}
 
 	if (
@@ -516,67 +525,67 @@ sub checkConnection {
 		sysLog("im", "重要", "重要訊息: 自動登出時間已到, 立即登出！");
 		$quit = 1;
 		quit(1, 1);
-	} elsif (
-		$config{'kore_sleepTime'}
-		&& (
-			$remote_socket && $remote_socket->connected()
-			|| $sc_v{'input'}{'conState'} > 0
-		)
-		&& 0
-	) {
-		my $idx = 0;
-
-		if ($config{"kore_sleepTime_${idx}_start"} eq "" || $config{"kore_sleepTime_${idx}_stop"} eq "") {
-			scModify('config', 'kore_sleepTime', 0, 2);
-		} else {
-			my @localtime = localtime time;
-			$localtime[4] = $localtime[4] + 1;
-
-			my ($s_hr,$s_min,$s_sec);
-			my ($e_hr,$e_min,$e_sec);
-
-			while (1) {
-				($s_hr,$s_min,$s_sec) = $config{"kore_sleepTime_${idx}_start"}=~ /(\d+):(\d+):(\d+)/;
-				($e_hr,$e_min,$e_sec) = $config{"kore_sleepTime_${idx}_stop"}=~ /(\d+):(\d+):(\d+)/;
-
-				if (
-					(
-						$config{"kore_sleepTime_${idx}_day"} eq ""
-						|| $config{"kore_sleepTime_${idx}_day"} == $localtime[6]
-					)
-					&& $s_hr >= $localtime[2]
-					&& $s_min >= $localtime[1]
-					&& $s_sec >= $localtime[0]
-					&& $e_hr <= $localtime[2]
-					&& $e_min <= $localtime[1]
-					&& $e_sec <= $localtime[0]
-				) {
-					my $halt_sec = 0;
-					my $hr	= $e_hr - $s_hr;
-					my $min	= $e_min - $s_min;
-					my $sec	= $e_sec - $s_sec;
-
-					if ($hr<0) { $hr = $hr + 24;}
-					my $reconnect_time = $hr * 3600 + $min * 60 + $sec;
-
-					$sc_v{'input'}{'conState'} = 1;
-					undef $sc_v{'input'}{'conState_tries'};
-
-					undef @ai_seq;
-					undef @ai_seq_args;
-
-					print "\nwaiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n\n";
-					sysLog("a", "waiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n");
-					$timeout_ex{'master'}{'time'} = time;
-					$timeout_ex{'master'}{'timeout'} = $reconnect_time;
-					killConnection(\$remote_socket);
-
-					last;
-				}
-
-				$idx++;
-			}
-		}
+#	} elsif (
+#		$config{'kore_sleepTime'}
+#		&& (
+#			$remote_socket && $remote_socket->connected()
+#			|| $sc_v{'input'}{'conState'} > 0
+#		)
+#		&& 0
+#	) {
+#		my $idx = 0;
+#
+#		if ($config{"kore_sleepTime_${idx}_start"} eq "" || $config{"kore_sleepTime_${idx}_stop"} eq "") {
+#			scModify('config', 'kore_sleepTime', 0, 2);
+#		} else {
+#			my @localtime = localtime time;
+#			$localtime[4] = $localtime[4] + 1;
+#
+#			my ($s_hr,$s_min,$s_sec);
+#			my ($e_hr,$e_min,$e_sec);
+#
+#			while (1) {
+#				($s_hr,$s_min,$s_sec) = $config{"kore_sleepTime_${idx}_start"}=~ /(\d+):(\d+):(\d+)/;
+#				($e_hr,$e_min,$e_sec) = $config{"kore_sleepTime_${idx}_stop"}=~ /(\d+):(\d+):(\d+)/;
+#
+#				if (
+#					(
+#						$config{"kore_sleepTime_${idx}_day"} eq ""
+#						|| $config{"kore_sleepTime_${idx}_day"} == $localtime[6]
+#					)
+#					&& $s_hr >= $localtime[2]
+#					&& $s_min >= $localtime[1]
+#					&& $s_sec >= $localtime[0]
+#					&& $e_hr <= $localtime[2]
+#					&& $e_min <= $localtime[1]
+#					&& $e_sec <= $localtime[0]
+#				) {
+#					my $halt_sec = 0;
+#					my $hr	= $e_hr - $s_hr;
+#					my $min	= $e_min - $s_min;
+#					my $sec	= $e_sec - $s_sec;
+#
+#					if ($hr<0) { $hr = $hr + 24;}
+#					my $reconnect_time = $hr * 3600 + $min * 60 + $sec;
+#
+#					$sc_v{'input'}{'conState'} = 1;
+#					undef $sc_v{'input'}{'conState_tries'};
+#
+#					undef @ai_seq;
+#					undef @ai_seq_args;
+#
+#					print "\nwaiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n\n";
+#					sysLog("a", "waiting Time : ".$config{"kore_sleepTime_${idx}_start"}." to ".$config{"kore_sleepTime_${idx}_stop"}."\n");
+#					$timeout_ex{'master'}{'time'} = time;
+#					$timeout_ex{'master'}{'timeout'} = $reconnect_time;
+#					killConnection(\$remote_socket);
+#
+#					last;
+#				}
+#
+#				$idx++;
+#			}
+#		}
 	}
 #Karasu End
 }
