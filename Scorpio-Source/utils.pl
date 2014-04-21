@@ -97,18 +97,34 @@ sub binSize {
 	return $found;
 }
 
+#sub existsInList {
+#	my ($list, $val) = @_;
+#	undef @array;
+#	@array = split /,/, $list;
+#	return 0 if ($val eq "");
+#	$val = lcCht($val);
+#	foreach (@array) {
+#		s/^\s+//;
+#		s/\s+$//;
+#		s/\s+/ /g;
+#		next if ($_ eq "");
+#		return 1 if (lcCht($_) eq $val);
+#	}
+#	return 0;
+#}
+
 sub existsInList {
 	my ($list, $val) = @_;
 	undef @array;
-	@array = split /,/, $list;
+	@array = split /,/, lcCht($list);
 	return 0 if ($val eq "");
-	$val = lc($val);
+	$val = lcCht($val);
 	foreach (@array) {
 		s/^\s+//;
 		s/\s+$//;
 		s/\s+/ /g;
 		next if ($_ eq "");
-		return 1 if (lc($_) eq $val);
+		return 1 if ($_ eq $val);
 	}
 	return 0;
 }
@@ -147,13 +163,29 @@ sub findIndexString {
 }
 
 
+#sub findIndexString_lc {
+#	my $r_array = shift;
+#	my $match = shift;
+#	my $ID = shift;
+#	my $i;
+#	for ($i = 0; $i < @{$r_array} ;$i++) {
+#		if ((%{$$r_array[$i]} && lcCht($$r_array[$i]{$match}) eq lcCht($ID))
+#			|| (!%{$$r_array[$i]} && $ID eq "")) {
+#			return $i;
+#		}
+#	}
+#	if ($ID eq "") {
+#		return $i;
+#	}
+#}
+
 sub findIndexString_lc {
 	my $r_array = shift;
 	my $match = shift;
 	my $ID = shift;
 	my $i;
 	for ($i = 0; $i < @{$r_array} ;$i++) {
-		if ((%{$$r_array[$i]} && lc($$r_array[$i]{$match}) eq lc($ID))
+		if ((%{$$r_array[$i]} && lcCht($$r_array[$i]{$match}) eq lcCht($ID))
 			|| (!%{$$r_array[$i]} && $ID eq "")) {
 			return $i;
 		}
@@ -238,14 +270,14 @@ sub existsInList_quote {
 	undef @array;
 	@array = split /,/, $list;
 	return 0 if ($val eq "");
-	#$val = lc($val);
+	#$val = lcCht($val);
 	foreach (@array) {
 		s/^\s+//;
 		s/\s+$//;
 		s/\s+/ /g;
 		($_) = $_ =~ /^"([\s\S]*?)"$/;
 		next if ($_ eq "");
-		#return 1 if (lc($_) eq $val);
+		#return 1 if (lcCht($_) eq $val);
 		return 1 if ($_ eq $val);
 	}
 	return 0;
@@ -286,6 +318,21 @@ sub findIndexStringPriority_lc {
 
 # Return index which is not selected
 # findIndexStringNotSelected_lc(reference list, reference selected_list, match pattern, id);
+#sub findIndexStringNotSelected_lc {
+#	my $r_array1 = shift;
+#	my $r_array2 = shift;
+#	my $match = shift;
+#	my $ID = shift;
+#	my $i;
+#	for ($i = 0; $i < @{$r_array1}; $i++) {
+#		if ((%{$$r_array1[$i]} && lcCht($$r_array1[$i]{$match}) eq lcCht($ID)) || (!%{$$r_array1[$i]} && $ID eq "")) {
+#			return $i if (binFind(\@{$r_array2}, $i) eq "");
+#		}
+#	}
+#	if ($ID eq "") {
+#		return $i;
+#	}
+#}
 sub findIndexStringNotSelected_lc {
 	my $r_array1 = shift;
 	my $r_array2 = shift;
@@ -293,7 +340,7 @@ sub findIndexStringNotSelected_lc {
 	my $ID = shift;
 	my $i;
 	for ($i = 0; $i < @{$r_array1}; $i++) {
-		if ((%{$$r_array1[$i]} && lc($$r_array1[$i]{$match}) eq lc($ID)) || (!%{$$r_array1[$i]} && $ID eq "")) {
+		if ((%{$$r_array1[$i]} && lcCht($$r_array1[$i]{$match}) eq lcCht($ID)) || (!%{$$r_array1[$i]} && $ID eq "")) {
 			return $i if (binFind(\@{$r_array2}, $i) eq "");
 		}
 	}
@@ -405,7 +452,7 @@ sub splitUseArray_sc {
 	my $sym		= shift;
 	my $upcase	= shift;
 
-	$var = uc($var) if ($upcase);
+	$var = ucCht($var) if ($upcase);
 
 	my @r_array = split /\Q$sym\E/, $var;
 	foreach (@r_array) {
