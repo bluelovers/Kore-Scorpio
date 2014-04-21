@@ -77,9 +77,10 @@ sub mathPercent {
 }
 
 sub distance {
-	my $r_hash1 = shift;
-	my $r_hash2 = shift;
-	my $mode = shift;
+	my $r_hash1	= shift;
+	my $r_hash2	= shift;
+	my $mode	= shift;
+#	my $debug	= shift;
 	my $val;
 	my %line;
 	if ($r_hash2) {
@@ -88,6 +89,16 @@ sub distance {
 	} else {
 		%line = %{$r_hash1};
 	}
+
+#	if ($debug) {
+#		print <<"EOM";
+#distance $line{'x'}, $line{'y'}
+#
+#$$r_hash1{'x'} - $$r_hash2{'x'}
+#$$r_hash1{'y'} - $$r_hash2{'y'}
+#EOM
+#;
+#	}
 
 	$val = sqrt($line{'x'} ** 2 + $line{'y'} ** 2);
 
