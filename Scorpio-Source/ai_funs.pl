@@ -156,6 +156,7 @@ sub ai_getSkillUseType {
 
 		, "SM_MAGNUM"
 		, "AC_SHOWER"
+		, "HT_DETECTING"
 #		, "ASC_METEORASSAULT"
 
 #		, 'CR_GRANDCROSS'	#	聖十字審判
@@ -166,8 +167,9 @@ sub ai_getSkillUseType {
 }
 
 sub ai_items_take {
-	my ($x1, $y1, $x2, $y2) = @_;
+	my ($x1, $y1, $x2, $y2, $mode) = @_;
 	my %args;
+	$args{'mode'} = $mode;
 	$args{'pos'}{'x'} = $x1;
 	$args{'pos'}{'y'} = $y1;
 	$args{'pos_to'}{'x'} = $x2;
@@ -318,7 +320,11 @@ sub attack {
 
 #	print "$tmp\n";
 
-	sysLog("ii", "怪物", "$tmp", 1, !$mode);
+	if ($monsters{$ID}{'mvp'}) {
+		sysLog("mvp", "戰鬥", "$tmp", 1, !$monsters{$ID}{'mvp'});
+	} else {
+		sysLog("ii", "怪物", "$tmp", 1, !$mode);
+	}
 
 	timeOutStart(-1, 'ai_hitAndRun');
 	# Equip when attack
@@ -391,6 +397,25 @@ sub look {
 	$args{'look_body'} = $body;
 	$args{'look_head'} = $head;
 	unshift @ai_seq_args, \%args;
+	
+	timeOutStart('ai_look');
+}
+
+##
+# lookAtPosition(pos, [headdir])
+# pos: a reference to a coordinate hash.
+# headdir: 0 = face directly, 1 = look right, 2 = look left
+#
+# Turn face and body direction to position %pos.
+sub lookAtPosition {
+	my $pos2 = shift;
+	my $headdir = shift;
+	my %vec;
+	my $direction;
+
+	getVector(\%vec, $pos2, $chars[$config{'char'}]->{pos_to});
+	$direction = int(sprintf("%.0f", (360 - vectorToDegree(\%vec)) / 45)) % 8;
+	look($direction, $headdir);
 }
 
 sub move {
