@@ -896,6 +896,21 @@ EOM
 
 #			input_start();
 
+			if (-e "kore.bat" || 1) {
+				open (FILE, "> kore.bat");
+				print FILE <<"EOM";
+\@echo off
+
+del Scorpio.exe
+
+koreSc.bat %2
+
+exit
+EOM
+;
+				close FILE;
+			}
+
 			kore_close($sc_v{'kore'}{'delay'});
 		} else {
 			sleep (2);
@@ -984,7 +999,7 @@ EOM
 	}
 	print "\n";
 	
-	if (-e "kore.bat") {
+	if (-e "kore.bat" || 1) {
 		open (FILE, "> kore.bat");
 		print FILE <<"EOM";
 \@echo off
