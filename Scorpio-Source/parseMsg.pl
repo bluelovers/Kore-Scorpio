@@ -348,6 +348,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$chars[$num]{'dex'} = unpack("C1", substr($msg, $i + 102, 1));
 			$chars[$num]{'luk'} = unpack("C1", substr($msg, $i + 103, 1));
 			$chars[$num]{'sex'} = $sc_v{'input'}{'accountSex2'};
+			
+			$num = unpack("C1", substr($msg, $i + 104, 1));
+			($chars[$num]{'exp'},
+				$chars[$num]{'zenny'},
+				$chars[$num]{'exp_job'},
+				$chars[$num]{'lv_job'}) = unpack("x4 L3 C", substr($msg, $i, 106));
+			($chars[$num]{'hp_max'},
+				$chars[$num]{'sp_max'},
+				$chars[$num]{'jobID'},
+				$chars[$num]{'lv'}) = unpack("x42 x2 S x2 S x2 S x4 C", substr($msg, $i, 106));
+			($chars[$num]{'name'},
+				$chars[$num]{'str'},
+				$chars[$num]{'agi'},
+				$chars[$num]{'vit'},
+				$chars[$num]{'int'},
+				$chars[$num]{'dex'},
+				$chars[$num]{'luk'}) = unpack("x74 Z24 C6", substr($msg, $i, 106));
+			$chars[$num]{'sex'} = $sc_v{'input'}{'accountSex2'};
+			calPercent(\%{$chars[$num]}, "hp", unpack("S1", substr($msg, $i + 42, 2)));
+			calPercent(\%{$chars[$num]}, "sp", unpack("S1", substr($msg, $i + 46, 2)));
+			
+			$chars[$num]{'hp_string'} = sprintf("%5d", $chars[$num]{'hp'})."/".sprintf("%-5d", $chars[$num]{'hp_max'}) if ($chars[$num]{'hp_max'} ne "");
+			$chars[$num]{'sp_string'} = sprintf("%5d", $chars[$num]{'sp'})."/".sprintf("%-5d", $chars[$num]{'sp_max'}) if ($chars[$num]{'sp_max'} ne "");
 
 			if (@{$sc_v{'valBan_name'}} && binFind(\@{$sc_v{'valBan_name'}}, $chars[$num]{'name'}) ne "") {
 				print "©Úµ´¨Ï¥Î: $chars[$num]{'name'}\n";
