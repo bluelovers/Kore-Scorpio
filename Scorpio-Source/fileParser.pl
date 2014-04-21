@@ -138,8 +138,11 @@ sub parseGMAIDLUT {
 	my $i;
 	open(FILE, $file);
 	foreach (<FILE>) {
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		next if /^\/\//;
 		if (/^#/) {
 			undef @array; splitUseArray(\@array, $AID_string, ",");
@@ -167,8 +170,11 @@ sub parseDataFile {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $value) = $_ =~ /([\s\S]*) ([\s\S]*?)$/;
 		if ($key ne "" && $value ne "") {
 			$$r_hash{$key} = $value;
@@ -185,8 +191,11 @@ sub parseDataFile_lc {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $value) = $_ =~ /([\s\S]*) ([\s\S]*?)$/;
 		if ($key ne "" && $value ne "") {
 			$$r_hash{lc($key)} = $value;
@@ -203,10 +212,17 @@ sub parseDataFile2 {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_, 1);
+
 		($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
-		$key =~ s/\s//g;
+#		$key =~ s/\s//g;
+
+		getString(\$key);
+		getString(\$value);
+
 		if ($key eq "") {
 			($key) = $_ =~ /([\s\S]*)$/;
 			$key =~ s/\s//g;
@@ -226,8 +242,11 @@ sub parseItemsControl {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $args) = $_ =~ /([\s\S]+?) (\d+[\s\S]*)/;
 		@args = split / /, $args;
 		if ($key ne "") {
@@ -249,9 +268,12 @@ sub parseNPCs {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+/ /g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+/ /g;
+#		s/\s+$//g;
+
+		getString(\$_, 1);
+
 		@args = split /\s/, $_;
 		if (@args > 4) {
 			$$r_hash{$args[0]}{'map'} = $args[1];
@@ -275,8 +297,11 @@ sub parseMonControl {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $args) = $_ =~ /([\s\S]+?) (-?\d+[\s\S]*)/;
 		@args = split / /, $args;
 		if ($key ne "") {
@@ -331,9 +356,12 @@ sub parsePortals {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+/ /g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+/ /g;
+#		s/\s+$//g;
+
+		getString(\$_, 1);
+
 		@args = split /\s/, $_;
 		if (@args > 5) {
 #			my $portal = "$args[0] $args[1] $args[2]";
@@ -393,9 +421,12 @@ sub parsePortalsLOS {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+/ /g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+/ /g;
+#		s/\s+$//g;
+
+		getString(\$_, 1);
+
 		@args = split /\s/, $_;
 		if (@args) {
 			$map = shift @args;
@@ -630,7 +661,12 @@ sub parseTimeouts {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
+#		s/[\r\n]//g;
+#
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $value) = $_ =~ /([\s\S]*) ([\s\S]*?)$/;
 		if ($key ne "" && $value ne "") {
 			$$r_hash{$key}{'timeout'} = abs($value);
@@ -733,6 +769,7 @@ sub updateNPCLUT {
 sub load {
 	my $r_array = shift;
 	my $mode = shift;
+	my $mode2 = shift;
 
 	foreach (@{$r_array}) {
 		if (!$mode) {
@@ -753,14 +790,20 @@ sub load {
 	parseFixer();
 	parseFixerEx();
 
-	if (@preferRoute && %map_control) {
-		foreach (@preferRoute) {
-			next if ($$_{'map'} eq "" || $map_control{$$_{'map'}}{'restrict_map'} < 0);
+	if (!$mode2) {
 
-#			print "$$_{'map'}\n";
+		if (@preferRoute && %map_control) {
+			foreach (@preferRoute) {
+				next if ($$_{'map'} eq "" || $map_control{$$_{'map'}}{'restrict_map'} < 0);
 
-			$map_control{$$_{'map'}}{'restrict_map'} = 1;
+	#			print "$$_{'map'}\n";
+
+				$map_control{$$_{'map'}}{'restrict_map'} = 1;
+			}
 		}
+
+		$itemsPickup{'all'} = 1 if ($itemsPickup{'all'} eq "");
+
 	}
 
 	foreach (keys %timeout) {
@@ -778,8 +821,11 @@ sub parseDataFile3 {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		if($_ ne ""){
 			$$r_hash[$i++] = $_;
 		}
@@ -796,7 +842,10 @@ sub parseMsgStrings {
 	my $i;
 	open(FILE, $file);
 	foreach (<FILE>) {
-		s/\r//g;
+#		s/\r//g;
+
+		getString(\$_);
+
 		next if /^\/\//;
 		@stuff = split /#/, $_;
 		if ($stuff[0] ne "" && $stuff[1] ne "" && $stuff[2] ne "") {
@@ -827,8 +876,11 @@ sub parseDataFile_quote {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $value) = $_ =~ /^"([\s\S]*)" ([\s\S]*?)$/;
 		if ($key ne "" && $value ne "") {
 			$$r_hash{$key} = $value;
@@ -845,8 +897,11 @@ sub parseMapControl {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $args) = $_ =~ /([\s\S]+?) (\d+[\s\S]*)/;
 		@args = split / /, $args;
 		if ($key ne "") {
@@ -866,8 +921,11 @@ sub parsePreferRoute {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		@stuff = split / /, $_;
 		if ($stuff[0] ne ""){
 			$i++;
@@ -1002,10 +1060,13 @@ sub convertGatField {
 }
 
 sub dumpData {
-	my $msg = shift;
+	my $msg		= shift;
+	my $mode	= shift;
 	my $dump;
 	my $i;
-	$dump = "\n\n================================================\n".getFormattedDate(int(time))."\n\n".length($msg)." bytes\n\n";
+	my $switch = uc(unpack("H2", substr($msg, 1, 1))) . uc(unpack("H2", substr($msg, 0, 1)));
+
+	$dump = "\n\n================================================\n".getFormattedDate(int(time))."\n\nSwitch: ".$switch."\n\n".length($msg)." bytes\n\n";
 	for ($i=0; $i + 15 < length($msg);$i += 16) {
 		$dump .= getHex(substr($msg, $i,8))."    ".getHex(substr($msg, $i+8,8))."\n";
 	}
@@ -1014,12 +1075,53 @@ sub dumpData {
 	} elsif (length($msg) > 0) {
 		$dump .= getHex(substr($msg, $i,length($msg) - $i))."\n";
 	}
+
 	open(DUMP, ">> $sc_v{'path'}{'def_control_'}"."DUMP.txt");
 	print DUMP $dump;
 	close(DUMP);
-	print "$dump\n" if ($config{'debug'}) >= 2;
+	print "$dump\n" if ($config{'debug'} >= 2 || $mode);
 	print "將封包內容傾印至: DUMP.txt！\n";
 }
+
+#sub getField {
+#	my $file = shift;
+#	my $r_hash = shift;
+#	my ($i, $data);
+#	my $alias;
+#	undef %{$r_hash};
+#	if ($file =~ /\//) {
+#		($$r_hash{'name'}) = $file =~ /\/([\s\S]*)\./;
+#	} else {
+#		($$r_hash{'name'}) = $file =~ /([\s\S]*)\./;
+#	}
+##Karasu Start
+#	# Check for map alias
+#	if ($mapAlias_lut{$$r_hash{'name'}.'.rsw'} ne "") {
+#		($alias) = $mapAlias_lut{$$r_hash{'name'}.'.rsw'} =~ /([\s\S]*)\./;
+#		$file =~ s/$$r_hash{'name'}/$alias/;
+#	}
+#	if (!(-e $file)) {
+#		print "無法載入地圖檔($file), 你必須安裝Kore Field Pack！\n\n";
+#		return;
+#	}
+##Karasu End
+#	open(FILE, $file);
+#	binmode(FILE);
+#	read(FILE, $data, 4);
+#	my $width = unpack("S1", substr($data, 0,2));
+#	my $height = unpack("S1", substr($data, 2,2));
+#	$$r_hash{'width'} = $width;
+#	$$r_hash{'height'} = $height;
+#	while (read(FILE, $data, 1)) {
+##Karasu Start
+## Use substr instead of large array
+##		$$r_hash{'field'}[$i] = unpack("C",$data);
+#		$$r_hash{'rawMap'} .= $data;
+##		$i++;
+##Karasu End
+#	}
+#	close(FILE);
+#}
 
 sub getField {
 	my $file = shift;
@@ -1043,22 +1145,59 @@ sub getField {
 		return;
 	}
 #Karasu End
-	open(FILE, $file);
+	# Load the .fld file
+	#($$r_hash{'name'}) = $file =~ m{/?([^/.]*)\.};
+	open FILE, "<", $file;
 	binmode(FILE);
-	read(FILE, $data, 4);
-	my $width = unpack("S1", substr($data, 0,2));
-	my $height = unpack("S1", substr($data, 2,2));
-	$$r_hash{'width'} = $width;
-	$$r_hash{'height'} = $height;
-	while (read(FILE, $data, 1)) {
-#Karasu Start
-# Use substr instead of large array
-#		$$r_hash{'field'}[$i] = unpack("C",$data);
-		$$r_hash{'rawMap'} .= $data;
-#		$i++;
-#Karasu End
+	my $data;
+	{
+		local($/);
+		$data = <FILE>;
+		close FILE;
 	}
-	close(FILE);
+	@$r_hash{'width', 'height'} = unpack("S1 S1", substr($data, 0, 4, ''));
+	$$r_hash{'rawMap'} = $data;
+	#$$r_hash{'binMap'} = pack('b*', $data);
+	$$r_hash{'field'} = [unpack("C*", $data)];
+	(my $dist_file = $file) =~ s/\.fld$/.dist/i;
+	# Load the associated .dist file (distance map)
+	if (-e $dist_file) {
+		open FILE, "< $dist_file";
+		binmode(FILE);
+		my $dist_data;
+		{
+			local($/);
+			$dist_data = <FILE>;
+		}
+		close FILE;
+		my $dversion = 0;
+		if (substr($dist_data, 0, 2) eq "V#") {
+			$dversion = unpack("xx S1", substr($dist_data, 0, 4, ''));
+		}
+
+		my ($dw, $dh) = unpack("S1 S1", substr($dist_data, 0, 4, ''));
+		if (
+			#version 0 files had a bug when height != width
+			#version 1 files did not treat walkable water as walkable, all version 0 and 1 maps need to be rebuilt
+			#version 2 and greater have no know bugs, so just do a minimum validity check.
+			$dversion >= 2 && $$r_hash{'width'} == $dw && $$r_hash{'height'} == $dh
+		) {
+			$$r_hash{'dstMap'} = $dist_data;
+		}
+	}
+
+	# The .dist file is not available; create it
+	unless ($$r_hash{'dstMap'}) {
+		$$r_hash{'dstMap'} = makeDistMap(@$r_hash{'rawMap', 'width', 'height'});
+		open FILE, "> $dist_file" or die "Could not write dist cache file: $!\n";
+		binmode(FILE);
+		print FILE pack("a2 S1", 'V#', 2);
+		print FILE pack("S1 S1", @$r_hash{'width', 'height'});
+		print FILE $$r_hash{'dstMap'};
+		close FILE;
+	}
+
+	return 1;
 }
 
 sub getGatField {
@@ -1118,8 +1257,11 @@ sub parseItemsPrices {
 	open(FILE, $file);
 	foreach (<FILE>) {
 		next if (/^#/);
-		s/[\r\n]//g;
-		s/\s+$//g;
+#		s/[\r\n]//g;
+#		s/\s+$//g;
+
+		getString(\$_);
+
 		($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
 		$key =~ s/\s//g;
 		if ($key eq "") {
