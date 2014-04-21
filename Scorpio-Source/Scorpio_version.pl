@@ -1,8 +1,8 @@
 # Scorpio version config //
 
-$sc_v{'Scorpio'}{'version'}	= "5.11.1.2";
-$sc_v{'Scorpio'}{'update'}	= "01/11/05 - 11:03:23";
-$sc_v{'Scorpio'}{'regkey'}	= "0f8243594fd85969fc37ec85bee96346";
+$sc_v{'Scorpio'}{'version'}	= "5.11.2.0";
+$sc_v{'Scorpio'}{'update'}	= "02/11/05 - 08:11:03";
+$sc_v{'Scorpio'}{'regkey'}	= "0bce65a2cbe8b7d6bd1c6a44b55dcbe9";
 
 $sc_v{'Scorpio'}{'checkVer'}	= 0;
 
