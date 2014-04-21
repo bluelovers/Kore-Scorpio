@@ -12,7 +12,8 @@ sub AI {
 
 	undef $ai_v{'temp'}{'tele'};
 
-	ai_event_cmd(\%{(shift)});
+#	ai_event_cmd(\%{(shift)});
+	ai_event_cmd_sc();
 
 	ai_event_getInfo();
 
@@ -1032,7 +1033,7 @@ sub ai_event_teleportAuto {
 #							."◆啟動 teleportAuto_spell - 隨機移動！\n"
 #							, "tele"
 #						);
-						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！");
+						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！", 0, !$config{'recordEvent_escape'});
 
 						move($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'});
 
@@ -1053,7 +1054,7 @@ sub ai_event_teleportAuto {
 #							."◆啟動 teleportAuto_spell - 瞬間移動！\n"
 #							, "tele"
 #						);
-						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 瞬間移動！");
+						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 瞬間移動！", 0, !$config{'recordEvent_escape'});
 
 						$ai_v{'temp'}{'tele'} = 1;
 
@@ -1258,353 +1259,6 @@ sub ai_event_teleportAuto {
 
 #	return $tele_val;
 	return $sc_v{'ai'}{'temp'}{'teleported'};
-}
-
-sub ai_event_cmd {
-	my %cmd = %{(shift)};
-
-	return 0 if (!$config{'autoAdmin'} || !%cmd);
-
-
-	$responseVars{'cmd_user'} = $cmd{'user'};
-
-	if ($cmd{'user'} eq $chars[$config{'char'}]{'name'}) {
-		return;
-	}
-
-	if ($cmd{'type'} eq "pm" || $cmd{'type'} eq "p" || $cmd{'type'} eq "g") {
-		$ai_v{'temp'}{'qm'} = quotemeta $config{'adminPassword'};
-		if ($cmd{'msg'} =~ /^$ai_v{'temp'}{'qm'}\b/) {
-			if ($overallAuth{$cmd{'user'}} == 1) {
-				sendMessage(\$remote_socket, "pm", getResponse("authF"), $cmd{'user'});
-			} else {
-				auth($cmd{'user'}, 1);
-				sendMessage(\$remote_socket, "pm", getResponse("authS"), $cmd{'user'});
-			}
-		}
-	}
-	$ai_v{'temp'}{'qm'} = quotemeta $config{'callSign'};
-	if ($overallAuth{$cmd{'user'}} >= 1
-		&& ($cmd{'msg'} =~ /\b$ai_v{'temp'}{'qm'}\b/i || $cmd{'type'} eq "pm")) {
-		if ($cmd{'msg'} =~ /\bsit\b/i) {
-			if ($ai_v2{'attackAuto_old'} eq "" && $config{'attackAuto'} > 0) {
-				$ai_v2{'attackAuto_old'} = $config{'attackAuto'};
-#				configModify("attackAuto", 1);
-				scModify("config", "attackAuto", 1, 1);
-			}
-			if ($ai_v2{'route_randomWalk_old'} eq "" && $config{'route_randomWalk'} > 0) {
-				$ai_v2{'route_randomWalk_old'} = $config{'route_randomWalk'};
-#				configModify("route_randomWalk", 0);
-				scModify("config", "route_randomWalk", 0, 1);
-			}
-			aiRemove("move");
-			aiRemove("route");
-			aiRemove("route_getRoute");
-			aiRemove("route_getMapRoute");
-			sit();
-			$ai_v{'sitAuto_forceStop'} = 0;
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("sitS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\bstand\b/i) {
-			if ($ai_v2{'attackAuto_old'} ne "") {
-#				configModify("attackAuto", $ai_v2{'attackAuto_old'});
-				scModify("config", "attackAuto", $ai_v2{'attackAuto_old'}, 1);
-				undef $ai_v2{'attackAuto_old'};
-			}
-			if ($ai_v2{'route_randomWalk_old'} ne "") {
-#				configModify("route_randomWalk", $ai_v2{'route_randomWalk_old'});
-				scModify("config", "route_randomWalk", $ai_v2{'route_randomWalk_old'}, 1);
-				undef $ai_v2{'route_randomWalk_old'};
-			}
-			stand();
-			$ai_v{'sitAuto_forceStop'} = 1;
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("standS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\brelog\b/i) {
-			$sc_v{'input'}{'MinWaitRecon'} = 1;
-			relogWait("", 1);
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("relogS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\blogout\b/i) {
-			quit();
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("quitS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\breload\b/i) {
-			parseReload($');
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("reloadS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\bstatus\b/i) {
-			$responseVars{'char_sp'} = $chars[$config{'char'}]{'sp'};
-			$responseVars{'char_hp'} = $chars[$config{'char'}]{'hp'};
-			$responseVars{'char_sp_max'} = $chars[$config{'char'}]{'sp_max'};
-			$responseVars{'char_hp_max'} = $chars[$config{'char'}]{'hp_max'};
-			$responseVars{'char_lv'} = $chars[$config{'char'}]{'lv'};
-			$responseVars{'char_lv_job'} = $chars[$config{'char'}]{'lv_job'};
-			$responseVars{'char_exp'} = $chars[$config{'char'}]{'exp'};
-			$responseVars{'char_exp_max'} = $chars[$config{'char'}]{'exp_max'};
-			$responseVars{'char_exp_job'} = $chars[$config{'char'}]{'exp_job'};
-			$responseVars{'char_exp_job_max'} = $chars[$config{'char'}]{'exp_job_max'};
-			$responseVars{'char_weight'} = $chars[$config{'char'}]{'weight'};
-			$responseVars{'char_weight_max'} = $chars[$config{'char'}]{'weight_max'};
-			$responseVars{'zenny'} = $chars[$config{'char'}]{'zenny'};
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("statusS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\bconf\b/i) {
-			$ai_v{'temp'}{'after'} = $';
-			($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'}) = $ai_v{'temp'}{'after'} =~ /(\w+) (\w+)/;
-			@{$ai_v{'temp'}{'conf'}} = keys %config;
-			if ($ai_v{'temp'}{'arg1'} eq "") {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("confF1"), $cmd{'user'}) if $config{'verbose'};
-			} elsif (binFind(\@{$ai_v{'temp'}{'conf'}}, $ai_v{'temp'}{'arg1'}) eq "") {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("confF2"), $cmd{'user'}) if $config{'verbose'};
-			} elsif ($ai_v{'temp'}{'arg2'} eq "value" || valBolck($ai_v{'temp'}{'arg1'})) {
-				if ($ai_v{'temp'}{'arg1'} =~ /username/i || $ai_v{'temp'}{'arg1'} =~ /password/i) {
-					sendMessage(\$remote_socket, $cmd{'type'}, getResponse("confF3"), $cmd{'user'}) if $config{'verbose'};
-				} else {
-					$responseVars{'key'} = $ai_v{'temp'}{'arg1'};
-					$responseVars{'value'} = $config{$ai_v{'temp'}{'arg1'}};
-					sendMessage(\$remote_socket, $cmd{'type'}, getResponse("confS1"), $cmd{'user'}) if $config{'verbose'};
-					timeOutStart('ai_thanks_set');
-				}
-			} else {
-#				configModify($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'});
-				scModify("config", $ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'}, 2, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("confS2"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			}
-		} elsif ($cmd{'msg'} =~ /\btimeout\b/i) {
-			$ai_v{'temp'}{'after'} = $';
-			($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'}) = $ai_v{'temp'}{'after'} =~ /([\s\S]+) (\w+)/;
-			if ($ai_v{'temp'}{'arg1'} eq "") {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("timeoutF1"), $cmd{'user'}) if $config{'verbose'};
-			} elsif ($timeout{$ai_v{'temp'}{'arg1'}} eq "") {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("timeoutF2"), $cmd{'user'}) if $config{'verbose'};
-			} elsif ($ai_v{'temp'}{'arg2'} eq "" || valBolck($ai_v{'temp'}{'arg1'})) {
-				$responseVars{'key'} = $ai_v{'temp'}{'arg1'};
-				$responseVars{'value'} = $timeout{$ai_v{'temp'}{'arg1'}};
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("timeoutS1"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			} else {
-#				setTimeout($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'});
-				scModify("timeout", $ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'}, 2, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("timeoutS2"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			}
-		} elsif ($cmd{'msg'} =~ /\bshut[\s\S]*up\b/i) {
-			if ($config{'verbose'}) {
-#				configModify("verbose", 0);
-				scModify("config", "verbose", 0, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOffS"), $cmd{'user'});
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOffF"), $cmd{'user'});
-			}
-		} elsif ($cmd{'msg'} =~ /\bspeak\b/i) {
-			if (!$config{'verbose'}) {
-#				configModify("verbose", 1);
-				scModify("config", "verbose", 1, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOnS"), $cmd{'user'});
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOnF"), $cmd{'user'});
-			}
-		} elsif ($cmd{'msg'} =~ /\bdate\b/i) {
-			$responseVars{'date'} = getFormattedDate(int(time));
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("dateS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\bmove\b/i
-			&& $cmd{'msg'} =~ /\bstop\b/i) {
-			aiRemove("move");
-			aiRemove("route");
-			aiRemove("route_getRoute");
-			aiRemove("route_getMapRoute");
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("moveS"), $cmd{'user'}) if $config{'verbose'};
-			timeOutStart('ai_thanks_set');
-		} elsif ($cmd{'msg'} =~ /\bmove\b/i) {
-			$ai_v{'temp'}{'after'} = $';
-			$ai_v{'temp'}{'after'} =~ s/^\s+//;
-			$ai_v{'temp'}{'after'} =~ s/\s+$//;
-			($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'}, $ai_v{'temp'}{'arg3'}) = $ai_v{'temp'}{'after'} =~ /(\d+)\D+(\d+)(.*?)$/;
-			undef $ai_v{'temp'}{'map'};
-			if ($ai_v{'temp'}{'arg1'} eq "") {
-				($ai_v{'temp'}{'map'}) = $ai_v{'temp'}{'after'} =~ /(.*?)$/;
-			} else {
-				$ai_v{'temp'}{'map'} = $ai_v{'temp'}{'arg3'};
-			}
-			$ai_v{'temp'}{'map'} =~ s/\s//g;
-			if (($ai_v{'temp'}{'arg1'} eq "" || $ai_v{'temp'}{'arg2'} eq "") && !$ai_v{'temp'}{'map'}) {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("moveF"), $cmd{'user'}) if $config{'verbose'};
-			} else {
-				$ai_v{'temp'}{'map'} = $field{'name'} if ($ai_v{'temp'}{'map'} eq "");
-				if ($maps_lut{$ai_v{'temp'}{'map'}.'.rsw'}) {
-					if ($ai_v{'temp'}{'arg2'} ne "") {
-						print "計算路徑前往指定地點 - $maps_lut{$ai_v{'temp'}{'map'}.'.rsw'}($ai_v{'temp'}{'map'}): ".getFormattedCoords($ai_v{'temp'}{'arg1'}, $ai_v{'temp'}{'arg2'})."\n";
-						$ai_v{'temp'}{'x'} = $ai_v{'temp'}{'arg1'};
-						$ai_v{'temp'}{'y'} = $ai_v{'temp'}{'arg2'};
-					} else {
-						print "計算路徑前往指定地圖 - $maps_lut{$ai_v{'temp'}{'map'}.'.rsw'}($ai_v{'temp'}{'map'})\n";
-						undef $ai_v{'temp'}{'x'};
-						undef $ai_v{'temp'}{'y'};
-					}
-					sendMessage(\$remote_socket, $cmd{'type'}, getResponse("moveS"), $cmd{'user'}) if $config{'verbose'};
-					ai_route(\%{$ai_v{'temp'}{'returnHash'}}, $ai_v{'temp'}{'x'}, $ai_v{'temp'}{'y'}, $ai_v{'temp'}{'map'}, 0, 0, 1, 0, 0, 1);
-					timeOutStart('ai_thanks_set');
-				} else {
-					print "指定地圖設定錯誤 - $sc_v{'path'}{'tables'}/maps.txt中找不到 $ai_v{'temp'}{'map'}.rsw\n";
-					sendMessage(\$remote_socket, $cmd{'type'}, getResponse("moveF"), $cmd{'user'}) if $config{'verbose'};
-				}
-			}
-		} elsif ($cmd{'msg'} =~ /\blook\b/i) {
-			($ai_v{'temp'}{'body'}) = $cmd{'msg'} =~ /(\d+)/;
-			($ai_v{'temp'}{'head'}) = $cmd{'msg'} =~ /\d+ (\d+)/;
-			if ($ai_v{'temp'}{'body'} ne "") {
-				look($ai_v{'temp'}{'body'}, $ai_v{'temp'}{'head'});
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("lookS"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("lookF"), $cmd{'user'}) if $config{'verbose'};
-			}
-
-		} elsif ($cmd{'msg'} =~ /\bfollow/i
-			&& $cmd{'msg'} =~ /\bstop\b/i) {
-			if ($config{'follow'}) {
-				aiRemove("follow");
-#				configModify("follow", 0);
-				scModify("config", "follow", 0, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followStopS"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followStopF"), $cmd{'user'}) if $config{'verbose'};
-			}
-		} elsif ($cmd{'msg'} =~ /\bfollow\b/i) {
-			$ai_v{'temp'}{'after'} = $';
-			$ai_v{'temp'}{'after'} =~ s/^\s+//;
-			$ai_v{'temp'}{'after'} =~ s/\s+$//;
-			$ai_v{'temp'}{'targetID'} = ai_getIDFromChat(\%players, $cmd{'user'}, $ai_v{'temp'}{'after'});
-			if ($ai_v{'temp'}{'targetID'} ne "") {
-				aiRemove("follow");
-				ai_follow($players{$ai_v{'temp'}{'targetID'}}{'name'});
-#				configModify("follow", 1);
-				scModify("config", "follow", 1, 1);
-#				configModify("followTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
-				scModify("config", "followTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'}, 1);
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followS"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followF"), $cmd{'user'}) if $config{'verbose'};
-			}
-		} elsif ($cmd{'msg'} =~ /\btank/i
-			&& $cmd{'msg'} =~ /\bstop\b/i) {
-			if (!$config{'tankMode'}) {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankStopF"), $cmd{'user'}) if $config{'verbose'};
-			} elsif ($config{'tankMode'}) {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankStopS"), $cmd{'user'}) if $config{'verbose'};
-#				configModify("tankMode", 0);
-				scModify("config", "tankMode", 0, 1);
-				timeOutStart('ai_thanks_set');
-			}
-		} elsif ($cmd{'msg'} =~ /\btank/i) {
-			$ai_v{'temp'}{'after'} = $';
-			$ai_v{'temp'}{'after'} =~ s/^\s+//;
-			$ai_v{'temp'}{'after'} =~ s/\s+$//;
-			$ai_v{'temp'}{'targetID'} = ai_getIDFromChat(\%players, $cmd{'user'}, $ai_v{'temp'}{'after'});
-			if ($ai_v{'temp'}{'targetID'} ne "") {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankS"), $cmd{'user'}) if $config{'verbose'};
-#				configModify("tankMode", 1);
-				scModify("config", "tankMode", 1, 1);
-#				configModify("tankModeTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
-				scModify("config", "tankModeTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'}, 1);
-				timeOutStart('ai_thanks_set');
-			} else {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankF"), $cmd{'user'}) if $config{'verbose'};
-			}
-		} elsif ($cmd{'msg'} =~ /\btown/i) {
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("moveS"), $cmd{'user'}) if $config{'verbose'};
-			useTeleport(2);
-			timeOutStart('ai_thanks_set');
-
-		} elsif ($cmd{'msg'} =~ /\bwhere\b/i) {
-			$responseVars{'x'} = $chars[$config{'char'}]{'pos_to'}{'x'};
-			$responseVars{'y'} = $chars[$config{'char'}]{'pos_to'}{'y'};
-			$responseVars{'map'} = qq~$maps_lut{$field{'name'}.'.rsw'} ($field{'name'})~;
-			timeOutStart('ai_thanks_set');
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("whereS"), $cmd{'user'}) if $config{'verbose'};
-		}
-
-	}
-	$ai_v{'temp'}{'qm'} = quotemeta $config{'callSign'};
-	if ($overallAuth{$cmd{'user'}} >= 1 && ($cmd{'msg'} =~ /\b$ai_v{'temp'}{'qm'}\b/i || $cmd{'type'} eq "pm")
-		&& $cmd{'msg'} =~ /\bheal\b/i) {
-		$ai_v{'temp'}{'after'} = $';
-		($ai_v{'temp'}{'amount'}) = $ai_v{'temp'}{'after'} =~ /(\d+)/;
-		$ai_v{'temp'}{'after'} =~ s/\d+//;
-		$ai_v{'temp'}{'after'} =~ s/^\s+//;
-		$ai_v{'temp'}{'after'} =~ s/\s+$//;
-		$ai_v{'temp'}{'targetID'} = ai_getIDFromChat(\%players, $cmd{'user'}, $ai_v{'temp'}{'after'});
-		if ($ai_v{'temp'}{'targetID'} eq "") {
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("healF1"), $cmd{'user'}) if $config{'verbose'};
-		} elsif ($chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'} > 0) {
-			undef $ai_v{'temp'}{'amount_healed'};
-			undef $ai_v{'temp'}{'sp_needed'};
-			undef $ai_v{'temp'}{'sp_used'};
-			undef $ai_v{'temp'}{'failed'};
-			undef @{$ai_v{'temp'}{'skillCasts'}};
-			while ($ai_v{'temp'}{'amount_healed'} < $ai_v{'temp'}{'amount'}) {
-				for ($i = 1; $i <= $chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'}; $i++) {
-					$ai_v{'temp'}{'sp'} = 10 + ($i * 3);
-					$ai_v{'temp'}{'amount_this'} = int(($chars[$config{'char'}]{'lv'} + $chars[$config{'char'}]{'int'}) / 8)
-							* (4 + $i * 8);
-					last if ($ai_v{'temp'}{'amount_healed'} + $ai_v{'temp'}{'amount_this'} >= $ai_v{'temp'}{'amount'});
-				}
-				$ai_v{'temp'}{'sp_needed'} += $ai_v{'temp'}{'sp'};
-				$ai_v{'temp'}{'amount_healed'} += $ai_v{'temp'}{'amount_this'};
-			}
-			while ($ai_v{'temp'}{'sp_used'} < $ai_v{'temp'}{'sp_needed'} && !$ai_v{'temp'}{'failed'}) {
-				for ($i = 1; $i <= $chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'}; $i++) {
-					$ai_v{'temp'}{'lv'} = $i;
-					$ai_v{'temp'}{'sp'} = 10 + ($i * 3);
-					if ($ai_v{'temp'}{'sp_used'} + $ai_v{'temp'}{'sp'} > $chars[$config{'char'}]{'sp'}) {
-						$ai_v{'temp'}{'lv'}--;
-						$ai_v{'temp'}{'sp'} = 10 + ($ai_v{'temp'}{'lv'} * 3);
-						last;
-					}
-					last if ($ai_v{'temp'}{'sp_used'} + $ai_v{'temp'}{'sp'} >= $ai_v{'temp'}{'sp_needed'});
-				}
-				if ($ai_v{'temp'}{'lv'} > 0) {
-					$ai_v{'temp'}{'sp_used'} += $ai_v{'temp'}{'sp'};
-					$ai_v{'temp'}{'skillCast'}{'skill'} = 28;
-					$ai_v{'temp'}{'skillCast'}{'lv'} = $ai_v{'temp'}{'lv'};
-					$ai_v{'temp'}{'skillCast'}{'maxCastTime'} = 0;
-					$ai_v{'temp'}{'skillCast'}{'minCastTime'} = 0;
-					$ai_v{'temp'}{'skillCast'}{'ID'} = $ai_v{'temp'}{'targetID'};
-					unshift @{$ai_v{'temp'}{'skillCasts'}}, {%{$ai_v{'temp'}{'skillCast'}}};
-				} else {
-					$responseVars{'char_sp'} = $chars[$config{'char'}]{'sp'} - $ai_v{'temp'}{'sp_used'};
-					sendMessage(\$remote_socket, $cmd{'type'}, getResponse("healF2"), $cmd{'user'}) if $config{'verbose'};
-					$ai_v{'temp'}{'failed'} = 1;
-				}
-			}
-			if (!$ai_v{'temp'}{'failed'}) {
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("healS"), $cmd{'user'}) if $config{'verbose'};
-				timeOutStart('ai_thanks_set');
-			}
-			foreach (@{$ai_v{'temp'}{'skillCasts'}}) {
-				ai_skillUse($$_{'skill'}, $$_{'lv'}, $$_{'maxCastTime'}, $$_{'minCastTime'}, $$_{'ID'});
-			}
-		} else {
-			sendMessage(\$remote_socket, $cmd{'type'}, getResponse("healF3"), $cmd{'user'}) if $config{'verbose'};
-		}
-	}
-
-	if ($overallAuth{$cmd{'user'}} >= 1) {
-		if ($cmd{'msg'} =~ /\bthank/i || $cmd{'msg'} =~ /\bthn/i) {
-			if (!checkTimeOut('ai_thanks_set')) {
-				$timeout{'ai_thanks_set'}{'time'} -= $timeout{'ai_thanks_set'}{'timeout'};
-				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("thankS"), $cmd{'user'}) if $config{'verbose'};
-			}
-		}
-	}
-
 }
 
 sub ai_event_auto_request {
@@ -2226,11 +1880,13 @@ sub ai_event_route_preferRoute {
 #	if ($ai_seq[0] eq "" && $field{'name'} && $field{'name'} ne $config{'lockMap'} && checkTimeOut('ai_warpTo_wait')) {
 		undef $ai_v{'temp'}{'index'};
 		undef $ai_v{'temp'}{'index_next'};
+		undef $ai_v{'temp'}{'found'};
+
 		$ai_v{'temp'}{'index'} = findIndexString_lc(\@preferRoute, "map", $field{'name'});
 		if ($ai_v{'temp'}{'index'} ne "") {
 			$ai_v{'temp'}{'index_next'} = $ai_v{'temp'}{'index'} + 1;
 
-			undef $ai_v{'temp'}{'found'};
+#			undef $ai_v{'temp'}{'found'};
 
 			if ($config{'preferRoute_warp'} && @{$record{'warp'}{'memo'}} && $sc_v{'ai'}{'warpTo'}{'open'}) {
 
@@ -2286,6 +1942,8 @@ sub ai_event_route_preferRoute {
 						|| $ai_v{'temp'}{'index_end'} eq ""
 					)
 				) {
+					$ai_v{'temp'}{'index_end'} = @preferRoute - 1 if ($ai_v{'temp'}{'index_end'} eq "");
+					
 					for ($i=$ai_v{'temp'}{'index_next'}; $i<$ai_v{'temp'}{'index_end'}+1; $i++) {
 						next if (
 							$preferRoute[$i]{'map'} eq ""
@@ -2330,10 +1988,26 @@ sub ai_event_route_preferRoute {
 
 			}
 
-			if (!$ai_v{'temp'}{'found'} && $config{'autoRoute_saveMap'} && $config{'saveMap'} && $config{'saveMap'} ne $field{'name'} && !$indoors_lut{$field{'name'}.'.rsw'}) {
-				$ai_v{'temp'}{'index_back'} = findIndexString_lc(\@preferRoute, "map", $config{'saveMap'});
+			if (
+				!$ai_v{'temp'}{'found'}
+				&& $config{'autoRoute_saveMap'}
+				&& $config{'saveMap'}
+				&& $config{'saveMap'} ne $field{'name'}
+				&& !$indoors_lut{$field{'name'}.'.rsw'}
+			) {
+#				$ai_v{'temp'}{'index_back'} = findIndexString_lc(\@preferRoute, "map", $config{'saveMap'});
+				$ai_v{'temp'}{'index_back'} = findIndexString_sc(\@preferRoute, "map", $config{'saveMap'}, $ai_v{'temp'}{'index'});
+				$ai_v{'temp'}{'index_end'} = findIndexString_sc(\@preferRoute, "map", $config{'lockMap'}, $ai_v{'temp'}{'index'});
 
-				if ($ai_v{'temp'}{'index_back'} > $ai_v{'temp'}{'index'}) {
+				if (
+					$ai_v{'temp'}{'index_back'} > $ai_v{'temp'}{'index'}
+					&& (
+						$ai_v{'temp'}{'index_end'} eq ""
+						|| $ai_v{'temp'}{'index_end'} > $ai_v{'temp'}{'index_back'}
+					)
+#					|| $ai_v{'temp'}{'index'} eq ""
+#					|| ($config{'saveMap'} ne"" && $preferRoute[$ai_v{'temp'}{'index_next'}]{'map'} eq $config{'saveMap'})
+				) {
 					$ai_v{'temp'}{'found'} = 1;
 
 					print "依照偏好路徑 - 自動順移回儲存點 ".getMapName($config{'saveMap'}, 1)."\n";
@@ -2463,6 +2137,19 @@ sub ai_event_route_preferRoute {
 			}
 #		} else {
 #			timeOutStart(-1, 'ai_warpTo_wait');
+		} elsif (
+			0
+			&& $config{'autoRoute_saveMap'}
+			&& $config{'saveMap'}
+			&& $config{'saveMap'} ne $field{'name'}
+			&& !$indoors_lut{$field{'name'}.'.rsw'}
+			&& findIndexString_lc(\@preferRoute, "map", $config{'saveMap'}) ne ""
+		) {
+			$ai_v{'temp'}{'found'} = 1;
+
+			print "依照偏好路徑 - 你不在偏好路徑內自動順移回儲存點 ".getMapName($config{'saveMap'}, 1)."\n";
+
+			useTeleport(2);
 		}
 	}
 #Karasu End
@@ -2505,10 +2192,10 @@ sub ai_event_lockMap {
 #
 #	}
 
-	if ($ai_v{'waitting_for_leave_indoor'} && $field{'name'} ne "" && !$ai_v{'temp'}{'inDoor'}) {
+	if ($sc_v{'ai'}{'temp'}{'waitting_for_leave_indoor'} && $field{'name'} ne "" && !$ai_v{'temp'}{'inDoor'}) {
 #		printC("event", "安全", "成功\離開不能瞬移地圖，目前地圖：".getMapName($field{'name'}, 1));
 		sysLog("event", "安全", "成功\離開不能瞬移地圖，目前地圖：".getMapName($field{'name'}, 1), 1);
-		undef $ai_v{'waitting_for_leave_indoor'};
+		undef $sc_v{'ai'}{'temp'}{'waitting_for_leave_indoor'};
 		aiRemove("move");
 		aiRemove("route");
 		aiRemove("route_getRoute");
@@ -2527,6 +2214,7 @@ sub ai_event_lockMap {
 #		&& $field{'name'} ne ""
 #		&& $config{'lockMap'} ne ""
 #		&& !$sc_v{'ai'}{'first'}
+		&& $config{'lockMap'} ne ""
 		&& (
 			$field{'name'} ne $config{'lockMap'}
 			|| (
@@ -2552,7 +2240,7 @@ sub ai_event_lockMap {
 			&& $field{'name'} ne $config{'lockMap'}
 			&& ($ai_v{'temp'}{'inDoor'} || $config{'respawnAuto_undef'})
 		) {
-			undef $ai_v{'waitting_for_leave_indoor'};
+			undef $sc_v{'ai'}{'temp'}{'waitting_for_leave_indoor'};
 			if ($ai_v{'temp'}{'inDoor'}) {
 
 #				print "試圖離開不能瞬移地圖，當前地圖：".getMapName($field{'name'}, 1)."\n";
@@ -2563,9 +2251,13 @@ sub ai_event_lockMap {
 				print "正在計算鎖定地圖路線: $maps_lut{$config{'lockMap'}.'.rsw'}($config{'lockMap'})\n";
 
 				ai_route(\%{$ai_v{'temp'}{'returnHash'}}, "", "", $config{'lockMap'}, 0, 0, 1, 0, 0, 1);
-				$ai_v{'waitting_for_leave_indoor'} = 1;
+				$sc_v{'ai'}{'temp'}{'waitting_for_leave_indoor'} = 1;
 
-			} elsif ($config{'respawnAuto_undef'} && $map_control{$field{'name'}}{'teleport_allow'} >= 1) {
+			} elsif (
+				$config{'respawnAuto_undef'}
+				&& $map_control{$field{'name'}}{'teleport_allow'} >= 1
+				&& $sc_v{'ai'}{'temp'}{'respawnAuto_undef'} < 5
+			) {
 				print "◆限定地圖: 你出現在非限定地圖 ".getMapName($field{'name'}, 1)."！\n";
 				print "◆啟動 respawnAuto_undef - 瞬間移動回儲存點！\n";
 #				chatLog("危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！", "d");
@@ -2576,10 +2268,12 @@ sub ai_event_lockMap {
 
 				$ai_v{'clear_aiQueue'} = 1;
 
+				$sc_v{'ai'}{'temp'}{'respawnAuto_undef'}++;
+
 				timeOutStart('ai_warpTo_wait');
 			} elsif ($config{'respawnAuto_undef'} && $map_control{$field{'name'}}{'teleport_allow'} <= 0) {
 				print "◆限定地圖: 你出現在非限定地圖 ".getMapName($field{'name'}, 1)."！\n";
-				print "◆啟動 respawnAuto_undef - 瞬間移動回儲存點！\n";
+				print "◆啟動 respawnAuto_undef - 無法瞬間移動回儲存點, 立即登出！\n";
 
 				sysLog("event", "危險", "限定地圖: 你無法從目前的地圖($map_string)瞬移回儲存點, 立即登出！", 1);
 				quit(1, 1);
@@ -2639,7 +2333,17 @@ sub ai_event_route_randomWalk {
 
 	return 0 if (!$config{'route_randomWalk'} || $ai_v{'temp'}{'teleOnEvent'});
 
-	if ($ai_seq[0] eq "" && length($field{'rawMap'}) > 1 && (!$cities_lut{$field{'name'}.'.rsw'} || ($config{'route_randomWalk_inCity'} && $cities_lut{$field{'name'}.'.rsw'}))) {
+	if (
+		$ai_seq[0] eq ""
+		&& length($field{'rawMap'}) > 1
+		&& (
+			!$cities_lut{$field{'name'}.'.rsw'}
+			|| (
+				$config{'route_randomWalk_inCity'}
+				&& $cities_lut{$field{'name'}.'.rsw'}
+			)
+		)
+	) {
 		if ($config{'route_randomWalk_upLeft'} && $config{'route_randomWalk_bottomRight'}) {
 			undef @array; splitUseArray(\@array, $config{'route_randomWalk_upLeft'}, ",");
 			$ai_v{'temp'}{'upLeft'}{'x'} = $array[0]; $ai_v{'temp'}{'upLeft'}{'y'} = $array[1];
@@ -4055,7 +3759,10 @@ sub ai_event_items_take {
 		shift @ai_seq;
 		shift @ai_seq_args;
 		ai_clientSuspend(0, $timeout{'ai_attack_waitAfterKill'}{'timeout'});
-	} elsif ($config{'itemsTakeAuto'} && timeOut(\%{$ai_seq_args[0]{'ai_items_take_start'}})) {
+	} elsif (
+		(1 || $config{'itemsTakeAuto'} || $ai_seq_args[0]{'mode'})
+		&& timeOut(\%{$ai_seq_args[0]{'ai_items_take_start'}})
+	) {
 		undef $ai_v{'temp'}{'foundID'};
 		undef $ai_v{'temp'}{'itemsPickup'};
 
@@ -5065,7 +4772,20 @@ sub ai_event_auto_attack {
 				} elsif ($config{'attackAuto'} >= 2
 					&& $ai_seq[0] ne "sitAuto" && $ai_seq[0] ne "take" && $ai_seq[0] ne "items_gather" && $ai_seq[0] ne "items_take"
 					# MVP control
-					&& !($monsters{$_}{'dmgFromYou'} == 0 && (binFind(\@MVPID, $monsters{$_}{'nameID'}) eq "" && ($monsters{$_}{'dmgTo'} > 0 || $monsters{$_}{'dmgFrom'} > 0 || %{$monsters{$_}{'missedFromPlayer'}} || %{$monsters{$_}{'missedToPlayer'}} || %{$monsters{$_}{'castOnByPlayer'}})))
+					&& !(
+						$monsters{$_}{'dmgFromYou'} == 0
+						&&
+						(
+							binFind(\@MVPID, $monsters{$_}{'nameID'}) eq ""
+							&& (
+								$monsters{$_}{'dmgTo'} > 0
+								|| $monsters{$_}{'dmgFrom'} > 0
+								|| %{$monsters{$_}{'missedFromPlayer'}}
+								|| %{$monsters{$_}{'missedToPlayer'}}
+								|| %{$monsters{$_}{'castOnByPlayer'}}
+							)
+						)
+					)
 #					&& $monsters{$_}{'attack_failed'} == 0
 #					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
 					&& ($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} >= 1 || $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq "")
@@ -5087,20 +4807,24 @@ sub ai_event_auto_attack {
 						$ai_v{'temp'}{'myDist'} = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}});
 						undef $ai_v{'temp'}{'smallDist'};
 						$ai_v{'temp'}{'first'} = 1;
-						for ($i = 0; $i < @playersID; $i++) {
-							next if ($playersID[$i] eq "");
-							$ai_v{'temp'}{'dist'} = distance(\%{$players{$playersID[$i]}{'pos_to'}}, \%{$monsters{$_}{'pos_to'}});
-							if ($ai_v{'temp'}{'first'} || $ai_v{'temp'}{'dist'} < $ai_v{'temp'}{'smallDist'}) {
-								$ai_v{'temp'}{'smallDist'} = $ai_v{'temp'}{'dist'};
-								undef $ai_v{'temp'}{'first'};
+						if ($config{'NotAttackDistance'}) {
+							for ($i = 0; $i < @playersID; $i++) {
+								next if ($playersID[$i] eq "");
+								$ai_v{'temp'}{'dist'} = distance(\%{$players{$playersID[$i]}{'pos_to'}}, \%{$monsters{$_}{'pos_to'}});
+								if ($ai_v{'temp'}{'first'} || $ai_v{'temp'}{'dist'} < $ai_v{'temp'}{'smallDist'}) {
+									$ai_v{'temp'}{'smallDist'} = $ai_v{'temp'}{'dist'};
+									undef $ai_v{'temp'}{'first'};
+								}
 							}
 						}
 						# Anklesnare Detection
-						for ($i = 0; $i < @spellsID; $i++) {
-							next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
-							if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$_}{'pos_to'}}) <= $config{'NotAttackNearSpell'}) {
-								$Ankled = 1;
-								last;
+						if ($config{'NotAttackNearSpell'}) {
+							for ($i = 0; $i < @spellsID; $i++) {
+								next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
+								if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$_}{'pos_to'}}) <= $config{'NotAttackNearSpell'}) {
+									$Ankled = 1;
+									last;
+								}
 							}
 						}
 						if (
@@ -5110,6 +4834,7 @@ sub ai_event_auto_attack {
 #							&& $monsters{$_}{'param1'} != 6
 							&& (
 								!$monsters{$_}{'param1'}
+								|| !$config{'attackAuto_preventParam1'}
 								|| !existsInList2($config{'attackAuto_preventParam1'}, $monsters{$_}{'param1'}, "noand")
 							)
 #							&& (
@@ -5245,6 +4970,8 @@ sub ai_event_attack {
 	##### ATTACK #####
 
 	return 0 if ($ai_seq[0] ne "attack");
+	
+	my $display;
 
 	if ($ai_seq_args[0]{'suspended'}) {
 		$ai_seq_args[0]{'ai_attack_giveup'}{'time'} += time - $ai_seq_args[0]{'suspended'};
@@ -5282,7 +5009,8 @@ sub ai_event_attack {
 			$monsters{$ai_seq_args[0]{'ID'}}{'attack_overTime'}++;
 		}
 
-		print "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - 嘗試攻擊逾時\n";
+#		print "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - 嘗試攻擊逾時\n";
+		sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - 嘗試攻擊逾時", 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'});
 
 		shift @ai_seq;
 		shift @ai_seq_args;
@@ -5300,31 +5028,37 @@ sub ai_event_attack {
 
 		shift @ai_seq;
 		shift @ai_seq_args;
-
-		my $display;
+		
+		undef $display;
 
 		if ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dead'}) {
 			my $val = mathPercent($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgTo'}, 0, 0, 0);
 
 			$display = "目標陣亡: $monsters_old{$ai_v{'ai_attack_ID_old'}}{'name'} ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'binID'})";
+
 			if (!$config{'hideMsg_attackDmgFromYou'} && $val > 0) {
 				$display .= " (Total: ${val}%)";
-				$display .= " - ".getSpend(time, $sc_v{'ai'}{'temp'}{'attack'}{'ai_start_time'});
+				if ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}) {
+					$display .= " - ".getSpend(time, $sc_v{'ai'}{'temp'}{'attack'}{'ai_start_time'});
+				}
 			}
 #Karasu Start
 			# Defeated monster record
 			$record{'monsters'}{$monsters_old{$ai_v{'ai_attack_ID_old'}}{'nameID'}}++ if ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0 || $monsters_old{$ai_v{'ai_attack_ID_old'}}{'missedFromYou'} > 0);
 #Karasu End
 			if (
-				$config{'itemsTakeAuto'}
-				&& $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0
-				&& (
-				 	!$config{'itemsTakeDamage'}
-				 	|| $val >= $config{'itemsTakeDamage'}
+				$monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}
+				|| (
+					$config{'itemsTakeAuto'}
+					&& $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0
+					&& (
+					 	!$config{'itemsTakeDamage'}
+					 	|| $val >= $config{'itemsTakeDamage'}
+					)
 				)
 			) {
-				ai_items_take($monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'y'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'y'});
-			} elsif ($ai_v{'temp'}{'getAggressives'}) {
+				ai_items_take($monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'y'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'y'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'});
+			} elsif ($ai_v{'temp'}{'getAggressives'} && !$monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}) {
 #				ai_clientSuspend(0, $timeout{'ai_attack_waitAfterKill'}{'timeout'});
 				ai_clientSuspend(0);
 			} else {
@@ -5341,7 +5075,14 @@ sub ai_event_attack {
 			$display = " - 地圖已轉換\n" if ($sc_v{'ai'}{'temp'}{'attack'}{'mapChanged'});
 		}
 
-		print "$display\n";
+#		print "$display\n" if ($display ne "");
+#		if ($display ne "" && $monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}) {
+#			sysLog("mvp", "戰鬥", "$display", 1, !$monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'});
+#		} elsif ($display ne "" && $monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}) {
+#			print "$display\n";
+#		}
+		
+		sysLog(($monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'}?"mvp":"none"), "戰鬥", "$display", 1, !$monsters_old{$ai_v{'ai_attack_ID_old'}}{'mvp'});
 
 #		timeOutStart(
 #			 'ai_teleport_search'
@@ -5355,7 +5096,10 @@ sub ai_event_attack {
 	) {
 		$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'ID'}}{'nameID'}) eq "");
 
-		print "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - [param3]: $monsters{$ai_seq_args[0]{'ID'}}{'param3'}\n";
+		$display = "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - [param3]: $monsters{$ai_seq_args[0]{'ID'}}{'param3'}";
+
+#		print "放棄目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - [param3]: $monsters{$ai_seq_args[0]{'ID'}}{'param3'}\n";
+		sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", $display, 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'});
 
 		shift @ai_seq;
 		shift @ai_seq_args;
@@ -5587,8 +5331,12 @@ sub ai_event_attack {
 			shift @ai_seq_args;
 
 			$record{'counts'}{'Steal-Dropping-target'}++;
-		} elsif (!$ai_v{'ai_attack_cleanMonster'} && !$monsters{$_}{'takenBy'}) {
-			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 被搶先攻擊\n" if (!$config{'attackBerserk'});
+		} elsif (!$ai_v{'ai_attack_cleanMonster'} && !$monsters{$ai_seq_args[0]{'ID'}}{'takenBy'}) {
+			
+			$display = "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 被搶先攻擊";
+			sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", $display, 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'}) if (!$config{'attackBerserk'});
+			
+#			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 被搶先攻擊\n" if (!$config{'attackBerserk'});
 
 			$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++;
 
@@ -5596,8 +5344,11 @@ sub ai_event_attack {
 			shift @ai_seq_args;
 
 		} elsif ($config{'attackAuto_notPortal'} && binSize(\@portalsID)) {
+		
+			$display = "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 接近傳點";
 
-			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 接近傳點\n";
+#			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 接近傳點\n";
+			sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", $display, 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'});
 
 			$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++;
 
@@ -5629,7 +5380,10 @@ sub ai_event_attack {
 					)
 				)
 			) {
-				print "放棄目標 - 需花費過多時間接近目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - ($monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'x'}, $monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'y'}) Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}})."\n";
+#				print "放棄目標 - 需花費過多時間接近目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - ($monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'x'}, $monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'y'}) Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}})."\n";
+				$display = "放棄目標 - 需花費過多時間接近目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - ($monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'x'}, $monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'y'}) Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}});
+				
+				sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", $display, 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'});
 
 				# MVP control
 				$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'ID'}}{'nameID'}) eq "");
@@ -5692,13 +5446,17 @@ sub ai_event_attack {
 				timeOutStart('ai_skill_use');
 			} elsif (
 				!$ai_seq_args[0]{'attackMethod'}{'type'}
+				&& $config{'attackAuto_checkMethod'}
 				&& !$monsters{$ai_seq_args[0]{'ID'}}{'dmgFromYou'}
 				&& !$monsters{$ai_seq_args[0]{'ID'}}{'missedFromYou'}
 				&& checkTimeOut('ai_attack')
 			) {
 				$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'ID'}}{'nameID'}) eq "");
 
-				print "放棄目標 - 沒有方式攻擊 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'})\n";
+#				print "放棄目標 - 沒有方式攻擊 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'})\n";
+				$display = "放棄目標 - 沒有方式攻擊 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'})";
+				
+				sysLog(($monsters{$ai_seq_args[0]{'ID'}}{'mvp'}?"mvp":"none"), "戰鬥", $display, 1, !$monsters{$ai_seq_args[0]{'ID'}}{'mvp'});
 
 				shift @ai_seq;
 				shift @ai_seq_args;
@@ -7038,4 +6796,5 @@ sub ai_event_auto_resurrect {
 		timeOutStart('ai_resurrect');
 	}
 }
+
 1;
