@@ -505,12 +505,16 @@ sub event_mvp {
 
 	my $mode;
 	my $t_type;
-	my $t_dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ID}{'pos_to'}});
+	my $t_dist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ID}{'pos_to'}}, 1);
 	my $t_map = getMapName($field{'name'}, 1)." ".posToCoordinate(\%{$monsters{$ID}{'pos_to'}}, 1);
 	my $name = $monsters{$ID}{'name'};
 	my $nameID = $monsters{$ID}{'nameID'};
 
 	my ($title, $msg);
+
+	return 0 if ($ID eq $chars[$config{'char'}]{'pet'}{'ID'} || $t_dist == 0);
+
+	$t_dist = int($t_dist);
 
 	if (binFind(\@MVPID, $nameID) ne "") {
 		$t_type = "MVP";
@@ -912,7 +916,11 @@ sub event_map {
 
 		makeCoords(\%{$chars[$config{'char'}]{'pos'}}, substr($msg, 6, 3));
 
-		$sc_v{'input'}{'conState'} = 4 if (!$option{'X-Kore'});
+		if ($option{'X-Kore'}) {
+#			$sc_v{'input'}{'conState'} = 4;
+		} else {
+			$sc_v{'input'}{'conState'} = 5;
+		}
 		undef $sc_v{'input'}{'conState_tries'};
 
 		$CONSOLE->Title("$chars[$config{'char'}]{'name'}");
