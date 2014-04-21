@@ -1,7 +1,7 @@
 # Scorpio version config //
 
-version	5.11.2.0
-update	02/11/05 - 08:11:03
-MD5	65ce2f14cc1cdc9d8a4e82b13e0a52fb
+version	5.11.2.1
+update	02/11/05 - 08:16:44
+MD5	fc36905222dbbd493580e7ad849666a7
 
 # // Scorpio version config
