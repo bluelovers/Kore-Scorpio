@@ -26,7 +26,11 @@ sub toHex {
 	my $msg;
 	@raw = split / /, $raw;
 	foreach (@raw) {
-		$msg .= pack("H2", $_);
+#		支援 A6 98 AE 8A 3E 9D B7 92 4F FB AC A4 67 01 C5 4F
+#		$msg .= pack("H2", $_);
+#		支援 A6 98 AE 8A 3E 9D B7 92 4F FB AC A4 67 01 C5 4F
+#		與 A698AE8A3E9DB7924FFBACA46701C54F
+		$msg .= pack("H*", $_);
 	}
 	return $msg;
 }
@@ -52,10 +56,14 @@ sub getPlayerType {
 	my $val3 = 0;
 
 	if (
-		binFind(\@partyUsersID, $ID) ne ""
-		|| (
-			($mode >= 0 || $chars[$config{'char'}]{'party'}{'users'}{$ID}{'hp_max'})
-			&& $chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} ne ""
+		(
+			binFind(\@partyUsersID, $ID) ne ""
+			|| $chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} ne ""
+		)
+		&& (
+			$mode >= 0
+			|| $chars[$config{'char'}]{'party'}{'users'}{$ID}{'hp_max'}
+#			&& $chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} ne ""
 		)
 	) {
 		$val = $val + 1;
@@ -271,6 +279,7 @@ sub ai_checkToUseSkill {
 
 		my $val = (
 			$config{"${key}_${i}_lvl"} > 0
+			&& !$config{"${key}_${i}_disabled"}
 			&& mathInNum(percent_hp(\%{$chars[$config{'char'}]}), $config{"${key}_${i}_hp_upper"}, $config{"${key}_${i}_hp_lower"}, 1)
 			&& mathInNum(percent_sp(\%{$chars[$config{'char'}]}), $config{"${key}_${i}_sp_upper"}, $config{"${key}_${i}_sp_lower"}, 1)
 			&& !($config{"${key}_${i}_stopWhenHit"} && $ai_v{'temp'}{'onHit'})
@@ -337,7 +346,8 @@ sub ai_checkToUseSkill {
 			)
 		) {
 			$ai_v{'temp'}{'found'} = 1;
-			scModify("config", "${key}_${i}_lvl", 0, 1) if ($config{"useSkill_smartCheck"});
+#			scModify("config", "${key}_${i}_lvl", 0, 1) if ($config{"useSkill_smartCheck"});
+			scModify("config", "${key}_${i}_disabled", 1, 1) if ($config{"useSkill_smartCheck"});
 		}
 
 		if (
@@ -994,7 +1004,7 @@ sub printC {
 		$color = ($FG_LIGHTCYAN);
 	} elsif (switchInput($channel, "p", "LIGHTBLUE")) {
 		$color = ($FG_LIGHTBLUE);
-	} elsif (switchInput($channel, "pm", "s", "event", "YELLOW", "update", "mvp", "kore")) {
+	} elsif (switchInput($channel, "pm", "s", "event", "YELLOW", "update", "mvp", "kore", "cmd")) {
 		$color = ($FG_YELLOW);
 	} elsif (switchInput($channel, "alert", "LIGHTRED", "error")) {
 		$color = ($FG_LIGHTRED);
@@ -1334,18 +1344,22 @@ sub parseSkill {
 #		my inCity = $cities_lut{$field{'name'}.'.rsw'};
 		my $inCity = getMapName($field{'name'}, 0, 1);
 
-		if ($config{"useCast_skill"} && $ai_v{'temp'}{'castWait'} && checkTimeOut('ai_skill_cast_wait')) {
+		if ($config{"useCast_skill"} && (1 || $ai_v{'temp'}{'castWait'}) && checkTimeOut('ai_skill_cast_wait')) {
 			undef $ai_v{'temp'}{'foundID'};
 			undef $ai_v{'useCast_skill'};
 			undef $ai_v{'useCast_skill_lvl'};
 
 			while (1) {
-				last if (!$config{"useCast_skill_$i"} || !$config{"useCast_skill_${i}_lvl"});
+				last if (!$config{"useCast_skill_$i"});
+#				next if (!$config{"useCast_skill_${i}_lvl"});
 
 				if (
+#					$config{"useCast_skill_${i}_lvl"}
+#					&& !$config{"useCast_skill_${i}_disabled"}
+#					&&
 					existsInList($config{"useCast_skill_${i}_cast"}, $skillName)
-					&& existsInList2($config{"useCast_skill_$i"."_castBy"}, $castBy, "and")
-					&& existsInList2($config{"useCast_skill_$i"."_castOn"}, $castOn, "and")
+					&& (!$config{"useCast_skill_$i"."_castBy"} || existsInList2($config{"useCast_skill_$i"."_castBy"}, $castBy, "and"))
+					&& (!$config{"useCast_skill_$i"."_castOn"} || existsInList2($config{"useCast_skill_$i"."_castOn"}, $castOn, "and"))
 					&& (
 						!$config{"useCast_skill_$i"."_dist"}
 						|| $dist < $config{"useCast_skill_$i"."_dist"}
@@ -1508,7 +1522,7 @@ sub parseSkill {
 						."◆啟動 teleportAuto_skill - 隨機移動至($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 隨機移動！ - Dist: $dist 格");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 隨機移動！ - Dist: $dist 格", 0, !$config{'recordEvent_escape'});
 
 					last;
 				} else {
@@ -1523,7 +1537,7 @@ sub parseSkill {
 						."◆啟動 teleportAuto_skill - 瞬間移動！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 瞬間移動！ - Dist: $dist 格");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay對$targetDisplay施展 ${skillName}, 瞬間移動！ - Dist: $dist 格", 0, !$config{'recordEvent_escape'});
 
 					last;
 				}
@@ -1570,6 +1584,8 @@ sub getName {
 		$val = $npcs_lut{$ID}{'name'};
 	} elsif (switchInput($switch, "player")) {
 		$val = (($charID_lut{$ID} ne "") ? $charID_lut{$ID} : $players{$ID}{'name'});
+	} elsif (switchInput($switch, "emotions_lut")) {
+		$val = $emotions_lut{$ID};
 	}
 
 	if (!$val && !$hide) {
@@ -2258,7 +2274,7 @@ sub valBolck {
 }
 
 sub scUpdate {
-	my ($hash) = @_;
+	my ($hash, $mode) = @_;
 
 	$hash = switchInputFix($hash, "timeout", "config");
 
@@ -2268,7 +2284,7 @@ sub scUpdate {
 		writeDataFileIntact2("$sc_v{'path'}{'control'}/timeouts.txt", \%timeout);
 	} else {
 #		writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
-		updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+		updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config, $mode);
 	}
 }
 
@@ -2306,7 +2322,7 @@ sub scModify {
 			if ($mode > 1) {
 #				writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
 #				updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
-				scUpdate("config");
+				scUpdate("config", 1);
 			}
 
 		}
@@ -3429,6 +3445,73 @@ sub ucCht {
 	my $string = shift;
 	$string =~ s/([\x80-\xff].|[\x00-\x7f])/(length $1 == 1) ? uc $1 : $1/eg;
 	return $string;
+}
+
+sub findIndexString_sc {
+	my $r_array	= shift;
+	my $match	= shift;
+	my $ID		= shift;
+	my $jumpIdx	= shift;
+	my $i;
+
+	if ($jumpIdx eq "" || $jumpIdx < 0) {
+		$jumpIdx = 0;
+	}
+
+#	print "findIndexString_sc ".@{$r_array}." [$jumpIdx]\n";
+
+	for ($i = $jumpIdx; $i < @{$r_array} ;$i++) {
+#		print "$i $$r_array[$i]{$match}\n";
+		if (
+			(%{$$r_array[$i]} && lcCht($$r_array[$i]{$match}) eq lcCht($ID))
+			|| (!%{$$r_array[$i]} && $ID eq "")
+		) {
+			return $i;
+		}
+	}
+	if ($ID eq "") {
+		return $i;
+	}
+}
+
+# openkore-1.6.4
+
+##
+# vectorToDegree(vector)
+# vector: a reference to a vector hash, as created by getVector().
+# Returns: the degree as a number.
+#
+# Converts a vector into a degree number.
+#
+# See also: getVector()
+#
+# Example:
+# my %from = (x => 100, y => 100);
+# my %to = (x => 120, y => 120);
+# my %vec;
+# getVector(\%vec, \%to, \%from);
+# vectorToDegree(\%vec);	# => 45
+sub vectorToDegree {
+	my $vec = shift;
+	my $x = $vec->{x};
+	my $y = $vec->{y};
+
+	if ($y == 0) {
+		if ($x < 0) {
+			return 270;
+		} elsif ($x > 0) {
+			return 90;
+		} else {
+			return undef;
+		}
+	} else {
+		my $ret = rad2deg(atan2($x, $y));
+		if ($ret < 0) {
+			return 360 + $ret;
+		} else {
+			return $ret;
+		}
+	}
 }
 
 1;
