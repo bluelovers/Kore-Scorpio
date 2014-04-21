@@ -24,7 +24,7 @@ sub event_00B1 {
 		} elsif ($chars[$config{'char'}]{'exp_last'} < $chars[$config{'char'}]{'exp'}) {
 			$sc_v{'exp'}{'base_add'} += $chars[$config{'char'}]{'exp'} - $chars[$config{'char'}]{'exp_last'};
 		}
-		$sc_v{'exp'}{'base'} += $sc_v{'exp'}{'base_add'};
+		$sc_v{'exp'}{'base'} += $sc_v{'exp'}{'base_add'} if ($chars[$config{'char'}]{'exp_max'} != $chars[$config{'char'}]{'exp'});
 	} elsif ($type == 2) {
 		$chars[$config{'char'}]{'exp_job_last'} = $chars[$config{'char'}]{'exp_job'};
 		$chars[$config{'char'}]{'exp_job'} = $val;
@@ -35,7 +35,7 @@ sub event_00B1 {
 		} elsif ($chars[$config{'char'}]{'exp_job_last'} < $chars[$config{'char'}]{'exp_job'}) {
 			$sc_v{'exp'}{'job_add'} += $chars[$config{'char'}]{'exp_job'} - $chars[$config{'char'}]{'exp_job_last'};
 		}
-		$sc_v{'exp'}{'job'} += $sc_v{'exp'}{'job_add'};
+		$sc_v{'exp'}{'job'} += $sc_v{'exp'}{'job_add'} if ($chars[$config{'char'}]{'exp_job_max'} != $chars[$config{'char'}]{'exp_job'});
 	} elsif ($type == 20) {
 		my $tmp_zenny = $val - $chars[$config{'char'}]{'zenny'};
 
@@ -65,14 +65,14 @@ sub event_00B1 {
 
 	}
 
-	if ($type == 2 && $sc_v{'exp'}{'base_add'}) {
+	if ($type == 2 && ($sc_v{'exp'}{'base_add'} || $chars[$config{'char'}]{'exp_max'} == $chars[$config{'char'}]{'exp'})) {
 		my $tmp_f = "%.3f";
 		my $percentB = "(".sprintf($tmp_f, $sc_v{'exp'}{'base_add'} * 100 / $chars[$config{'char'}]{'exp_max'})."%)" if ($chars[$config{'char'}]{'exp_max'});
 		my $percentJ = "(".sprintf($tmp_f, $sc_v{'exp'}{'job_add'} * 100 / $chars[$config{'char'}]{'exp_job_max'})."%)" if ($chars[$config{'char'}]{'exp_job_max'});
-		printC("[EXP] BaseExp: $sc_v{'exp'}{'base_add'} $percentB \/ JobExp: $sc_v{'exp'}{'job_add'} $percentJ\n", "exp");
+		printC("[EXP] BaseExp: $sc_v{'exp'}{'base_add'} $percentB \/ JobExp: $sc_v{'exp'}{'job_add'} $percentJ\n", "exp", 1);
 
-		undef $sc_v{'exp'}{'base_add'};
-		undef $sc_v{'exp'}{'job_add'};
+		$sc_v{'exp'}{'base_add'} = 0;
+		$sc_v{'exp'}{'job_add'} = 0;
 	}
 }
 
@@ -179,6 +179,9 @@ sub event_chat {
 		$uesr = $msg if ($user eq "");
 		$msg = $uesr if ($msg eq "");
 
+		$uesr = $msg;
+		$msg = "";
+
 		undef $c;
 
 	} elsif ($type eq "pm"){
@@ -234,7 +237,7 @@ sub event_chat {
 	$display = "${tag2}${c}${msg}" if (!$display);
 
 	event_beep($type);
-	printC("[${tag}] $display\n", $type_c);
+	printC("[${tag}] $display\n", $type_c, 1);
 #	chatLog($tag, $display, $type);
 	sysLog($type, $tag, $display);
 
@@ -253,11 +256,13 @@ sub event_chat {
 
 #	if ($config{'dcOnGM'} && !$quitBczGM) {
 	if ($config{'dcOnGM'}) {
-		my ($found, @array, $seperate);
+		my ($found, @array, $seperate, $text);
 
 		$seperate = (($config{'dcOnWord_split'}) ? $config{'dcOnWord_split'} : ",");
 
 #		$msg = uc $msg;
+
+		$msg = $uesr if (!$msg);
 
 		splitUseArray(\@array, $config{(switchInput($type, "s") ? 'dcOnSysWord' : 'dcOnChatWord')}, $seperate);
 
@@ -268,27 +273,55 @@ sub event_chat {
 #			$found = 1 if ($msg =~ /\Q$chars[$config{'char'}]{'name'}\E/i);
 		}
 
+#		$msg = ucCht($msg);
+
 		foreach (@array) {
 			if ($config{'dcOnWord_quote'}) {
 				($_) = $_ =~ /^"([\s\S]*?)"$/;
 			}
 
-			$found = 1 if ($msg =~ /\Q$_\E/i);
+			if ($msg =~ /\Q$_\E/i) {
+				$found = 1;
+
+				$text = $_;
+
+				last;
+			}
 
 #			print "[$found] $_\n" if (switchInput($type, "s"));
 
 #			print "[$found] $_\n";
 
-			if ($found) {
-				printC("◆發現ＧＭ: $tag頻道出現指定字詞【$_】！\n", "s");
-				# Beep on event
-				event_beep('GM');
-				undef %{$ai_v{'dcOnGM_counter'}};
-				quitOnEvent("dcOnGM", "迴避", "發現ＧＭ: $tag頻道出現指定字詞【$_】", "gm");
-#				chatLog("迴避", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】", "gm");
-				sysLog("gm", "迴避", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】");
-				last;
+
+		}
+
+		if ($found && $config{'dcOnWord_checkNpc'} && @npcsID && switchInput($type, "s")) {
+			undef @array;
+
+			splitUseArray(\@array, $msg, ":");
+			my $i;
+
+			for ($i = 0; $i < @npcsID; $i++) {
+#				next if ($npcsID[$i] eq "");
+
+				if ($npcsID[$i] ne "" && $npcs{$npcsID[$i]}{'name'} eq $array[0]) {
+					printC("◆啟動 dcOnWord_checkNpc - $tag頻道出現指定字詞【$text】 - 確認為NPC對話: $npcs{$npcsID[$i]}{'name'} ($npcs{$npcsID[$i]}{'binID'})\n", "s", 1);
+					sysLog("gm", "忽略", "$tag頻道出現指定字詞【$text】 - 確認為NPC對話: $npcs{$npcsID[$i]}{'name'} ($npcs{$npcsID[$i]}{'binID'})");
+
+					$found = 0;
+					last;
+				}
 			}
+		}
+
+		if ($found) {
+			printC("◆發現ＧＭ: $tag頻道出現指定字詞【$text】！\n", "s", 1);
+			# Beep on event
+			event_beep('GM');
+			undef %{$ai_v{'dcOnGM_counter'}};
+			quitOnEvent("dcOnGM", "迴避", "發現ＧＭ: $tag頻道出現指定字詞【$text】", "gm");
+#				chatLog("迴避", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】", "gm");
+			sysLog("gm", "迴避", "目前位置 【$maps_lut{$field{'name'}.'.rsw'}($field{'name'}): ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})."】");
 		}
 	}
 }
@@ -385,7 +418,7 @@ sub event_0073 {
 		# Set console title
 
 		# Set ignore all
-		sendIgnoreAll(\$remote_socket, !$config{'ignoreAll'});
+		sendIgnoreAll(\$remote_socket, !$config{'ignoreAll'}) if ($config{'ignoreAll'} ne "");
 		# Avoid GM
 		if ($ai_v{'teleOnGM'} == 2) {
 			undef %{$ai_v{'dcOnGM_counter'}};
@@ -449,6 +482,8 @@ sub event_shop_close {
 #
 #		$quit = 1;
 #	}
+
+	return 1;
 
 }
 
@@ -534,9 +569,9 @@ sub event_mvp {
 		} elsif ($switch eq "0080") {
 			$title	= "Died";
 			$msg	= "$name - 陣亡在 $t_map";
-		} elsif ($switch eq "007B") {
+		} elsif ($switch eq "007B" || $switch eq "022C") {
 			$title	= "Move";
-	#		$msg	= "$name - 陣亡在 $t_map";
+			$msg	= "$name - 移動到 $t_map";
 
 			$mode = -1;
 		} else {
@@ -554,8 +589,9 @@ sub event_mvp {
 		$record{'mvp'}{$nameID}{$title}{'time'} = time;
 		$record{'mvp'}{$nameID}{$title}{'map'} = $t_map;
 
-		if (!$mode) {
-			$msg = "[${t_type}] $sc_v{'parseMsg'}{'server_name'} - $msg - 距離: $t_dist 格";
+		if (!$mode || !$monsters{$ID}{'alert'}) {
+			$msg = "[${t_type}] $sc_v{'parseMsg'}{'server_name'} - $msg";
+#			" - 距離: $t_dist 格";
 
 			if ($config{'broadcastMode'}) {
 				sendMessage(\$remote_socket, "p", $msg) if ($config{'broadcastMode'} != 2 && %{$chars[$config{'char'}]{'party'}});
@@ -568,7 +604,9 @@ sub event_mvp {
 				}
 			}
 
-			sysLog("mvp", $title, $msg, 1, !$config{'recordMonsterInfo_mvp'});
+			$monsters{$ID}{'alert'} = 1;
+
+			sysLog("mvp", $title, "$msg - 距離: $t_dist 格", 1, !$config{'recordMonsterInfo_mvp'});
 		}
 
 		if (
@@ -578,13 +616,19 @@ sub event_mvp {
 				|| $t_type eq "MVP"
 			)
 			&& $monsters{$ID}{'mvp'} != 1
-			&& switchInput($switch, "0078", "007C", "007B")
+			&& switchInput($switch, "0078", "007C", "007B", "022C")
+			&& !$sc_v{'temp'}{'itemsImportantAutoMode'}
 		) {
 			$monsters{$ID}{'mvp'} = 1;
 
 			if (!$chars[$config{'char'}]{'mvp'}) {
 				attack($ID);
 			}
+#		} elsif (
+#			switchInput($switch, "0080")
+#			&& !switchInput($ai_seq[0], "take", "items_take")
+#		) {
+#			ai_items_take($monsters{$ID}{'pos'}{'x'}, $monsters{$ID}{'pos'}{'y'}, $monsters{$ID}{'pos_to'}{'x'}, $monsters{$ID}{'pos_to'}{'y'});
 		}
 
 	}
@@ -605,9 +649,11 @@ sub event_spell {
 
 	($sourceDisplay, $castBy) = ai_getCaseID($sourceID);
 
-	$targetDisplay = ($messages_lut{'011F'}{$type} ne "")
-		? $messages_lut{'011F'}{$type}
-		: "不明型態 ".$type;
+#	$targetDisplay = ($messages_lut{'011F'}{$type} ne "")
+#		? $messages_lut{'011F'}{$type}
+#		: "不明型態 ".$type;
+
+	$targetDisplay = getMsgStrings('011F', $type, 0, 1);
 
 	$s_cDist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$ID}{'pos'}});
 
@@ -631,7 +677,22 @@ sub event_spell {
 	# Avoid ground effect skills
 	my $i = 0;
 
+#	while ($config{"useCast_spell_$i"}) {
+##		last if (!$config{"useCast_spell_$i"});
+#		if (
+#			existsInList($config{"useCast_spel_$i"}, $targetDisplay)
+#			&& existsInList2($config{"useCast_spell_$i"."_castBy"}, $castBy, "and")
+#			&& (!$config{"useCast_spell_$i"."_dist"} || $s_cDist < $config{"useCast_spell_$i"."_dist"})
+#			&& ($config{"useCast_spell_$i"."_inCity"} || !$cities_lut{$field{'name'}.'.rsw'})
+#		) {
+#
+#		}
+#		$i++;
+#	}
+
 	return if ($sc_v{'temp'}{'itemsImportantAutoMode'});
+
+	$i = 0;
 
 	while (1) {
 		last if (!$config{"teleportAuto_spell_$i"} || $ai_v{'temp'}{'teleOnEvent'});
@@ -770,7 +831,10 @@ sub event_map {
 
 		$sc_v{'parseMsg'}{'map'} = $ai_v{'temp'}{'map'};
 
-		if ($ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "" || !$field{'name'}) {
+		if (
+			$ai_v{'temp'}{'map'} ne $field{'name'} || $field{'name'} eq "" || !$field{'name'}
+#			event_map_onChange($ai_v{'temp'}{'map'})
+		) {
 			getField("$sc_v{'path'}{'fields'}/$ai_v{'temp'}{'map'}.fld", \%field);
 
 			$sc_v{'parseMsg'}{'map'} = $ai_v{'temp'}{'map'};
@@ -788,7 +852,7 @@ sub event_map {
 				}
 			}
 
-			timeOutStart(-1, 'ai_partyAutoCreate');
+#			timeOutStart(-1, 'ai_partyAutoCreate');
 		}
 
 		aiRemove("attack");
@@ -815,7 +879,11 @@ sub event_map {
 #			timeOutStart(1, 'ai');
 		}
 	} elsif ($switch eq "0092") {
-		initMapChangeVars() if ($option{'X-Kore'});
+		if ($option{'X-Kore'}) {
+			initMapChangeVars();
+			$sc_v{'ai'}{'first'} = 1;
+			timeOutStart('ai_first_wait');
+		};
 #		initConnectVars();
 
 		$sc_v{'input'}{'conState'} = 4;
@@ -958,7 +1026,7 @@ sub event_map {
 				}
 
 				# Set ignore all
-				sendIgnoreAll(\$remote_socket, !$config{'ignoreAll'});
+				sendIgnoreAll(\$remote_socket, !$config{'ignoreAll'}) if ($config{'ignoreAll'} ne "");
 				# Avoid GM
 				if ($ai_v{'teleOnGM'} == 2) {
 					undef %{$ai_v{'dcOnGM_counter'}};
@@ -969,7 +1037,7 @@ sub event_map {
 				respawnUndefine($field{'name'}) if (!$sc_v{'parseMsg'}{'dcOnDualLogin'});
 				timeOutStart('ai');
 
-				timeOutStart(-1, 'ai_partyAutoCreate');
+#				timeOutStart(-1, 'ai_partyAutoCreate');
 
 	#			timeOutStart(-1, 'ai_partyAutoCreate');
 
@@ -1147,10 +1215,11 @@ sub event_takenBy {
 					if ($config{'attackAuto_takenBy'}) {
 						ai_takenBy($items{$ID}{'takenBy'});
 					}
-				} elsif ($config{'attackAuto_takenBy'} > 1) {
+				} elsif ($config{'attackAuto_takenBy'} > 1 && $config{'attackAuto_takenByMonsters'} ne "") {
 					undef $ai_v{'temp'}{'foundID'};
 					foreach (@monstersID) {
-						next if ($_ eq "" || !existsInList($config{'attackAuto_takenByMonsters'}, $monsters{$_}{'name'}));
+						next if (!isCollector($_));
+#						next if ($_ eq "" || !existsInList($config{'attackAuto_takenByMonsters'}, $monsters{$_}{'name'}));
 						if (
 							(
 								$monsters{$_}{'pos'}{'x'} == $items_old{$ID}{'pos'}{'x'}
@@ -1167,9 +1236,9 @@ sub event_takenBy {
 
 					ai_takenBy($ai_v{'temp'}{'foundID'}, $ID);
 				} else {
-					sysLog("ii", "不明", "重要物品: $items{$ID}{'name'} ($items{$ID}{'binID'}) x $items{$ID}{'amount'} 消失於 ($items{$ID}{'pos'}{'x'}, $items{$ID}{'pos'}{'y'})", 1);
+					sysLog("ii", "不明", "重要物品: $items{$ID}{'name'} ($items{$ID}{'binID'}) x $items{$ID}{'amount'} 消失於 ($items{$ID}{'pos'}{'x'}, $items{$ID}{'pos'}{'y'}) - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$items{$ID}{'pos'}}), 1);
 				}
-			} elsif ($config{'attackAuto_takenBy'} > 1) {
+			} elsif ($config{'attackAuto_takenBy'} > 1 && $config{'attackAuto_takenByMonsters'} ne "") {
 				undef $ai_v{'temp'}{'foundID'};
 				undef $ai_v{'temp'}{'pos'};
 				undef $ai_v{'temp'}{'pos_to'};
@@ -1230,13 +1299,423 @@ sub event_takenBy {
 
 				ai_takenBy($ai_v{'temp'}{'foundID'}, $ID);
 			} else {
-				sysLog("ii", "不明", "重要物品: $items{$ID}{'name'} ($items{$ID}{'binID'}) x $items{$ID}{'amount'} 消失於 ($items{$ID}{'pos'}{'x'}, $items{$ID}{'pos'}{'y'})", 1);
+				sysLog("ii", "不明", "重要物品: $items{$ID}{'name'} ($items{$ID}{'binID'}) x $items{$ID}{'amount'} 消失於 ($items{$ID}{'pos'}{'x'}, $items{$ID}{'pos'}{'y'}) - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$items{$ID}{'pos'}}), 1);
 			}
 		}
 		%{$items_old{$ID}} = %{$items{$ID}};
 		undef %{$items{$ID}};
 		binRemove(\@itemsID, $ID);
 	}
+}
+
+sub event_useSelf_smartAuto {
+	my ($switch, $msg, $msg_size) = @_;
+	my ($i, $ID, $hide, $newmsg);
+
+	if ($switch eq "01A6") {
+		decrypt(\$newmsg, substr($$msg, 4, length($$msg)-4));
+		$$msg = substr($$msg, 0, 4).$newmsg;
+		undef @callID;
+#		undef $invIndex;
+		for ($i = 4; $i < $msg_size; $i += 2) {
+#			$index = unpack("S1", substr($$msg, $i, 2));
+#			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
+#			binAdd(\@callID, $invIndex);
+
+			$ID = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", unpack("S1", substr($$msg, $i, 2)));
+			binAdd(\@callID, $ID);
+		}
+
+		if ($ai_v{'useSelf_smartAutocall'} || $config{'useSelf_smartAutocall'}) {
+			undef $ai_v{'useSelf_smartAutocall'};
+
+			for ($i = 0; $i < @callID; $i++) {
+				next if ($callID[$i] eq "");
+
+				if (existsInList($config{'useSelf_smartAutocall'}, $chars[$config{'char'}]{'inventory'}[$callID[$i]]{'name'})) {
+					sendPetCall(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$callID[$i]]{'index'});
+
+					$hide = 1;
+
+					last;
+				}
+			}
+		}
+
+#		print "請輸入 'call' 查看可孵化寵物蛋清單\n";
+	} elsif ($switch eq "018D") {
+		decrypt(\$newmsg, substr($$msg, 4, length($$msg)-4));
+		$$msg = substr($$msg, 0, 4).$newmsg;
+		undef @makeID;
+
+		for ($i = 4; $i < $msg_size; $i += 8) {
+			$ID = unpack("S1",substr($$msg, $i, 2));
+
+			binAdd(\@makeID, $ID);
+		}
+
+		if ($ai_v{'useSelf_smartAutomake'} || $config{'useSelf_smartAutomake'}) {
+
+			undef $ai_v{'useSelf_smartAutomake'};
+			for ($i = 0; $i < @makeID; $i++) {
+				next if ($makeID[$i] eq "");
+
+				if (existsInList($config{'useSelf_smartAutomake'}, $items_lut{$makeID[$i]})) {
+					sendItemCreate(\$remote_socket, $makeID[$i]);
+
+					$hide = 1;
+
+					last;
+				}
+			}
+		}
+
+#		print "請輸入 'make' 查看可鍛冶物品/配製藥瓶清單\n";
+	} elsif ($switch eq "01AD") {
+		decrypt(\$newmsg, substr($$msg, 4, length($$msg)-4));
+		$$msg = substr($$msg, 0, 4).$newmsg;
+		undef @arrowID;
+
+		for ($i = 4; $i < $msg_size; $i += 2) {
+			$ID = unpack("S1", substr($$msg, $i, 2));
+			binAdd(\@arrowID, $ID);
+		}
+
+		# Auto-make smart select
+
+		if ($ai_v{'useSelf_smartAutoarrow'}) {
+			undef $ai_v{'useSelf_smartAutoarrow'};
+			for ($i = 0; $i < @arrowID; $i++) {
+				next if ($arrowID[$i] eq "");
+
+				if (existsInList($config{'useSelf_smartAutoarrow'}, getName("items_lut", $arrowID[$i]))) {
+					sendArrowMake(\$remote_socket, $arrowID[$i]);
+
+					$hide = 1;
+
+					last;
+				}
+			}
+		}
+
+#		print "請輸入 'arrow' 查看可製作箭矢物品清單\n";
+	} elsif ($switch eq "01CD") {
+		undef @autospellID;
+		for ($i = 2; $i < 30; $i += 4) {
+			$ID = unpack("S1",substr($$msg, $i, 2));
+			binAdd(\@autospellID, $ID);
+		}
+#		print "請輸入 'autospell' 查看可選擇技能清單\n";
+		# Auto-spell smart select
+		if ($ai_v{'useSelf_skill_smartAutospell'} ne "" && binFind(\@autospellID, $ai_v{'useSelf_skill_smartAutospell'}) ne "") {
+			sendAutospell(\$remote_socket, $ai_v{'useSelf_skill_smartAutospell'});
+			undef $ai_v{'useSelf_skill_smartAutospell'};
+
+			$hide = 1;
+		}
+	} elsif ($switch eq "0177") {
+		decrypt(\$newmsg, substr($$msg, 4, length($$msg)-4));
+		$$msg = substr($$msg, 0, 4).$newmsg;
+		undef @identifyID;
+#		undef $invIndex;
+		for ($i = 4; $i < $msg_size; $i += 2) {
+#			$index = unpack("S1", substr($$msg, $i, 2));
+#			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
+#			binAdd(\@identifyID, $invIndex);
+
+			$ID = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", unpack("S1", substr($$msg, $i, 2)));
+			binAdd(\@identifyID, $ID);
+
+		}
+#		print "請輸入 'identify' 查看可鑑定物品清單\n";
+
+		if ($ai_v{'useSelf_skill_smartAutoidentify'} || $config{'useSelf_skill_smartAutoidentify'}) {
+			undef $ai_v{'useSelf_skill_smartAutoidentify'};
+
+			sendIdentify(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$identifyID[0]]{'index'});
+
+			$hide = 1;
+		}
+	}
+
+	print getMsgStrings($switch, 0, 0, 2)."\n" if (!$hide);
+
+#	event_useSelf_smartAuto($switch, \$msg, $msg_size);
+}
+
+#sub event_map_onChange {
+#	my ($map_get) = @_;
+#	my $val = 0;
+#
+#	if ($map_get ne $field{'name'} || !$field{'name'}) {
+#		$sc_v{'parseMsg'}{'map_last'} = $sc_v{'parseMsg'}{'map'};
+#		getField("$sc_v{'path'}{'fields'}/${map_get}.fld", \%field);
+#
+#		$val = 1;
+#	}
+#
+#	$sc_v{'parseMsg'}{'map'} = $map_get;
+#
+#	return $val;
+#}
+
+sub event_parseTarget {
+	my ($switch, $msg, $msg_size) = @_;
+#	my (
+#		$ID, $AID, $walk_speed
+#		, %coordsFrom, %coordsTo
+#		, $type, $pet, $nameID
+#		, $param1, $param2, $param3
+#		, $hair_s, $weapon, $shield, $hair_c
+#		, $desc
+#	);
+	my $desc;
+
+	if ($switch eq "022C") {
+		$ID = substr($$msg, 2, 4);
+		$AID = unpack("S*", $ID);
+
+		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+
+		$walk_speed = unpack("S", substr($$msg, 6, 2)) / 1000;
+
+		makeCoords(\%coordsFrom, substr($$msg, 50+4, 3));
+		makeCoords2(\%coordsTo, substr($$msg, 52+4, 3));
+		$type = unpack("S*",substr($$msg, 14+2, 2));
+		$pet = unpack("C*",substr($$msg, 16+2, 1));
+		$level = unpack("S1",substr($$msg, 58+4, 2));
+		# 0119 status
+		$param1 = unpack("S1", substr($$msg, 8, 2));
+		$param2 = unpack("S1", substr($$msg, 10, 2));
+		$param3 = unpack("S1", substr($$msg, 12, 2));
+
+#		$hair_s = unpack("S1", substr($$msg, 16, 2));
+#		$weapon = unpack("S1", substr($$msg, 18, 2));
+#		$shield = unpack("S1", substr($$msg, 20, 2));
+#		$hair_c = unpack("S1", substr($$msg, 32, 2));
+
+		$desc = "Moved";
+	} elsif ($switch eq "007B") {
+		$ID = substr($msg, 2, 4);
+		$AID = unpack("S*", $ID);
+
+		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+
+		my $walk_speed = unpack("S", substr($$msg, 6, 2)) / 1000;
+
+		makeCoords(\%coordsFrom, substr($$msg, 50, 3));
+		makeCoords2(\%coordsTo, substr($$msg, 52, 3));
+		$type = unpack("S*",substr($$msg, 14, 2));
+		$pet = unpack("C*",substr($$msg, 16, 1));
+		$level = unpack("S1",substr($$msg, 58, 2));
+		# 0119 status
+		$param1 = unpack("S1", substr($$msg, 8, 2));
+		$param2 = unpack("S1", substr($$msg, 10, 2));
+		$param3 = unpack("S1", substr($$msg, 12, 2));
+
+#		$hair_s = unpack("S1", substr($$msg, 16, 2));
+#		$weapon = unpack("S1", substr($$msg, 18, 2));
+#		$shield = unpack("S1", substr($$msg, 20, 2));
+#		$hair_c = unpack("S1", substr($$msg, 32, 2));
+
+		$desc = "Moved";
+	} elsif ($switch eq "0078") {
+		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+
+		$ID = substr($msg, 2, 4);
+		$walk_speed = unpack("S", substr($$msg, 6, 2)) / 1000;
+#		makeCoords(\%coords, substr($msg, 46, 3));
+		makeCoords(\%coordsTo, substr($$msg, 46, 3));
+
+		%coordsFrom = %coordsTo;
+
+		$type = unpack("S1",substr($$msg, 14, 2));
+		$pet = unpack("C1",substr($$msg, 16, 1));
+		# 0119 status
+		$param1 = unpack("S1", substr($$msg, 8, 2));
+		$param2 = unpack("S1", substr($$msg, 10, 2));
+		$param3 = unpack("S1", substr($$msg, 12, 2));
+		$level = unpack("S1", substr($$msg, 52, 2));
+
+#		$hair_s = unpack("S1", substr($$msg, 16, 2));
+#		$weapon = unpack("S1", substr($$msg, 18, 2));
+#		$shield = unpack("S1", substr($$msg, 20, 2));
+#		$hair_c = unpack("S1", substr($$msg, 28, 2));
+
+		$desc = "Exists";
+	}
+
+	if (0 && $type == 45) {
+		if (!%{$portals{$ID}}) {
+			$portals{$ID}{'appear_time'} = time;
+			$nameID = unpack("L1", $ID);
+			$exists = portalExists($field{'name'}, \%coords);
+			$display = ($exists ne "")
+				? "$portals_lut{$exists}{'source'}{'map'} -> $portals_lut{$exists}{'dest'}{'map'}"
+				: "不明傳點 ".$nameID;
+			binAdd(\@portalsID, $ID);
+			$portals{$ID}{'source'}{'map'} = $field{'name'};
+			$portals{$ID}{'type'} = $type;
+			$portals{$ID}{'nameID'} = $nameID;
+			$portals{$ID}{'name'} = $display;
+			$portals{$ID}{'binID'} = binFind(\@portalsID, $ID);
+		}
+		%{$portals{$ID}{'pos'}} = %coords;
+		print "發現傳送點: $portals{$ID}{'name'} - ($portals{$ID}{'binID'}) ".getFormattedCoords($coords{'x'}, $coords{'y'})." - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$portals{$ID}{'pos'}})."\n";
+
+	} elsif ($jobs_lut{$type} ne "") {
+		if (!%{$players{$ID}}) {
+			binAdd(\@playersID, $ID);
+			$players{$ID}{'appear_time'} = time;
+			$players{$ID}{'sex'} = $sex;
+			$players{$ID}{'jobID'} = $type;
+			$players{$ID}{'name'} = "不明人物";
+			$players{$ID}{'binID'} = binFind(\@playersID, $ID);
+			print "Player Appeared: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$sex} $jobs_lut{$type}\n" if ($config{'debug'});
+		}
+
+		$players{$ID}{'walk_speed'} = $walk_speed;
+
+		$players{$ID}{'time_move'} = time;
+		$players{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+
+		%{$players{$ID}{'pos'}} = %coordsFrom;
+		%{$players{$ID}{'pos_to'}} = %coordsTo;
+		# 0119 status
+		$players{$ID}{'param1'} = $param1;
+		$players{$ID}{'param2'} = $param2;
+		$players{$ID}{'param3'} = $param3;
+		# Player's look
+#		$players{$ID}{'hair_s'} = $hair_s;
+#		$players{$ID}{'weapon'} = $weapon;
+#		$players{$ID}{'shield'} = $shield;
+#		$players{$ID}{'hair_c'} = $hair_c;
+		# Player's level
+		$players{$ID}{'lv'} = $level;
+		print "Player ${desc}: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+		# Avoid GM by ID
+		avoidGM($ID, "", "${desc}", 1) if ($config{'dcOnGM_paranoia'});
+	} elsif ($type >= 1000) {
+		if ($pet) {
+			if (!%{$pets{$ID}} || $pets{$ID}{'name'} eq "") {
+				$pets{$ID}{'appear_time'} = time;
+				$display = ($monsters_lut{$type} ne "")
+						? $monsters_lut{$type}
+						: "不明種類 ".$type;
+				binAdd(\@petsID, $ID);
+				$pets{$ID}{'nameID'} = $type;
+				$pets{$ID}{'name'} = $display;
+				$pets{$ID}{'name_given'} = "不明寵物";
+				$pets{$ID}{'binID'} = binFind(\@petsID, $ID);
+			}
+
+			$pets{$ID}{'walk_speed'} = $walk_speed;
+
+			$pets{$ID}{'time_move'} = time;
+			$pets{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+
+			%{$pets{$ID}{'pos'}} = %coordsFrom;
+			%{$pets{$ID}{'pos_to'}} = %coordsTo;
+			$pets{$ID}{'lv'} = $level;
+			if ($monsters{$ID}) {
+#					binRemove(\@monstersID, $ID);
+#					delete $monsters{$ID};
+
+				undef $ai_v{'temp'}{'ai_attack_index'};
+				undef $ai_v{'ai_attack_ID'};
+				$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
+
+				if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
+					$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
+
+					if ($ai_v{'ai_attack_ID'} eq $ID) {
+						print "放棄目標 $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - 目標為寵物 $pets{$ID}{'name'} ($pets{$ID}{'binID'}) - ($pets{$ID}{'pos_to'}{'x'}, $pets{$ID}{'pos_to'}{'y'}) - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$pets{$ID}{'pos'}})."\n";
+						aiRemove("attack");
+						aiRemove("skill_use");
+					}
+				}
+
+				binRemove(\@monstersID, $ID);
+				undef %{$monsters{$ID}};
+				delete $monsters{$ID};
+			}
+			print "Pet ${desc}: $pets{$ID}{'name'} ($pets{$ID}{'binID'}) - lv $pets{$ID}{'lv'}\n" if ($config{'debug'});
+
+#			dumpData(substr($$msg, 0, $msg_size), 0, 0, getHex(substr($$msg, 16+2, 1))." ID: ".getID($ID)." Moved: ".getName("auto", $ID, 0, -1)." - $type $pets{$ID}{'name'} - lv $pets{$ID}{'lv'} - ($pets{$ID}{'pos_to'}{'x'}, $pets{$ID}{'pos_to'}{'y'}) - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$pets{$ID}{'pos'}}));
+		} else {
+			if (!%{$monsters{$ID}} || $monsters{$ID}{'name'} eq "") {
+				binAdd(\@monstersID, $ID);
+				$monsters{$ID}{'appear_time'} = time;
+				$monsters{$ID}{'nameID'} = $type;
+				$display = ($monsters_lut{$type} ne "")
+					? $monsters_lut{$type}
+					: "不明怪物 ".$type;
+				$monsters{$ID}{'nameID'} = $type;
+				$monsters{$ID}{'name'} = $display;
+				$monsters{$ID}{'binID'} = binFind(\@monstersID, $ID);
+				print "Monster Appeared: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n" if ($config{'debug'});
+
+			}
+
+			$monsters{$ID}{'walk_speed'} = $walk_speed;
+
+			$monsters{$ID}{'time_move'} = time;
+			$monsters{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+
+			%{$monsters{$ID}{'pos'}} = %coordsFrom;
+			%{$monsters{$ID}{'pos_to'}} = %coordsTo;
+##Karasu Start
+# 				# Record monster data
+#				recordMonsterData($ID) if ($config{'recordMonsterInfo'});
+##Karasu End
+			# 0119 status
+			$monsters{$ID}{'param1'} = $param1;
+			$monsters{$ID}{'param2'} = $param2;
+			$monsters{$ID}{'param3'} = $param3;
+			$monsters{$ID}{'lv'} = $level;
+			# Anklesnare Detection
+
+			event_mvp($switch, $ID);
+
+			if (binFind(\@MVPID, $monsters{$ID}{'nameID'}) eq "") {
+				for ($i = 0; $i < @spellsID; $i++) {
+					next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
+					if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$ID}{'pos_to'}}) <= 1) {
+						$monsters{$ID}{'attack_failed'}++;
+						last;
+					}
+				}
+			}
+			print "Monster ${desc}: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - lv $monsters{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+		}
+	} elsif ($type < 1000) {
+		if (!%{$npcs{$ID}}) {
+			$npcs{$ID}{'appear_time'} = time;
+			$nameID = unpack("L1", $ID);
+#				$display = (%{$npcs_lut{$nameID}})
+#					? $npcs_lut{$nameID}{'name'}
+#					: "不明NPC ".$nameID;
+
+#				$display = getName("npcs_lut", $nameID);
+
+			binAdd(\@npcsID, $ID);
+			$npcs{$ID}{'type'} = $type;
+			$npcs{$ID}{'nameID'} = $nameID;
+			$npcs{$ID}{'name'} = getName("npcs_lut", $nameID);
+			$npcs{$ID}{'binID'} = binFind(\@npcsID, $ID);
+		}
+		%{$npcs{$ID}{'pos'}} = %coordsTo;
+		print "發現NPC: $npcs{$ID}{'name'} - ($npcs{$ID}{'binID'}) - ($coordsTo{'x'}, $coordsTo{'y'}) Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%coordsTo)."\n";
+
+	} else {
+		print "[$switch] Unknown ${desc}: $type - ".getHex($ID)."\n" if ($config{'debug'});
+		# Avoid GM by ID
+		avoidGM($ID, "", "${desc}($switch type:$type)", 1) if ($config{'dcOnGM_paranoia'});
+	}
+
+#	if (distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%coordsTo) > 100) {
+#		dumpData(substr($$msg, 0, $msg_size), 0, 0, getHex(substr($$msg, 52+2, 3))." 距離超過 100 - ($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'}) - ($coordsTo{'x'}, $coordsTo{'y'})");
+#	}
 }
 
 1;
