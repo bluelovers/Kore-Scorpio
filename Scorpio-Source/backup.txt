@@ -1,0 +1,163 @@
+
+backup_File AI.pl {
+	size	275.93 KB (282552 bytes)
+	MD5	63108ff2e843237d313dd939ac645b37
+}
+
+backup_File Scorpio-2005-make.pl {
+	size	6.36 KB (6514 bytes)
+	MD5	6b15b4ad20b23e8bb54afe1631ba2788
+}
+
+backup_File Scorpio-2005-上船版-確認使用者.bat {
+	size	73 bytes (73 bytes)
+	MD5	76e4a423424b24db0afb2a5f41b9c104
+}
+
+backup_File Scorpio-2005-上船版.bat {
+	size	65 bytes (65 bytes)
+	MD5	f38caf9042a1c9cd1a175951deed9eeb
+}
+
+backup_File Scorpio-2005-測試版-確認使用者.bat {
+	size	51 bytes (51 bytes)
+	MD5	72407dad7c7b2e173a04573d884147f8
+}
+
+backup_File Scorpio-2005-測試版.bat {
+	size	35 bytes (35 bytes)
+	MD5	4c475403f01170465801fe2b83f5d390
+}
+
+backup_File Scorpio-2005-發布版.bat {
+	size	51 bytes (51 bytes)
+	MD5	db960d32dc912c34b32ef35b513d46b2
+}
+
+backup_File Scorpio-Backup.pl {
+	size	7.26 KB (7431 bytes)
+	MD5	8e071e9dbb5ea76f2ab603c89d1dfe18
+}
+
+backup_File Scorpio.exe {
+	size	660.00 KB (675840 bytes)
+	MD5	b6960abd5d906b2c8378436bbb4a0031
+}
+
+backup_File Scorpio.pl {
+	size	50.87 KB (52086 bytes)
+	MD5	70a863b57dce4e31dacb61d174620e94
+}
+
+backup_File Scorpio_update.pl {
+	size	1.13 KB (1152 bytes)
+	MD5	e759adc82b5e50fab18ce9465d885062
+}
+
+backup_File Scorpio_version.pl {
+	size	437 bytes (437 bytes)
+	MD5	7f899c44d4816e98dc8c657785fa3f6c
+}
+
+backup_File ai_cmd.pl {
+	size	20.94 KB (21447 bytes)
+	MD5	a6a7d0cbf3f05da427a63fbc696cfce6
+}
+
+backup_File ai_funs.pl {
+	size	22.67 KB (23216 bytes)
+	MD5	8409a277d6aa7ef6b5553a43a6377c3e
+}
+
+backup_File ai_npc.pl {
+	size	77.75 KB (79618 bytes)
+	MD5	9fc900dd55c22962278702e61ab1ae90
+}
+
+backup_File ai_route.pl {
+	size	12.09 KB (12383 bytes)
+	MD5	1a36b9a7a9c387df2a77b8f5dfcbb602
+}
+
+backup_File ex_config.txt {
+	size	25.36 KB (25968 bytes)
+	MD5	e715ed7dbb67aa44f4cc0121a9a401bf
+}
+
+backup_File ex_config_plus.txt {
+	size	9.76 KB (9997 bytes)
+	MD5	0be0771c1f626c4eaca855599f3e3bee
+}
+
+backup_File ex_timeouts.txt {
+	size	2.03 KB (2075 bytes)
+	MD5	bda25ba4bce8704da0105124c3ae65e0
+}
+
+backup_File fileParser.pl {
+	size	42.90 KB (43931 bytes)
+	MD5	780aeb8e085549cf068fd3565f94424f
+}
+
+backup_File input.pl {
+	size	20.89 KB (21391 bytes)
+	MD5	6f8f08c0c14b0a2c440caff7d076c365
+}
+
+backup_File math.pl {
+	size	7.08 KB (7252 bytes)
+	MD5	7e5297b01cb679623ca8bdf6b5336366
+}
+
+backup_File miscFunctions.pl {
+	size	49.25 KB (50427 bytes)
+	MD5	ec2242ba91c5232491a688c7f9c48cbb
+}
+
+backup_File packetParser.pl {
+	size	49.70 KB (50888 bytes)
+	MD5	5bfd852ee6f8ebd204a15cccadce41c8
+}
+
+backup_File parseInput.pl {
+	size	134.05 KB (137267 bytes)
+	MD5	e95b34db98fe9254e5cf28a2592cc6f3
+}
+
+backup_File parseMsg.pl {
+	size	276.88 KB (283522 bytes)
+	MD5	0dd9ab9fd835b136f83923b549d6a5fc
+}
+
+backup_File scFunctions.pl {
+	size	90.19 KB (92358 bytes)
+	MD5	1fd81ae1ced3cac4707f750c1906a348
+}
+
+backup_File sc_event.pl {
+	size	56.10 KB (57447 bytes)
+	MD5	e6e4338e6691e64c851c97d93ad39ac8
+}
+
+backup_File utils.pl {
+	size	10.24 KB (10488 bytes)
+	MD5	a195b5f5f9d87ada3d547613c9db61e9
+}
+
+backup_File version-old.txt {
+	size	153 bytes (153 bytes)
+	MD5	0b4c6abde2dc3c1af2c85ddbedb99f68
+}
+
+backup_File version.txt {
+	size	146 bytes (146 bytes)
+	MD5	8f05bb41230b010105ebc473107c8bfd
+}
+
+backup_File version_data.txt {
+	size	378 bytes (378 bytes)
+	MD5	6bed709f7f8064eb72dee72039fd1bad
+}
+
+backup_Files 32
+
