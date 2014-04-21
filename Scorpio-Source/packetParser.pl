@@ -16,12 +16,19 @@ sub parseSendMsg {
 	# of time using ai_clientSuspend().
 
 	if ($switch eq "0064") {#systeman
-		if ($option{'X-Kore_version'}) {
-			scModify('config', 'version', unpack("L*", substr($msg, 2, 4)), 1);
+
+		my $tmp_version		= unpack("L*", substr($msg, 2, 4));
+		my $tmp_master_version	= unpack("C*", substr($msg, 54, 1));
+
+		if ($option{'X-Kore_version'} && $config{'version'} ne $tmp_version) {
+			scModify('config', 'version', $tmp_version, 1);
 		}
 		if ($config{'X-Kore_master_version'}) {
-			scModify('config', "master_version_".$config{'master'}, unpack("C*", substr($msg, 54, 1)), 1);
+			scModify('config', "master_version_".$config{'master'}, $tmp_master_version, 1);
 		}
+
+#		print "$remote_socket{'PeerAddr'} : $remote_socket{'PeerPort'}\n";
+#		print "$remote_socket{'PeerAddr'} : $remote_socket{'PeerPort'}\n";
 	} elsif ($switch eq "0066") {
 		# Login character selected
 #		configModify("char", unpack("C*",substr($msg, 2, 1)));
@@ -200,12 +207,39 @@ sub parseSendMsg {
 #		print "[$switch] $name = $name2\n";
 #		dumpData($sendMsg,1);
 ##		print "­Ü®w±K½X: ".getHex(substr($msg,4,16))."\n";
+#	} elsif ($switch eq "0151") {
+#		print "[$switch] lastswitch: $lastswitch\n";
 	}
 	if ($config{'debug_sendPacket'}) {
+		my $found = 1;
+
 		if (!defined($spackets{$switch}) && $sendMsg ne "" ) {
-			dumpData($sendMsg,1);
+			dumpData($sendMsg, 1, 1);
+		} elsif ($config{'debug_switch_send'} && existsInList($config{'debug_switch_send'}, $switch)) {
+			dumpData($sendMsg, 1, 1);
+		} else {
+			$found = 0;
 		}
+
+		if ($found) {
+			my $temp1;
+			my $temp2;
+
+			$temp1 = length($sendMsg);
+			$temp2 = unpack("S1", substr($sendMsg, 2, 2));
+
+			print <<"EOM";
+sendPacket.Switch: $switch
+sendPacket.Length - 1: $temp1
+sendPacket.Length - 2: $temp2
+sendPacket.Length - 3: $spackets{$switch}
+EOM
+;
+}
+	} elsif ($config{'debug_switch_send'} && existsInList($config{'debug_switch_send'}, $switch)) {
+		dumpData($sendMsg, 1, 1);
 	}
+
 	if ($sendMsg ne "") {
 		sendToServerByInject(\$remote_socket, $sendMsg);
 
@@ -1052,14 +1086,28 @@ sub sendPartyLeave {
 	print "Sent Leave Party: $name\n" if ($config{'debug'} >= 2);
 }
 
-sub sendPartyOrganize {
+sub sendPartyOrganize_old {
 	my $r_socket = shift;
 	my $name = shift;
+
 	$name = substr($name, 0, 24) if (length($name) > 24);
 	$name = $name . chr(0) x (24 - length($name));
 	my $msg = pack("C*", 0xF9, 0x00) . $name;
 	encrypt($r_socket, $msg);
 	print "Sent Organize Party: $name\n" if ($config{'debug'} >= 2);
+}
+
+sub sendPartyOrganize {
+	my $r_socket = shift;
+	my $name = shift;
+	my $flag1 = shift;
+	my $flag2 = shift;
+
+	$name = substr($name, 0, 24) if (length($name) > 24);
+	$name = $name . chr(0) x (24 - length($name));
+	my $msg = pack("C*", 0xF9, 0x00) . $name . pack("C*", $flag1) . pack("C*", $flag2);
+	encrypt($r_socket, $msg);
+	print "Sent Organize Party: $name [$flag1, $flag2]\n" if ($config{'debug'} >= 2);
 }
 
 sub sendPartyShareEXP {
@@ -1674,6 +1722,31 @@ sub sendMapLoginPK {
 	pack("C*", 0x00, 0x2C, 0xFC, 0x2B, 0x8B, 0x01, 0x00, 0x60, 0x00, 0xFF, 0xFF, 0xFF, 0xFF) .
 		$sessionID . pack("L1", getTickCount()) . pack("C*",$sex);
 	encrypt($r_socket, $msg);
+}
+
+#--------------------------------------------
+# koreSC - BLUELOVERS
+
+# Send Emblem Request packages
+sub sendGuildEmblemRequest {
+	my $r_socket = shift;
+	my $targetID = shift;
+	my $msg = pack("C*", 0x51, 0x01).$targetID;
+	encrypt($r_socket, $msg);
+	print "Sent Guild Emblem Request ".getID($targetID)."\n" if ($config{'debug'} >= 2);
+}
+
+sub sendPartyOrganize_050924 {
+	my $r_socket = shift;
+	my $name = shift;
+	my $flag1 = shift;
+	my $flag2 = shift;
+
+	$name = substr($name, 0, 24) if (length($name) > 24);
+	$name = $name . chr(0) x (24 - length($name));
+	my $msg = pack("C*", 0xF9, 0x00) . $name . pack("L*", $flag1) . pack("L*", $flag2);
+	encrypt($r_socket, $msg);
+	print "Sent Organize Party: $name [$flag1, $flag2]\n" if ($config{'debug'} >= 2);
 }
 
 1;
