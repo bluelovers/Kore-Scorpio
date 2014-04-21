@@ -201,6 +201,7 @@ sub ai_setMapChanged {
 	$index = 0 if ($index eq "");
 	if ($index < @ai_seq_args) {
 		$ai_seq_args[$index]{'mapChanged'} = time;
+		undef $ai_seq_args[$index]{'move'};
 	}
 	$ai_v{'portalTrace_mapChanged'} = 1;
 }
@@ -272,6 +273,7 @@ sub ai_storageAutoCheck {
 sub attack {
 	my $ID = shift;
 	my $mode = shift;
+	my $modeEx = shift;
 	my %args;
 
 	if ($ai_v{'temp'}{'teleOnEvent'} && $config{'attackAuto_stopOnTele'}){
@@ -288,6 +290,9 @@ sub attack {
 	$args{'ID'} = $ID;
 	%{$args{'pos_to'}} = %{$monsters{$ID}{'pos_to'}};
 	%{$args{'pos'}} = %{$monsters{$ID}{'pos'}};
+
+	$args{'takenBy'} = $modeEx;
+
 	unshift @ai_seq, "attack";
 	unshift @ai_seq_args, \%args;
 
