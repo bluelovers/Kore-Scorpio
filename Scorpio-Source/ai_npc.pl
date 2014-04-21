@@ -585,18 +585,39 @@ sub ai_event_npc_autoStorage {
 				undef @{$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}};
 
 				for ($i = 0; $i < @{$chars[$config{'char'}]{'inventory'}};$i++) {
-					next if (!%{$chars[$config{'char'}]{'inventory'}[$i]} || $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne "" || $chars[$config{'char'}]{'inventory'}[$i]{'borned'});
-					if ($items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
-						&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}) {
-						if ($ai_seq_args[0]{'lastIndex'} ne "" && $ai_seq_args[0]{'lastIndex'} == $chars[$config{'char'}]{'inventory'}[$i]{'index'}
-							&& checkTimeOut('ai_storageAuto_giveup')) {
+					next if (
+						!%{$chars[$config{'char'}]{'inventory'}[$i]}
+						|| $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne ""
+						|| $chars[$config{'char'}]{'inventory'}[$i]{'borned'}
+#						|| $ai_seq_args[0]{'lastAdds'}[$chars[$config{'char'}]{'inventory'}[$i]{'index'}]
+						|| ($config{'storagegetAuto_smartAdd'} && $ai_seq_args[0]{'lastAdds'}[$i])
+#						|| $sc_v{'ai'}{'temp'}{'stockVoid'}{'storage_lastIndex'} eq $chars[$config{'char'}]{'inventory'}[$i]{'index'}
+					);
+					if (
+						$items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
+						&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
+					) {
+						if (
+							$ai_seq_args[0]{'lastIndex'} ne ""
+							&& $ai_seq_args[0]{'lastIndex'} == $chars[$config{'char'}]{'inventory'}[$i]{'index'}
+							&& checkTimeOut('ai_storageAuto_giveup')
+						) {
 							last AUTOSTORAGE;
-						} elsif ($ai_seq_args[0]{'lastIndex'} eq "" || $ai_seq_args[0]{'lastIndex'} != $chars[$config{'char'}]{'inventory'}[$i]{'index'}) {
+						} elsif (
+							$ai_seq_args[0]{'lastIndex'} eq ""
+							|| $ai_seq_args[0]{'lastIndex'} != $chars[$config{'char'}]{'inventory'}[$i]{'index'}
+						) {
 							timeOutStart('ai_storageAuto_giveup');
 						}
 						undef $ai_seq_args[0]{'done'};
+						
+#						print "i: $i - Now: $chars[$config{'char'}]{'inventory'}[$i]{'index'} - lastIndex: $ai_seq_args[0]{'lastIndex'} - lastAdds: ".$ai_seq_args[0]{'lastAdds'}[$i]."\n";
+						
 						$ai_seq_args[0]{'lastIndex'} = $chars[$config{'char'}]{'inventory'}[$i]{'index'};
 						sendStorageAdd(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$i]{'index'}, $chars[$config{'char'}]{'inventory'}[$i]{'amount'} - $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'});
+						
+						$ai_seq_args[0]{'lastAdds'}[$i] = 1;
+						
 						timeOutStart('ai_storageAuto');
 						last AUTOSTORAGE;
 					}
@@ -1843,6 +1864,11 @@ sub ai_npc_autoTalk {
 			$sc_v{'temp'}{'ai'}{'talkAuto'}{'do'} = 1;
 		}
 	}
+	
+#	if (!$ai_seq_args[0]{'sendLook'} && %{$npcs_lut{$ID}}) {
+#		$ai_seq_args[0]{'sendLook'} = 1;
+#		lookAtPosition($npcs_lut{$ID}->{pos});
+#	}
 
 	return $val;
 }
