@@ -339,10 +339,13 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$sc_v{'input'}{'conState'} = 3;
 		undef $sc_v{'input'}{'conState_tries'};
 		$msg_size = unpack("S1", substr($msg, 2, 2));
-		if ($config{"master_version_$config{'master'}"} == 0 || 1) {
+		if ($config{"master_version_$config{'master'}"} == 0) {
 			$startVal = 24;
 		} else {
 			$startVal = 4;
+			
+			#2006-5-3
+			$startVal = 24;
 		}
 		for($i = $startVal; $i < $msg_size; $i+=106) {
 #exp display bugfix - chobit andy 20030129
