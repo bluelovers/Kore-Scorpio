@@ -166,6 +166,12 @@ EOM
 		$ai_v{'time'} = time;
 	}
 
+
+
+#	print "AI: @ai_seq | $stuff\n" if ($sc_v{'ai'}{'temp'}{'last_AI'} ne $ai_seq[0]);
+
+	$sc_v{'ai'}{'temp'}{'last_AI'} = $ai_seq[0];
+
 	#koreSE2.2
 	if (@ai_seq > 20) {
 		sysLog(
@@ -204,7 +210,7 @@ sub ai_event_getInfo {
 		print "Wiped old\n" if ($config{'debug'} >= 2);
 	}
 
-	if (checkTimeOut('ai_getInfo')) {
+	if ((1 || !$option{'X-Kore'}) && checkTimeOut('ai_getInfo')) {
 		foreach (keys %players) {
 			if ($players{$_}{'name'} eq "不明人物") {
 				sendGetPlayerInfo(\$remote_socket, $_);
@@ -227,6 +233,27 @@ sub ai_event_getInfo {
 			if ($pets{$_}{'name_given'} =~ /不明寵物/) {
 				sendGetPlayerInfo(\$remote_socket, $_);
 				last;
+			}
+		}
+		if ($config{'guildAutoEmblem'} > 0) {
+			foreach (keys (%guild)) {
+				next if (
+					$_ eq ""
+					|| $guild{$_}{'ebm2bmp'}
+					|| $guild{$_}{'name'} eq ""
+					|| ($config{'guildAutoEmblem'} == 1 && $guilds_lut{getID($_)} ne "")
+				);
+
+				$guild{$_}{'nameID'} = getID($_) if ($guild{$_}{'nameID'} eq "");
+
+				$guilds_lut{$guild{$_}{'nameID'}} = $guild{$_}{'name'};
+
+#				if (!$guild{$_}{'ebm2bmp'}) {
+				sendGuildEmblemRequest(\$remote_socket, $_);
+				$guild{$_}{'ebm2bmp'} = 1;
+#					print "sendGuildEmblemRequest $guild{$_}{'name'}\n";
+				last;
+#				}
 			}
 		}
 		timeOutStart('ai_getInfo');
@@ -273,6 +300,9 @@ sub ai_event_getInfo {
 	} elsif (%{$ai_v{'portalTrace'}} && $field{'name'}) {
 		undef $ai_v{'temp'}{'foundID'};
 		undef $ai_v{'temp'}{'smallDist'};
+
+#		print "檢查是否有新傳點\n";
+
 		$ai_v{'temp'}{'first'} = 1;
 		foreach (@portalsID) {
 			$ai_v{'temp'}{'dist'} = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$portals{$_}{'pos'}});
@@ -284,9 +314,15 @@ sub ai_event_getInfo {
 		}
 
 		if (%{$portals{$ai_v{'temp'}{'foundID'}}}) {
-			if (portalExists($field{'name'}, \%{$portals{$ai_v{'temp'}{'foundID'}}{'pos'}}) eq ""
-				&& $ai_v{'portalTrace'}{'source'}{'map'} && $ai_v{'portalTrace'}{'source'}{'pos'}{'x'} ne "" && $ai_v{'portalTrace'}{'source'}{'pos'}{'y'} ne ""
-				&& $field{'name'} && $portals{$ai_v{'temp'}{'foundID'}}{'pos'}{'x'} ne "" && $portals{$ai_v{'temp'}{'foundID'}}{'pos'}{'y'} ne "") {
+			if (
+				portalExists($field{'name'}, \%{$portals{$ai_v{'temp'}{'foundID'}}{'pos'}}) eq ""
+				&& $ai_v{'portalTrace'}{'source'}{'map'}
+				&& $ai_v{'portalTrace'}{'source'}{'pos'}{'x'} ne ""
+				&& $ai_v{'portalTrace'}{'source'}{'pos'}{'y'} ne ""
+				&& $field{'name'}
+				&& $portals{$ai_v{'temp'}{'foundID'}}{'pos'}{'x'} ne ""
+				&& $portals{$ai_v{'temp'}{'foundID'}}{'pos'}{'y'} ne ""
+			) {
 
 
 				$portals{$ai_v{'temp'}{'foundID'}}{'name'} = "$field{'name'} -> $ai_v{'portalTrace'}{'source'}{'map'}";
@@ -402,6 +438,9 @@ sub ai_event_getInfo {
 		for ($i = 0; $i<=$j ; $i++) {
 			sendGuildRequest(\$remote_socket, $i);
 		}
+
+#		sendGuildEmblemRequest(\$remote_socket, $ID) if ($config{'guildAutoEmblem'} && !$guild{$chars[$config{'char'}]{'guild'}{'ID'}}{'ebm2bmp'});
+
 		timeOutStart('ai_guildAutoInfo');
 	}
 
@@ -452,7 +491,13 @@ sub ai_event_teleportAuto {
 
 #	return 1 if ($sc_v{'temp'}{'teleOnEvent'});
 
-	my ($tele_val, $tele_verbose);
+#	my ($tele_val, $tele_verbose);
+
+	undef $sc_v{'ai'}{'temp'}{'teleported'};
+	undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
+	undef $sc_v{'ai'}{'temp'}{'teleport_allow'};
+
+	$sc_v{'ai'}{'temp'}{'teleport_allow'} = $map_control{lcCht($field{'name'})}{'teleport_allow'};
 
 #	$ai_v{'map_name_lu'} = getMapID($map_name, 3);
 
@@ -491,7 +536,20 @@ sub ai_event_teleportAuto {
 #	$ai_v{'temp'}{'getAggressives'}	= ai_getAggressives();
 #	$ai_v{'temp'}{'getAggressives'}	= $ai_v{'temp'}{'getAggressives'}?$ai_v{'temp'}{'getAggressives'}:$ai_v{'temp'}{'onHit'};
 
-	return 1 if ($sc_v{'temp'}{'itemsImportantAutoMode'} || $map_control{lc($field{'name'})}{'teleport_allow'} < 0);
+	if ($sc_v{'ai'}{'temp'}{'teleport_allow'} < 0 || $ai_v{'temp'}{'teleOnEvent'} >= $config{'teleportAuto_maxUses'} || !checkTimeOut('ai_teleport_waitAfterKill')) {
+		undef $sc_v{'temp'}{'teleOnEvent'};
+		undef $ai_v{'temp'}{'teleOnEvent'};
+
+		timeOutStart('ai_teleport_waitAfterKill') if (checkTimeOut('ai_teleport_waitAfterKill') || $ai_v{'temp'}{'teleOnEvent'} >= $config{'teleportAuto_maxUses'});
+
+#		print "無法順移地點\n";
+
+		return 0;
+	} elsif ($sc_v{'temp'}{'itemsImportantAutoMode'} || $config{'teleportAuto_autoMode'} < 0) {
+		return 1;
+#	} else {
+#		print "$field{'name'} = $map_control{lcCht($field{'name'})}{'teleport_allow'}\n";
+	}
 
 #	undef $ai_v{'temp'}{'tele'};
 
@@ -499,22 +557,32 @@ sub ai_event_teleportAuto {
 #Karasu Start
 		# Detect more condition
 		my %agNotorious;
-		my $name_lc;
+#		my $name_lc;
 #		my $agMonsters = ai_getAggressives();
 		my $agMonsters = $ai_v{'temp'}{'getAggressives'};
 
 		my $tele_coords = getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'});
 
+		undef $sc_v{'ai'}{'temp'}{'name_lc'};
+		undef $sc_v{'ai'}{'temp'}{'teleport_auto'};
+
 		foreach (@monstersID) {
-			$name_lc = lc($monsters{$_}{'name'});
-			$agNotorious{$name_lc}++ if ($mon_control{$name_lc}{'teleport_auto'} == 5 && ($monsters{$_}{'dmgToYou'} > 0 || $monsters{$_}{'missedYou'} > 0));
+#			$name_lc = lcCht($monsters{$_}{'name'});
+			$sc_v{'ai'}{'temp'}{'name_lc'} = lcCht($monsters{$_}{'name'});
+			$sc_v{'ai'}{'temp'}{'teleport_auto'} = $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_auto'};
+			$agNotorious{$sc_v{'ai'}{'temp'}{'name_lc'}}++ if ($mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_auto'} == 5 && ($monsters{$_}{'dmgToYou'} > 0 || $monsters{$_}{'missedYou'} > 0));
+
+#			print "$monsters{$_}{'name'} = $sc_v{'ai'}{'temp'}{'name_lc'} = $sc_v{'ai'}{'temp'}{'teleport_auto'}\n";
+
+			next if ($sc_v{'ai'}{'temp'}{'name_lc'} eq "" || !$sc_v{'ai'}{'temp'}{'teleport_auto'});
+
 			if (
-				$mon_control{$name_lc}{'teleport_auto'} == 1
+				$sc_v{'ai'}{'temp'}{'teleport_auto'} == 1
 				|| (
 					(
-						$mon_control{$name_lc}{'teleport_auto'} == 2
+						$sc_v{'ai'}{'temp'}{'teleport_auto'} == 2
 						|| (
-							$mon_control{$name_lc}{'teleport_auto'} == 3
+							$sc_v{'ai'}{'temp'}{'teleport_auto'} == 3
 							&& (
 #								binFind(\@ai_seq, "attack") eq ""
 								!$ai_v{'temp'}{'inAttack'}
@@ -536,50 +604,55 @@ sub ai_event_teleportAuto {
 					)
 				)
 				|| (
-					$mon_control{$name_lc}{'teleport_auto'} == 4
-					&& distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}}) <= $mon_control{$name_lc}{'teleport_extra'}
+					$sc_v{'ai'}{'temp'}{'teleport_auto'} == 4
+					&& distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}}) <= $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra'}
 				)
 				|| (
-					$mon_control{$name_lc}{'teleport_extra'}
-					&& $agNotorious{$name_lc} >= $mon_control{$name_lc}{'teleport_extra'}
+					$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra'}
+					&& $agNotorious{$sc_v{'ai'}{'temp'}{'name_lc'}} >= $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra'}
 				)
 				|| (
-					$mon_control{$name_lc}{'teleport_auto'} == 5
+					$sc_v{'ai'}{'temp'}{'teleport_auto'} == 5
 					&& (
 						$monsters{$_}{'dmgToYou'} > 0
 						|| $monsters{$_}{'missedYou'} > 0
 					)
 					&& (
-						$mon_control{$name_lc}{'teleport_extra2'}
-						&& $agMonsters >= $mon_control{$name_lc}{'teleport_extra2'}
+						$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra2'}
+						&& $agMonsters >= $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra2'}
 					)
 				)
 			) {
 				# Verbose of teleport
-				undef $tele_verbose;
+				undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
 
-				if ($mon_control{$name_lc}{'teleport_auto'} == 1) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(1): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
-				} elsif ($mon_control{$name_lc}{'teleport_auto'} == 2) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(2): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
-				} elsif ($mon_control{$name_lc}{'teleport_auto'} == 3) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(3): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
-				} elsif ($mon_control{$name_lc}{'teleport_auto'} == 4) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(4): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 距離: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}})."\n";
-				} elsif ($agNotorious{$name_lc} >= $mon_control{$name_lc}{'teleport_extra'}) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(5-1): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 數量: $agNotorious{$name_lc}\n";
-				} elsif ($agMonsters >= $mon_control{$name_lc}{'teleport_extra2'}) {
-					$tele_verbose = "▲自動瞬移 - 迴避指定怪物(5-2): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 數量: $agMonsters\n";
+				if ($sc_v{'ai'}{'temp'}{'teleport_auto'} == 1) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(1): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
+				} elsif ($sc_v{'ai'}{'temp'}{'teleport_auto'} == 2) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(2): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
+				} elsif ($sc_v{'ai'}{'temp'}{'teleport_auto'} == 3) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(3): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords\n";
+				} elsif ($sc_v{'ai'}{'temp'}{'teleport_auto'} == 4) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(4): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 距離: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}})."\n";
+				} elsif ($agNotorious{$sc_v{'ai'}{'temp'}{'name_lc'}} >= $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra'}) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(5-1): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 數量: $agNotorious{$sc_v{'ai'}{'temp'}{'name_lc'}}\n";
+				} elsif ($agMonsters >= $mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra2'}) {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物(5-2): $monsters{$_}{'name'}, 瞬移前座標: $tele_coords, 數量: $agMonsters\n";
+				} else {
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避指定怪物設定錯誤: $monsters{$_}{'name'}, [$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'attack_auto'}], [$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_auto'}], [$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_search'}], [$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra'}], [$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_extra2'}]\n";
+
+					sysLog("debug", "自動瞬移", $sc_v{'ai'}{'temp'}{'tele_verbose'});
 				}
 
-				$ai_v{'temp'}{'teleOnEvent'} = 1;
-				timeOutStart('ai_teleport_event');
-				$tele_val = useTeleport(1);
+#				$ai_v{'temp'}{'teleOnEvent'} = 1;
+#				timeOutStart('ai_teleport_event');
+#				$tele_val = useTeleport(1);
+				$sc_v{'ai'}{'temp'}{'teleported'} = useTeleport(1);
 				$ai_v{'clear_aiQueue'} = 1;
 
 				$sc_v{'temp'}{'teleOnEvent'} = 1;
 
-				printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+#				printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
 
 				$ai_v{'temp'}{'tele'} = 1;
 
@@ -591,16 +664,17 @@ sub ai_event_teleportAuto {
 
 	if (!$ai_v{'temp'}{'tele'} && checkTimeOut('ai_teleport_hp') && (ai_getAggressivesEx() || $sc_v{'ai'}{'onHit'} || $ai_v{'temp'}{'onHit'})) {
 		my $tele = 1;
-		undef $tele_verbose;
+#		undef $tele_verbose;
+		undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
 		my $agMonsters = ai_getAggressivesEx();
 		$agMonsters = 1 if (!$agMonsters && ($sc_v{'ai'}{'onHit'} || $ai_v{'temp'}{'onHit'}));
 
 		my $modeConfig = ($config{'teleportAuto_autoMode'} > 1)?"teleportAuto_whenDmgToYou":"teleportAuto_onHit";
 
 		if ($config{'teleportAuto_minAggressives'} && $agMonsters >= $config{'teleportAuto_minAggressives'}) {
-			$tele_verbose = "▲自動瞬移 - 遭受 $config{'teleportAuto_minAggressives'} 隻以上怪物圍攻\n";
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 遭受 $config{'teleportAuto_minAggressives'} 隻以上怪物圍攻\n";
 		} elsif ($config{'teleportAuto_sp'} && percent_sp(\%{$chars[$config{'char'}]}) <= $config{'teleportAuto_sp'}) {
-			$tele_verbose = "▲自動瞬移 - SP低於 $config{'teleportAuto_sp'}%\n";
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - SP低於 $config{'teleportAuto_sp'}%\n";
 		} elsif (
 			$config{'teleportAuto_onHit'}
 			&& ($sc_v{'ai'}{'onHit'} >= $config{'teleportAuto_onHit'})
@@ -610,15 +684,15 @@ sub ai_event_teleportAuto {
 				&& percent_hp(\%{$chars[$config{'char'}]}) > $config{'teleportAuto_hp'}
 			)
 		) {
-			$tele_verbose = "▲自動瞬移 - 遭受超過 $config{'teleportAuto_onHit'} 傷害\n";
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 遭受超過 $config{'teleportAuto_onHit'} 傷害\n";
 		} elsif ($config{'teleportAuto_hp'} && percent_hp(\%{$chars[$config{'char'}]}) <= $config{'teleportAuto_hp'}) {
-			$tele_verbose = "▲自動瞬移 - HP低於 $config{'teleportAuto_hp'}%\n";
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - HP低於 $config{'teleportAuto_hp'}%\n";
 
 			if ($config{'teleportAuto_autoMode'} > 0){
 				if ($ai_v{'ka'}{$modeConfig} eq ""){
 					$ai_v{'ka'}{$modeConfig} = ($config{$modeConfig}?1:0);
 					$config{$modeConfig} = 1;
-					$tele_verbose = "[Event] HP低於 $config{'teleportAuto_hp'}% 啟動 $modeConfig\n";
+					$sc_v{'ai'}{'temp'}{'tele_verbose'} = "[Event] HP低於 $config{'teleportAuto_hp'}% 啟動 $modeConfig\n";
 
 					timeOutStart('ai_event_onHit');
 				} elsif ($ai_v{'ka'}{$modeConfig} ne "" && !$config{$modeConfig} && $config{'teleportAuto_hp'}) {
@@ -635,7 +709,7 @@ sub ai_event_teleportAuto {
 
 			if ($config{'teleportAuto_autoMode'} > 0 && $ai_v{'ka'}{$modeConfig} ne "" && !$sc_v{'ai'}{'onHit'}){
 				$config{$modeConfig} = $ai_v{'ka'}{$modeConfig};
-				$tele_verbose = "[Event] HP高於 $config{'teleportAuto_hp'}% $modeConfig 恢復為 $config{$modeConfig}\n";
+				$sc_v{'ai'}{'temp'}{'tele_verbose'} = "[Event] HP高於 $config{'teleportAuto_hp'}% $modeConfig 恢復為 $config{$modeConfig}\n";
 				undef $ai_v{'ka'}{$modeConfig};
 
 				$tele = -1;
@@ -648,19 +722,22 @@ sub ai_event_teleportAuto {
 
 			event_checkInfo();
 
-			$ai_v{'temp'}{'teleOnEvent'} = 1;
-			timeOutStart('ai_teleport_event');
-			$tele_val = useTeleport(1);
+#			$ai_v{'temp'}{'teleOnEvent'} = 1;
+#			timeOutStart('ai_teleport_event');
+#			$tele_val = useTeleport(1);
+			$sc_v{'ai'}{'temp'}{'teleported'} = useTeleport(1);
 			$ai_v{'clear_aiQueue'} = 1;
 			timeOutStart('ai_teleport_hp');
 
 			$sc_v{'temp'}{'teleOnEvent'} = 1;
 
-			printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+#			printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
 
 			$ai_v{'temp'}{'tele'} = 1;
 		} elsif ($tele < 0) {
-			printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+#			printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele");
+		} else {
+			undef $sc_v{'ai'}{'temp'}{'tele_verbose'};
 		}
 	}
 
@@ -670,6 +747,7 @@ sub ai_event_teleportAuto {
 			&& !$chars[$config{'char'}]{'param1'}
 #			&& !($config{'teleportAuto_search'} > 1 && ($ai_v{'useGuild_skill'} || $ai_v{'useParty_skill'}))
 		)
+		&& !$sc_v{'ai'}{'first'}
 		&& !$ai_v{'temp'}{'tele'}
 		&& $ai_seq[0] ne "clientSuspend"
 #		&& !$sc_v{'temp'}{'teleOnEvent'}
@@ -699,28 +777,44 @@ sub ai_event_teleportAuto {
 			|| !binSize(\@{$ai_v2{'ImportantItem'}{'targetID'}})
 		)
 	) {
-		undef $ai_v{'temp'}{'search'};
-		foreach (keys %mon_control) {
-			if ($mon_control{$_}{'teleport_search'}) {
-				$ai_v{'temp'}{'search'} = 1;
-				last;
-			}
-		}
-		if ($ai_v{'temp'}{'search'}) {
+#		undef $ai_v{'temp'}{'search'};
+#		foreach (keys %mon_control) {
+#			if ($mon_control{$_}{'teleport_search'}) {
+#				$ai_v{'temp'}{'search'} = 1;
+#				last;
+#			}
+#		}
+#		if ($ai_v{'temp'}{'search'}) {
 			undef $ai_v{'temp'}{'found'};
+			undef $sc_v{'ai'}{'temp'}{'name_lc'};
 			foreach (@monstersID) {
-				if ($mon_control{lc($monsters{$_}{'name'})}{'teleport_search'} && !$monsters{$_}{'attack_failed'}) {
+				$sc_v{'ai'}{'temp'}{'name_lc'} = lcCht($monsters{$_}{'name'});
+#				print "$sc_v{'ai'}{'temp'}{'name_lc'} = ";
+#				print lcCht($monsters{$_}{'name'})." ($monsters{$_}{'binID'}) = $monsters{$_}{'attack_failed'}\n";
+
+				if (
+					(
+#						$mon_control{lcCht($monsters{$_}{'name'})}{'teleport_search'}
+						$mon_control{$sc_v{'ai'}{'temp'}{'name_lc'}}{'teleport_search'}
+						|| $monsters{$_}{'takenBy'}
+					)
+					&& !$monsters{$_}{'attack_failed'}
+				) {
 					$ai_v{'temp'}{'found'} = 1;
 					last;
 				}
 			}
 			if (!$ai_v{'temp'}{'found'}) {
 				# Verbose of teleport
-				if ($config{'teleportAuto_verbose'}) {
-					print "▲自動瞬移 - 搜尋指定怪物($timeout{'ai_teleport_search'}{'timeout'}秒)\n";
-				}
-				$ai_v{'temp'}{'teleOnEvent'} = 1;
-				timeOutStart('ai_teleport_event');
+#				if ($config{'teleportAuto_verbose'}) {
+#					print "▲自動瞬移 - 搜尋指定怪物($timeout{'ai_teleport_search'}{'timeout'}秒)\n";
+#				}
+
+#				printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 搜尋指定怪物($timeout{'ai_teleport_search'}{'timeout'}秒)\n", "tele");
+				$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 搜尋指定怪物($timeout{'ai_teleport_search'}{'timeout'}秒)\n";
+
+#				$ai_v{'temp'}{'teleOnEvent'} = 1;
+#				timeOutStart('ai_teleport_event');
 				useTeleport(1);
 				$ai_v{'clear_aiQueue'} = 1;
 				timeOutStart('ai_teleport_idle');
@@ -733,7 +827,7 @@ sub ai_event_teleportAuto {
 #					sysLog("ii", "順移", "撿取物品失敗: $items{$ai_seq_args[$ai_index]{'ID'}}{'name'} ($items{$ai_seq_args[$ai_index]{'ID'}}{'binID'}) 你瞬間移動了", 1);
 #				}
 			}
-		}
+#		}
 		timeOutStart('ai_teleport_search');
 	}
 
@@ -743,17 +837,22 @@ sub ai_event_teleportAuto {
 		} elsif (
 			checkTimeOut('ai_teleport_idle')
 			&& $ai_v{'ai_teleport_safe'}
+			&& !$sc_v{'ai'}{'first'}
 
 			&& !$ai_v{'temp'}{'inTake'}
 			&& $ai_v{'temp'}{'inLockMap'}
 			&& binFind(\@ai_seq, "follow") eq ""
 			&& binFind(\@ai_seq, "skill_use") eq ""
 		) {
-			if ($config{'teleportAuto_verbose'}) {
-			print "▲自動瞬移 - 發呆超過時間($timeout{'ai_teleport_idle'}{'timeout'}秒)\n";
-			}
-			$ai_v{'temp'}{'teleOnEvent'} = 1;
-			timeOutStart('ai_teleport_event');
+#			if ($config{'teleportAuto_verbose'}) {
+#				printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 發呆超過時間($timeout{'ai_teleport_idle'}{'timeout'}秒)\n", "tele");
+#			}
+#			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 發呆超過時間($timeout{'ai_teleport_idle'}{'timeout'}秒)\n", "tele");
+
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 發呆超過時間($timeout{'ai_teleport_idle'}{'timeout'}秒)\n";
+
+#			$ai_v{'temp'}{'teleOnEvent'} = 1;
+#			timeOutStart('ai_teleport_event');
 			useTeleport(1);
 			$ai_v{'clear_aiQueue'} = 1;
 			timeOutStart('ai_teleport_idle');
@@ -805,6 +904,7 @@ sub ai_event_teleportAuto {
 	if (
 		$config{'teleportAuto_portal'}
 		&& !$ai_v{'temp'}{'tele'}
+		&& !$sc_v{'ai'}{'first'}
 		&& checkTimeOut('ai_teleport_portal')
 		&& $ai_v{'ai_teleport_safe'}
 		&& !$sc_v{'temp'}{'teleOnEvent'}
@@ -819,11 +919,15 @@ sub ai_event_teleportAuto {
 	) {
 		if (binSize(\@portalsID)) {
 			# Verbose of teleport
-			if ($config{'teleportAuto_verbose'}) {
-				print "▲自動瞬移 - 迴避傳送點\n";
-			}
-			$ai_v{'temp'}{'teleOnEvent'} = 1;
-			timeOutStart('ai_teleport_event');
+#			if ($config{'teleportAuto_verbose'}) {
+#				print "▲自動瞬移 - 迴避傳送點\n";
+#			}
+
+#			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 迴避傳送點\n", "tele");
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避傳送點\n";
+
+#			$ai_v{'temp'}{'teleOnEvent'} = 1;
+#			timeOutStart('ai_teleport_event');
 			useTeleport(1);
 			$ai_v{'clear_aiQueue'} = 1;
 
@@ -839,7 +943,8 @@ sub ai_event_teleportAuto {
 		my ($sourceDisplay, $castBy);
 
 		while (1) {
-			last if (!$config{"teleportAuto_spell_$i"} || $ai_v{'temp'}{'teleOnEvent'});
+#			last if (!$config{"teleportAuto_spell_$i"} || $ai_v{'temp'}{'teleOnEvent'});
+			last if (!$config{"teleportAuto_spell_$i"} || $ai_v{'temp'}{'tele'});
 			foreach (@spellsID) {
 #				undef $sourceDisplay;
 				undef $targetDisplay;
@@ -861,11 +966,13 @@ sub ai_event_teleportAuto {
 
 				($sourceDisplay, $castBy) = ai_getCaseID($spells{$_}{'sourceID'});
 
-				$targetDisplay = ($messages_lut{'011F'}{$spells{$_}{'type'}} ne "")
-					? $messages_lut{'011F'}{$spells{$_}{'type'}}
-					: "不明型態 ".$spells{$_}{'type'};
+#				$targetDisplay = ($messages_lut{'011F'}{$spells{$_}{'type'}} ne "")
+#					? $messages_lut{'011F'}{$spells{$_}{'type'}}
+#					: "不明型態 ".$spells{$_}{'type'};
 
-				$s_cDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$_}{'pos'}}));
+				$targetDisplay = getMsgStrings('011F', $spells{$_}{'type'}, 0, 1);
+
+				$s_cDist = distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$_}{'pos'}});
 
 				if (
 					existsInList($config{"teleportAuto_spell_$i"}, $targetDisplay)
@@ -882,35 +989,70 @@ sub ai_event_teleportAuto {
 					if ($config{"teleportAuto_spell_$i"."_randomWalk"} ne "") {
 						undef @array;
 						splitUseArray(\@array, $config{"teleportAuto_spell_$i"."_randomWalk"}, ",");
+
+#						$array[0] = 1 if {!$array[0]};
+
+#						undef $result;
+
+						if ($array[1] <= $array[0]) {
+							$array[1] = $array[0]+2;
+#							$result = 1;
+							$config{"teleportAuto_spell_$i"."_randomWalk"} = "$array[0],$array[1]";
+						} elsif (!$array[1]) {
+							$array[1] = 1;
+#							$result = 1;
+							$config{"teleportAuto_spell_$i"."_randomWalk"} = "$array[0],$array[1]";
+						}
+
 						do {
 							$ai_v{'temp'}{'randX'} = $chars[$config{'char'}]{'pos_to'}{'x'} + int(rand() * ($array[1] * 2 + 1)) - $array[1];
 							$ai_v{'temp'}{'randY'} = $chars[$config{'char'}]{'pos_to'}{'y'} + int(rand() * ($array[1] * 2 + 1)) - $array[1];
-						} while (ai_route_getOffset(\%field, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
-									|| $ai_v{'temp'}{'randX'} == $chars[$config{'char'}]{'pos_to'}{'x'} && $ai_v{'temp'}{'randY'} == $chars[$config{'char'}]{'pos_to'}{'y'}
-									|| $ai_v{'temp'}{'randX'} == $spells{$_}{'pos'}{'x'} && $ai_v{'temp'}{'randY'} == $spells{$_}{'pos'}{'y'}
-									|| abs($ai_v{'temp'}{'randX'} - $chars[$config{'char'}]{'pos_to'}{'x'}) < $array[0] && abs($ai_v{'temp'}{'randY'} - $chars[$config{'char'}]{'pos_to'}{'y'}) < $array[0]);
-
-						printC(
-							"◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
-							."◆啟動 teleportAuto_spell - 隨機移動！\n"
-							, "tele"
+						} while (
+							ai_route_getOffset(\%field, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
+							|| (
+								$ai_v{'temp'}{'randX'} == $chars[$config{'char'}]{'pos_to'}{'x'}
+								&& $ai_v{'temp'}{'randY'} == $chars[$config{'char'}]{'pos_to'}{'y'}
+							)
+							|| (
+								$ai_v{'temp'}{'randX'} == $spells{$_}{'pos'}{'x'}
+								&& $ai_v{'temp'}{'randY'} == $spells{$_}{'pos'}{'y'}
+							)
+							|| (
+								abs($ai_v{'temp'}{'randX'} - $chars[$config{'char'}]{'pos_to'}{'x'}) < $array[0]
+								&& abs($ai_v{'temp'}{'randY'} - $chars[$config{'char'}]{'pos_to'}{'y'}) < $array[0]
+							)
 						);
+
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
+								."◆啟動 teleportAuto_spell - 隨機移動至($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})！\n";
+
+#						printVerbose(
+#							$config{'teleportAuto_verbose'}
+#							,"◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
+#							."◆啟動 teleportAuto_spell - 隨機移動！\n"
+#							, "tele"
+#						);
 						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！");
 
 						move($ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'});
 
 						last;
 					} else {
-						$ai_v{'temp'}{'teleOnEvent'} = 1;
-						timeOutStart('ai_teleport_event');
-						$tele_val = useTeleport(1);
+#						$ai_v{'temp'}{'teleOnEvent'} = 1;
+#						timeOutStart('ai_teleport_event');
+#						$tele_val = useTeleport(1);
+						$sc_v{'ai'}{'temp'}{'teleported'} = useTeleport(1);
 						$ai_v{'clear_aiQueue'} = 1;
 
-						printC(
-							"◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
-							."◆啟動 teleportAuto_spell - 瞬間移動！\n"
-							, "tele"
-						);
+						$sc_v{'ai'}{'temp'}{'tele_verbose'} = "◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
+								."◆啟動 teleportAuto_spell - 瞬間移動！\n";
+
+#						printVerbose(
+#							$config{'teleportAuto_verbose'}
+#							,"◆存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格！\n"
+#							."◆啟動 teleportAuto_spell - 瞬間移動！\n"
+#							, "tele"
+#						);
 						sysLog("tele", "迴避", "存在技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 瞬間移動！");
 
 						$ai_v{'temp'}{'tele'} = 1;
@@ -955,9 +1097,11 @@ sub ai_event_teleportAuto {
 
 	if (
 		$config{'teleportAuto_search_portal'} > 0
+		&& !$ai_v{'temp'}{'tele'}
+		&& !$sc_v{'ai'}{'first'}
 		&& $ai_v{'ai_teleport_safe'}
 		&& $ai_seq_args[0]{'mapIndex'} >= 0
-		&& $map_control{lc($field{'name'})}{'teleport_allow'} == 1
+		&& $sc_v{'ai'}{'temp'}{'teleport_allow'} == 1
 		&& !(
 			$ai_seq[0] eq "route_getMapRoute"
 			|| $ai_seq[0] eq "storageAuto"
@@ -984,12 +1128,15 @@ sub ai_event_teleportAuto {
 	) {
 #		my $tdist = @{$ai_seq_args[0]{'solution'}};
 
+		$sc_v{'ai'}{'temp'}{'tele'}{'index'} = findIndexString_lc(\@preferRoute, "map", $field{'name'});
+
 		if (
 			$config{'preferRoute_teleport'}
-			&& $preferRoute[$ai_v{'temp'}{'index'}]{'upLeft'}{'x'} ne ""
-			&& $preferRoute[$ai_v{'temp'}{'index'}]{'upLeft'}{'y'} ne ""
-			&& $preferRoute[$ai_v{'temp'}{'index'}]{'bottomRight'}{'x'} ne ""
-			&& $preferRoute[$ai_v{'temp'}{'index'}]{'bottomRight'}{'y'} ne ""
+			&& $sc_v{'ai'}{'temp'}{'tele'}{'index'} ne ""
+			&& $preferRoute[$sc_v{'ai'}{'temp'}{'tele'}{'index'}]{'upLeft'}{'x'} ne ""
+			&& $preferRoute[$sc_v{'ai'}{'temp'}{'tele'}{'index'}]{'upLeft'}{'y'} ne ""
+			&& $preferRoute[$sc_v{'ai'}{'temp'}{'tele'}{'index'}]{'bottomRight'}{'x'} ne ""
+			&& $preferRoute[$sc_v{'ai'}{'temp'}{'tele'}{'index'}]{'bottomRight'}{'y'} ne ""
 		) {
 			timeOutStart(1, 'ai_teleport_search_portal');
 		} elsif (
@@ -998,8 +1145,13 @@ sub ai_event_teleportAuto {
 			$ai_v{'temp'}{'distance'} = distance(\%{$ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}});
 
 			if ($ai_v{'temp'}{'distance'} > $config{'teleportAuto_search_portal'}) {
-				print "Walk Distance from portal is $tdist\n";
-				print "Trying to Teleport nearer to Portal\n";
+#				print "Walk Distance from portal is $field{'name'} ($ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'x'},$ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'y'}) - Dist: $ai_v{'temp'}{'distance'}\n";
+#				print "Trying to Teleport nearer to Portal\n";
+
+#				printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 距離路徑傳點 $field{'name'} ($ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'x'},$ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'y'}) - Dist: $ai_v{'temp'}{'distance'}\n", "tele");
+				$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 距離路徑傳點 $field{'name'} ($ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'x'},$ai_seq_args[0]{'mapSolution'}[$ai_seq_args[0]{'mapIndex'}]{'source'}{'pos'}{'y'}) - Dist: $ai_v{'temp'}{'distance'} - AI: $ai_seq[0]\n";
+#				print "Trying to Teleport nearer to Portal\n";
+
 				$ai_v{'temp'}{'tele'} = 1;
 				useTeleport(1);
 #				$timeout{'ai_teleport_search_portal'}{'time'} = time;
@@ -1013,6 +1165,7 @@ sub ai_event_teleportAuto {
 	if (
 		$config{'teleportAuto_dmgFromYou'} > 0
 		&& !$ai_v{'temp'}{'tele'}
+		&& !$sc_v{'ai'}{'first'}
 		&& checkTimeOut('ai_teleport_dmgFromYou')
 		&& $ai_v{'ai_teleport_safe'}
 		&& !$sc_v{'temp'}{'teleOnEvent'}
@@ -1022,9 +1175,11 @@ sub ai_event_teleportAuto {
 		&& !$ai_v{'temp'}{'inTake'}
 		&& ai_getAggressivesEx(1) >= $config{'teleportAuto_dmgFromYou'}
 	) {
-		printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 你對 $config{'teleportAuto_dmgFromYou'} 隻以上怪物造成傷害\n", "tele");
-		$ai_v{'temp'}{'teleOnEvent'} = 1;
-		timeOutStart('ai_teleport_event');
+		$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 你對 $config{'teleportAuto_dmgFromYou'} 隻以上怪物造成傷害\n";
+
+#		printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 你對 $config{'teleportAuto_dmgFromYou'} 隻以上怪物造成傷害\n", "tele");
+#		$ai_v{'temp'}{'teleOnEvent'} = 1;
+#		timeOutStart('ai_teleport_event');
 		useTeleport(1);
 		$ai_v{'clear_aiQueue'} = 1;
 
@@ -1046,18 +1201,24 @@ sub ai_event_teleportAuto {
 	) {
 		if (binSize(\@playersID)) {
 			# Verbose of teleport
-			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 迴避玩家\n", "tele");
-			$ai_v{'temp'}{'teleOnEvent'} = 1;
-			timeOutStart('ai_teleport_event');
+
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避玩家\n";
+
+#			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 迴避玩家\n", "tele");
+#			$ai_v{'temp'}{'teleOnEvent'} = 1;
+#			timeOutStart('ai_teleport_event');
 			useTeleport(1);
 			$ai_v{'clear_aiQueue'} = 1;
 
 			$ai_v{'temp'}{'tele'} = 1;
 		} elsif ($config{'teleportAuto_player'} > 1 && binSize(\@npcsID)) {
 			# Verbose of teleport
-			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 迴避NPC\n", "tele");
-			$ai_v{'temp'}{'teleOnEvent'} = 1;
-			timeOutStart('ai_teleport_event');
+
+			$sc_v{'ai'}{'temp'}{'tele_verbose'} = "▲自動瞬移 - 迴避NPC\n";
+
+#			printVerbose($config{'teleportAuto_verbose'}, "▲自動瞬移 - 迴避NPC\n", "tele");
+#			$ai_v{'temp'}{'teleOnEvent'} = 1;
+#			timeOutStart('ai_teleport_event');
 			useTeleport(1);
 			$ai_v{'clear_aiQueue'} = 1;
 
@@ -1066,7 +1227,16 @@ sub ai_event_teleportAuto {
 		timeOutStart('ai_teleport_player');
 	}
 
-	ai_stopByTele($ai_v{'temp'}{'tele'});
+	printVerbose($config{'teleportAuto_verbose'}, $sc_v{'ai'}{'temp'}{'tele_verbose'}, "tele") if ($sc_v{'ai'}{'temp'}{'tele_verbose'} ne "");
+
+	if ($ai_v{'temp'}{'tele'} || $sc_v{'ai'}{'temp'}{'teleported'}) {
+#		printVerbose($config{'teleportAuto_verbose'}, $tele_verbose, "tele") if ($tele_verbose ne "");
+
+		$ai_v{'temp'}{'teleOnEvent'}++;
+		timeOutStart('ai_teleport_event');
+
+		ai_stopByTele($ai_v{'temp'}{'tele'});
+	}
 
 #	if ($ai_v{'temp'}{'tele'} && $ai_v{'temp'}{'inTake'}) {
 #		my $ai_index = binFind(\@ai_seq, "take");
@@ -1086,7 +1256,8 @@ sub ai_event_teleportAuto {
 
 #	$sc_v{'temp'}{'teleOnEvent'} = 1 if ($tele_val && $config{'teleportAuto_autoMode'} > 0);
 
-	return $tele_val;
+#	return $tele_val;
+	return $sc_v{'ai'}{'temp'}{'teleported'};
 }
 
 sub ai_event_cmd {
@@ -1118,11 +1289,13 @@ sub ai_event_cmd {
 		if ($cmd{'msg'} =~ /\bsit\b/i) {
 			if ($ai_v2{'attackAuto_old'} eq "" && $config{'attackAuto'} > 0) {
 				$ai_v2{'attackAuto_old'} = $config{'attackAuto'};
-				configModify("attackAuto", 1);
+#				configModify("attackAuto", 1);
+				scModify("config", "attackAuto", 1, 1);
 			}
 			if ($ai_v2{'route_randomWalk_old'} eq "" && $config{'route_randomWalk'} > 0) {
 				$ai_v2{'route_randomWalk_old'} = $config{'route_randomWalk'};
-				configModify("route_randomWalk", 0);
+#				configModify("route_randomWalk", 0);
+				scModify("config", "route_randomWalk", 0, 1);
 			}
 			aiRemove("move");
 			aiRemove("route");
@@ -1134,11 +1307,13 @@ sub ai_event_cmd {
 			timeOutStart('ai_thanks_set');
 		} elsif ($cmd{'msg'} =~ /\bstand\b/i) {
 			if ($ai_v2{'attackAuto_old'} ne "") {
-				configModify("attackAuto", $ai_v2{'attackAuto_old'});
+#				configModify("attackAuto", $ai_v2{'attackAuto_old'});
+				scModify("config", "attackAuto", $ai_v2{'attackAuto_old'}, 1);
 				undef $ai_v2{'attackAuto_old'};
 			}
 			if ($ai_v2{'route_randomWalk_old'} ne "") {
-				configModify("route_randomWalk", $ai_v2{'route_randomWalk_old'});
+#				configModify("route_randomWalk", $ai_v2{'route_randomWalk_old'});
+				scModify("config", "route_randomWalk", $ai_v2{'route_randomWalk_old'}, 1);
 				undef $ai_v2{'route_randomWalk_old'};
 			}
 			stand();
@@ -1217,7 +1392,8 @@ sub ai_event_cmd {
 			}
 		} elsif ($cmd{'msg'} =~ /\bshut[\s\S]*up\b/i) {
 			if ($config{'verbose'}) {
-				configModify("verbose", 0);
+#				configModify("verbose", 0);
+				scModify("config", "verbose", 0, 1);
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOffS"), $cmd{'user'});
 				timeOutStart('ai_thanks_set');
 			} else {
@@ -1225,7 +1401,8 @@ sub ai_event_cmd {
 			}
 		} elsif ($cmd{'msg'} =~ /\bspeak\b/i) {
 			if (!$config{'verbose'}) {
-				configModify("verbose", 1);
+#				configModify("verbose", 1);
+				scModify("config", "verbose", 1, 1);
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("verboseOnS"), $cmd{'user'});
 				timeOutStart('ai_thanks_set');
 			} else {
@@ -1292,7 +1469,8 @@ sub ai_event_cmd {
 			&& $cmd{'msg'} =~ /\bstop\b/i) {
 			if ($config{'follow'}) {
 				aiRemove("follow");
-				configModify("follow", 0);
+#				configModify("follow", 0);
+				scModify("config", "follow", 0, 1);
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followStopS"), $cmd{'user'}) if $config{'verbose'};
 				timeOutStart('ai_thanks_set');
 			} else {
@@ -1306,8 +1484,10 @@ sub ai_event_cmd {
 			if ($ai_v{'temp'}{'targetID'} ne "") {
 				aiRemove("follow");
 				ai_follow($players{$ai_v{'temp'}{'targetID'}}{'name'});
-				configModify("follow", 1);
-				configModify("followTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
+#				configModify("follow", 1);
+				scModify("config", "follow", 1, 1);
+#				configModify("followTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
+				scModify("config", "followTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'}, 1);
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("followS"), $cmd{'user'}) if $config{'verbose'};
 				timeOutStart('ai_thanks_set');
 			} else {
@@ -1319,7 +1499,8 @@ sub ai_event_cmd {
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankStopF"), $cmd{'user'}) if $config{'verbose'};
 			} elsif ($config{'tankMode'}) {
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankStopS"), $cmd{'user'}) if $config{'verbose'};
-				configModify("tankMode", 0);
+#				configModify("tankMode", 0);
+				scModify("config", "tankMode", 0, 1);
 				timeOutStart('ai_thanks_set');
 			}
 		} elsif ($cmd{'msg'} =~ /\btank/i) {
@@ -1329,8 +1510,10 @@ sub ai_event_cmd {
 			$ai_v{'temp'}{'targetID'} = ai_getIDFromChat(\%players, $cmd{'user'}, $ai_v{'temp'}{'after'});
 			if ($ai_v{'temp'}{'targetID'} ne "") {
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankS"), $cmd{'user'}) if $config{'verbose'};
-				configModify("tankMode", 1);
-				configModify("tankModeTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
+#				configModify("tankMode", 1);
+				scModify("config", "tankMode", 1, 1);
+#				configModify("tankModeTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'});
+				scModify("config", "tankModeTarget", $players{$ai_v{'temp'}{'targetID'}}{'name'}, 1);
 				timeOutStart('ai_thanks_set');
 			} else {
 				sendMessage(\$remote_socket, $cmd{'type'}, getResponse("tankF"), $cmd{'user'}) if $config{'verbose'};
@@ -1492,6 +1675,7 @@ sub ai_event_auto_request {
 
 	if (
 		$config{'preferRoute_warp'}
+#		&& !$sc_v{'ai'}{'first'}
 		&& $warp{'use'} != 26
 		&& $ai_seq[0] eq ""
 		&& (!@{$record{'warp'}{'memo'}} || $record{'warp'}{'use'} != 27)
@@ -1525,14 +1709,16 @@ sub ai_event_auto_request {
 	}
 
 	# Party auto share
-	if ($config{'partyAutoShare'} && %{$chars[$config{'char'}]{'party'}} && checkTimeOut('ai_partyAutoShare') && !$sc_v{'temp'}{'teleOnEvent'}) {
+	if ($config{'partyAutoShare'} && !$sc_v{'ai'}{'first'} && $ai_seq[0] eq "" && %{$chars[$config{'char'}]{'party'}} && checkTimeOut('ai_partyAutoShare') && !$sc_v{'temp'}{'teleOnEvent'}) {
 		sendPartyShareEXP(\$remote_socket, 1);
 		timeOutStart('ai_partyAutoShare');
 	}
 
 	if (
 		$config{'partyAutoCreate'}
-		&& $ai_seq[0] eq ""
+		&& !$sc_v{'ai'}{'first'}
+#		&& $ai_seq[0] eq ""
+		&& switchInput($ai_seq[0], "", "route")
 		&& !$sc_v{'temp'}{'teleOnEvent'}
 		&& checkTimeOut('ai_partyAutoCreate')
 		&& !(($sc_v{'input'}{'conState'} == 2 || $sc_v{'input'}{'conState'} == 3) && $sc_v{'input'}{'waitingForInput'})
@@ -1543,7 +1729,7 @@ sub ai_event_auto_request {
 			sysLog("event", "隊伍", "你沒有隊伍，自動建立隊伍。", 1);
 			parseInput("party create");
 #			timeOutStart('ai_partyAutoCreate');
-#			sleep(0.1);
+			sleep(0.3);
 			timeOutStart(-1, 'ai_partyAutoShare');
 		}
 	}
@@ -1571,10 +1757,17 @@ sub ai_event_autoCart {
 			last if (!$config{"cartgetAuto_$i"});
 			undef $ai_v{'temp'}{'invIndex'};
 			$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"cartgetAuto_$i"});
-			if ($config{"cartgetAuto_$i"."_minAmount"} ne "" && $config{"cartgetAuto_$i"."_maxAmount"} ne ""
-				&& ($ai_v{'temp'}{'invIndex'} eq ""
-				|| ($chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} <= $config{"cartgetAuto_$i"."_minAmount"}
-				&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $config{"cartgetAuto_$i"."_maxAmount"}))) {
+			if (
+				$config{"cartgetAuto_$i"."_minAmount"} ne ""
+				&& $config{"cartgetAuto_$i"."_maxAmount"} ne ""
+				&& (
+					$ai_v{'temp'}{'invIndex'} eq ""
+					|| (
+						$chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} <= $config{"cartgetAuto_$i"."_minAmount"}
+						&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $config{"cartgetAuto_$i"."_maxAmount"}
+					)
+				)
+			) {
 				undef $ai_v{'temp'}{'cartInvIndex'};
 				$ai_v{'temp'}{'cartInvIndex'} = findIndexString_lc(\@{$cart{'inventory'}}, "name", $config{"cartgetAuto_$i"});
 				if ($ai_v{'temp'}{'cartInvIndex'} ne "") {
@@ -2015,6 +2208,7 @@ sub ai_event_route_preferRoute {
 	if (
 		$config{'preferRoute'}
 		&& @preferRoute
+#		&& !$sc_v{'ai'}{'first'}
 		&& !(
 			$ai_v{'temp'}{'teleOnEvent'}
 			|| $sc_v{'temp'}{'teleOnEvent'}
@@ -2102,7 +2296,11 @@ sub ai_event_route_preferRoute {
 #						print "i= $i, j= $j - $preferRoute[$i]{'map'} : $record{'warp'}{'memo'}[$j]\n";
 
 						for ($j=0; $j<@{$record{'warp'}{'memo'}}; $j++) {
-							next if ($record{'warp'}{'memo'}[$j] eq "" || $field{'name'} eq $record{'warp'}{'memo'}[$j] || $record{'warp'}{'memo'}[$j] eq $config{'saveMap'});
+							next if (
+								$record{'warp'}{'memo'}[$j] eq ""
+								|| $field{'name'} eq $record{'warp'}{'memo'}[$j]
+								|| $record{'warp'}{'memo'}[$j] eq $config{'saveMap'}
+							);
 
 #							print "i= $i, j= $j - $preferRoute[$i]{'map'} : $record{'warp'}{'memo'}[$j]\n";
 
@@ -2247,7 +2445,7 @@ sub ai_event_route_preferRoute {
 #							&& !$cities_lut{$field{'name'}.'.rsw'}
 							&& !$ai_v{'temp'}{'inDoor'}
 							&& ($config{"preferRoute_teleport_inCity"} || !$ai_v{'temp'}{'inCity'})
-							&& $map_control{lc($field{'name'})}{'teleport_allow'} > 0
+							&& $map_control{lcCht($field{'name'})}{'teleport_allow'} > 0
 						) {
 							if ($config{'teleportAuto_verbose'}) {
 								print "▲自動瞬移 - 尚未到達偏好路徑指定的區域\n";
@@ -2263,6 +2461,8 @@ sub ai_event_route_preferRoute {
 					}
 				}
 			}
+#		} else {
+#			timeOutStart(-1, 'ai_warpTo_wait');
 		}
 	}
 #Karasu End
@@ -2306,23 +2506,29 @@ sub ai_event_lockMap {
 #	}
 
 	if ($ai_v{'waitting_for_leave_indoor'} && $field{'name'} ne "" && !$ai_v{'temp'}{'inDoor'}) {
-		printC("event", "安全", "成功\離開不能瞬移地圖，目前地圖：".getMapName($field{'name'}, 1));
+#		printC("event", "安全", "成功\離開不能瞬移地圖，目前地圖：".getMapName($field{'name'}, 1));
+		sysLog("event", "安全", "成功\離開不能瞬移地圖，目前地圖：".getMapName($field{'name'}, 1), 1);
 		undef $ai_v{'waitting_for_leave_indoor'};
 		aiRemove("move");
 		aiRemove("route");
 		aiRemove("route_getRoute");
 		aiRemove("route_getMapRoute");
+
+		return 1;
 	}
 
-	return 0 if (!$config{'lockMap'} || !$field{'name'} || ($ai_v{'temp'}{'teleOnEvent'} && 0) || !checkTimeOut('ai_warpTo_wait'));
+#	return 0 if (!$config{'lockMap'} || !$field{'name'} || ($ai_v{'temp'}{'teleOnEvent'} && 0) || !checkTimeOut('ai_warpTo_wait'));
 
 #Karasu Start
-	my $tmpMap = getMapID($field{'name'});
+#	my $tmpMap = getMapID($field{'name'});
 
 	if (
 		$ai_seq[0] eq ""
+#		&& $field{'name'} ne ""
+#		&& $config{'lockMap'} ne ""
+#		&& !$sc_v{'ai'}{'first'}
 		&& (
-			$tmpMap ne $config{'lockMap'}
+			$field{'name'} ne $config{'lockMap'}
 			|| (
 				$config{'lockMap_x'} ne ""
 				&& $config{'lockMap_y'} ne ""
@@ -2333,15 +2539,18 @@ sub ai_event_lockMap {
 				)
 			)
 		)
+		&& checkTimeOut('ai_warpTo_wait')
 	) {
 		if ($maps_lut{$config{'lockMap'}.'.rsw'} eq "") {
 			print "鎖定地圖(lockMap)設定錯誤 - $sc_v{'path'}{'tables'}/maps.txt中找不到 $config{'lockMap'}.rsw\n";
 		} elsif (
 			1
-			&& $map_control{$tmpMap}{'restrict_map'} ne "1"
-			&& $tmpMap ne ""
-			&& $tmpMap ne $config{'saveMap'}
-			&& $tmpMap ne $config{'lockMap'}
+#			&& $config{'respawnAuto_undef'}
+			&& $map_control{$field{'name'}}{'restrict_map'} ne "1"
+			&& $field{'name'} ne ""
+			&& $field{'name'} ne $config{'saveMap'}
+			&& $field{'name'} ne $config{'lockMap'}
+			&& ($ai_v{'temp'}{'inDoor'} || $config{'respawnAuto_undef'})
 		) {
 			undef $ai_v{'waitting_for_leave_indoor'};
 			if ($ai_v{'temp'}{'inDoor'}) {
@@ -2356,14 +2565,27 @@ sub ai_event_lockMap {
 				ai_route(\%{$ai_v{'temp'}{'returnHash'}}, "", "", $config{'lockMap'}, 0, 0, 1, 0, 0, 1);
 				$ai_v{'waitting_for_leave_indoor'} = 1;
 
-			} elsif ($config{'respawnAuto_undef'} && $map_control{lc($map_string)}{'teleport_allow'} >= 1) {
-				print "◆限定地圖: 你出現在非限定地圖($map_string)！\n";
+			} elsif ($config{'respawnAuto_undef'} && $map_control{$field{'name'}}{'teleport_allow'} >= 1) {
+				print "◆限定地圖: 你出現在非限定地圖 ".getMapName($field{'name'}, 1)."！\n";
 				print "◆啟動 respawnAuto_undef - 瞬間移動回儲存點！\n";
 #				chatLog("危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！", "d");
-				sysLog("event", "危險", "限定地圖: 你出現在非限定地圖($map_string), 瞬間移動回儲存點！");
+				sysLog("event", "危險", "限定地圖: 你出現在非限定地圖 ".getMapName($field{'name'}, 1).", 瞬間移動回儲存點！");
 
 				useTeleport(2);
 				ai_clientSuspend(0, 1);
+
+				$ai_v{'clear_aiQueue'} = 1;
+
+				timeOutStart('ai_warpTo_wait');
+			} elsif ($config{'respawnAuto_undef'} && $map_control{$field{'name'}}{'teleport_allow'} <= 0) {
+				print "◆限定地圖: 你出現在非限定地圖 ".getMapName($field{'name'}, 1)."！\n";
+				print "◆啟動 respawnAuto_undef - 瞬間移動回儲存點！\n";
+
+				sysLog("event", "危險", "限定地圖: 你無法從目前的地圖($map_string)瞬移回儲存點, 立即登出！", 1);
+				quit(1, 1);
+			} else {
+				$map_control{$field{'name'}}{'restrict_map'} = 1;
+				print "◆無法啟動 respawnAuto_undef - 將當前地圖：".getMapName($field{'name'}, 1)." 列入限定地圖\n";
 			}
 		} else {
 			if ($config{'lockMap_x'} ne "") {
@@ -2380,7 +2602,7 @@ sub ai_event_lockMap {
 				undef %{$lockMap{'pos_to'}};
 				print "計算路徑前往鎖定地圖 - $maps_lut{$config{'lockMap'}.'.rsw'}($config{'lockMap'})\n";
 			}
-			if ($tmpMap ne $config{'lockMap'}) {
+			if ($field{'name'} ne $config{'lockMap'}) {
 				# Find nearest portal
 				undef $ai_v{'temp'}{'foundID'};
 				if ($config{'lockMap_returnQuickly'}) {
@@ -2451,7 +2673,7 @@ sub ai_event_dead {
 
 		#force storage after death
 		unshift @ai_seq, "talkAuto";
-		unshift @ai_seq_args, {};
+		unshift @ai_seq_args, {'reset' => 1};
 	} elsif ($ai_seq[0] ne "dead" && $chars[$config{'char'}]{'dead'}) {
 		if ($sc_v{'temp'}{'itemsImportantAutoMode'}) {
 			undef $sc_v{'temp'}{'itemsImportantAutoMode'};
@@ -2486,13 +2708,20 @@ sub ai_event_dead {
 
 			if ($shop{'opened'}) {
 
-				event_shop_close(0, 1);
+#				event_shop_close(0, 1);
+				if (event_shop_close(2)) {
 
-				sleep(1);
+					sleep(1);
 
+					sendRespawn(\$remote_socket);
+
+				}
+
+			} else {
+				sendRespawn(\$remote_socket);
 			}
 
-			sendRespawn(\$remote_socket);
+
 			$chars[$config{'char'}]{'dead_time'} = time;
 
 		}
@@ -2506,7 +2735,8 @@ sub ai_event_auto_useItem {
 	##### AUTO-ITEM USE #####
 
 	if (
-		switchInput(
+		$config{'useSelf_item'}
+		&& switchInput(
 			$ai_seq[0],
 			"",
 			"route",
@@ -2523,13 +2753,16 @@ sub ai_event_auto_useItem {
 	) {
 		my $ai_index = binFind(\@ai_seq, "attack");
 
+		my $key = "useSelf_item";
+
 		my $i = 0;
 #		my $inTake	= ((binFind(\@ai_seq, "take") ne "" || binFind(\@ai_seq, "items_take") ne "" || binFind(\@ai_seq, "items_gather") ne "")?1:0);
 #		my $inAttack	= (binFind(\@ai_seq, "attack") ne "")?1:0;
 
 		while (1) {
 			last if (!$config{"useSelf_item_$i"});
-			if (percent_hp(\%{$chars[$config{'char'}]}) <= $config{"useSelf_item_$i"."_hp_upper"} && percent_hp(\%{$chars[$config{'char'}]}) >= $config{"useSelf_item_$i"."_hp_lower"}
+			if (
+				percent_hp(\%{$chars[$config{'char'}]}) <= $config{"useSelf_item_$i"."_hp_upper"} && percent_hp(\%{$chars[$config{'char'}]}) >= $config{"useSelf_item_$i"."_hp_lower"}
 				&& percent_sp(\%{$chars[$config{'char'}]}) <= $config{"useSelf_item_$i"."_sp_upper"} && percent_sp(\%{$chars[$config{'char'}]}) >= $config{"useSelf_item_$i"."_sp_lower"}
 				&& !($config{"useSelf_item_$i"."_stopWhenHit"} && $ai_v{'temp'}{'onHit'})
 				# Use when not sit
@@ -2545,6 +2778,7 @@ sub ai_event_auto_useItem {
 				&& (!$config{"useSelf_item_$i"."_unLockOnly"} || ($config{"useSelf_item_$i"."_unLockOnly"} && !$ai_v{'temp'}{'inLockMap'}))
 				&& !($config{"useSelf_item_$i"."_stopWhenAttack"} && $ai_v{'temp'}{'inAttack'})
 				&& !($config{"useSelf_item_$i"."_stopWhenTake"} && $ai_v{'temp'}{'inTake'})
+				&& ($config{"useSelf_item_${i}_inCity"} || !$ai_v{'temp'}{'inCity'} || $config{"useSelf_item_${i}_inCity"} eq "")
 			) {
 				# Judge parameter and status
 				undef $ai_v{'temp'}{'found'};
@@ -2576,6 +2810,77 @@ sub ai_event_auto_useItem {
 					}
 					$ai_v{'temp'}{'found'} = 1 if (!$ai_v{'temp'}{'foundEx'});
 				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItem_0"}) {
+					undef @array;
+					undef $ai_v{'temp'}{'index'};
+					undef $ai_v{'temp'}{'invIndex'};
+
+					$ai_v{'temp'}{'index'} = 0;
+
+					while (1) {
+						last if (!$config{"${key}_${i}_checkItem_$ai_v{'temp'}{'index'}"});
+
+						splitUseArray(\@array, $config{"${key}_${i}_checkItem_$ai_v{'temp'}{'index'}"}, ",");
+
+						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+						if (
+							$ai_v{'temp'}{'invIndex'} eq ""
+							|| (
+								$array[1] ne ""
+								&& $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} < $array[1]
+							)
+						) {
+							$ai_v{'temp'}{'found'} = 1;
+							last;
+						}
+
+						$ai_v{'temp'}{'index'}++;
+					}
+				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItemNot"}) {
+					undef @array;
+					splitUseArray(\@array, $config{"${key}_${i}_checkItemNot"}, ",");
+					foreach (@array) {
+						next if (!$_);
+						if (findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $_) ne "") {
+							$ai_v{'temp'}{'found'} = 1;
+							last;
+						}
+					}
+				}
+
+				if (!$ai_v{'temp'}{'found'} && $config{"${key}_${i}_checkItemNot_0"}) {
+					undef @array;
+					undef $ai_v{'temp'}{'index'};
+					undef $ai_v{'temp'}{'invIndex'};
+
+					$ai_v{'temp'}{'index'} = 0;
+
+					while (1) {
+						last if (!$config{"${key}_${i}_checkItemNot_$ai_v{'temp'}{'index'}"});
+
+						splitUseArray(\@array, $config{"${key}_${i}_checkItemNot_$ai_v{'temp'}{'index'}"}, ",");
+
+						$ai_v{'temp'}{'invIndex'} = findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $array[0]);
+
+						if (
+							$ai_v{'temp'}{'invIndex'} ne ""
+							&& (
+								$array[1] eq ""
+								|| $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} >= $array[1]
+							)
+						) {
+							$ai_v{'temp'}{'found'} = 1;
+							last;
+						}
+
+						$ai_v{'temp'}{'index'}++;
+					}
+				}
+
 				if ($config{"useSelf_item_$i"."_status"} ne "") {
 					foreach (@{$chars[$config{'char'}]{'status'}}) {
 						if (existsInList2($config{"useSelf_item_$i"."_status"}, $_, "noand")) {
@@ -2605,7 +2910,7 @@ sub ai_event_auto_useItem {
 							$k = 0;
 							while ($ai_v{'temp'}{'checkSupplyPass'}) {
 								last if (!$config{'storageAuto'} || !$config{'storageAuto_npc'} || !$config{"storagegetAuto_$k"});
-								if ($config{"storagegetAuto_$k"} eq $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'name'} && !$stockVoid{'storage'}[$k]
+								if ($config{"storagegetAuto_$k"} eq $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'name'} && !$sc_v{'ai'}{'temp'}{'stockVoid'}{'storage'}[$k]
 									&& $config{"storagegetAuto_$k"."_minAmount"} ne "" && $config{"storagegetAuto_$k"."_maxAmount"} ne ""
 									&& $config{"storagegetAuto_$k"."_minAmount"} == $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'} - 1) {
 									undef $ai_v{'temp'}{'checkSupplyPass'};
@@ -2627,15 +2932,19 @@ sub ai_event_auto_useItem {
 							$ai_v{"useSelf_item_$i"."_time"} = time;
 							# Item use repeat
 							$config{"useSelf_item_$i"."_repeat"} = 1 if(!$config{"useSelf_item_$i"."_repeat"});
+							$chars[$config{'char'}]{'sendItemUse'}++ if ($chars[$config{'char'}]{'sendItemUse_last'} == $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'});
+							$chars[$config{'char'}]{'sendItemUse_last'} = $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'amount'};
+
 							for ($j = 0; $j < $config{"useSelf_item_$i"."_repeat"}; $j++) {
 								sendItemUse(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'index'}, $accountID);
-								$chars[$config{'char'}]{'sendItemUse'}++;
+#								$chars[$config{'char'}]{'sendItemUse'}++;
 							}
+
 #							timeOutStart('ai_item_use_auto');
 							print qq~Auto-item use: $items_lut{$chars[$config{'char'}]{'inventory'}[$ai_v{'temp'}{'invIndex'}]{'nameID'}}\n~ if ($config{'debug'});
 						} elsif (binFind(\@ai_seq, "talkAuto") eq "" && binFind(\@ai_seq, "storageAuto") eq "" && binFind(\@ai_seq, "sellAuto") eq "" && binFind(\@ai_seq, "buyAuto") eq "") {
 							unshift @ai_seq, "talkAuto";
-							unshift @ai_seq_args, {};
+							unshift @ai_seq_args, {'reset' => 1};
 						}
 						last;
 					}
@@ -2665,6 +2974,7 @@ sub ai_event_auto_useSkill {
 			"items_take",
 			"attack"
 		)
+		|| $ai_v{'temp'}{'useSkill_notParam2'}
 		|| !checkTimeOut('ai_useSelf_skill_auto')
 	);
 
@@ -2692,7 +3002,7 @@ sub ai_event_auto_useSkill {
 #			percent_hp(\%{$chars[$config{'char'}]}) <= $config{"useSelf_skill_$i"."_hp_upper"} && percent_hp(\%{$chars[$config{'char'}]}) >= $config{"useSelf_skill_$i"."_hp_lower"}
 #			&& percent_sp(\%{$chars[$config{'char'}]}) <= $config{"useSelf_skill_$i"."_sp_upper"} && percent_sp(\%{$chars[$config{'char'}]}) >= $config{"useSelf_skill_$i"."_sp_lower"}
 			# Not really important, just change the sp judge
-			#&& $chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lc($config{"useSelf_skill_$i"})}}{$config{"useSelf_skill_$i"."_lvl"}}
+			#&& $chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lcCht($config{"useSelf_skill_$i"})}}{$config{"useSelf_skill_$i"."_lvl"}}
 #			&&
 #			timeOut($config{"useSelf_skill_$i"."_timeout"}, $ai_v{"useSelf_skill_$i"."_time"})
 ##			&& !($config{"useSelf_skill_$i"."_stopWhenHit"} && ai_getMonstersWhoHitMe())
@@ -2764,7 +3074,7 @@ sub ai_event_auto_useSkill {
 #				$ai_v{'temp'}{'found'} = 1 if ($ai_v{'temp'}{'invIndex'} eq "");
 #			}
 #			$ai_v{'temp'}{'found'} = 1 if (
-#				!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useSelf_skill_$i"})}}{'lv'}
+#				!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useSelf_skill_$i"})}}{'lv'}
 #				&& (
 #					$config{"useSelf_skill_$i"."_smartEquip"} eq ""
 #					|| ($config{"useSelf_skill_$i"."_smartEquip"} ne "" findIndexString_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"useSelf_skill_$i"."_smartEquip"}))
@@ -2796,7 +3106,7 @@ sub ai_event_auto_useSkill {
 
 				# Equip for skill
 				undef %{$ai_v{'checkEquip'}};
-				if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useSelf_skill_$i"})}}{'lv'} && $config{"useSelf_skill_$i"."_smartEquip"} ne "") {
+				if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useSelf_skill_$i"})}}{'lv'} && $config{"useSelf_skill_$i"."_smartEquip"} ne "") {
 					$ai_v{'checkEquip'}{'ignorePos'} = ai_equip_special($config{"useSelf_skill_$i"."_smartEquip"});
 					$ai_v{'checkEquip'}{'skillID'} = ai_getSkillUseID($config{"useSelf_skill_$i"});
 				}
@@ -2818,7 +3128,7 @@ sub ai_event_auto_useSkill {
 	}
 
 	if ($ai_v{'useSelf_skill'}) {
-#		if ($config{'useSelf_skill_smartHeal'} && $skills_rlut{lc($ai_v{'useSelf_skill'})} eq "AL_HEAL") {
+#		if ($config{'useSelf_skill_smartHeal'} && $skills_rlut{lcCht($ai_v{'useSelf_skill'})} eq "AL_HEAL") {
 #			undef $ai_v{'useSelf_skill_smartHeal_lvl'};
 #			$ai_v{'useSelf_skill_smartHeal_hp_dif'} = $chars[$config{'char'}]{'hp_max'} - $chars[$config{'char'}]{'hp'};
 #			$ai_v{'useSelf_skill_smartHeal_lvl_upper'} = ($chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'}) ? $chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'} : $ai_v{'useSelf_skill_lvl'};
@@ -2835,24 +3145,24 @@ sub ai_event_auto_useSkill {
 #			}
 #			$ai_v{'useSelf_skill_lvl'} = $ai_v{'useSelf_skill_smartHeal_lvl'};
 #		}
-		$ai_v{'useSelf_skill_lvl'} = ai_smartHeal($ai_v{'useSelf_skill_lvl'}) if ($skills_rlut{lc($ai_v{'useSelf_skill'})} eq "AL_HEAL");
-		if ($config{'useSelf_skill_smartAutospell'} && $skills_rlut{lc($ai_v{'useSelf_skill'})} eq "SA_AUTOSPELL") {
+		$ai_v{'useSelf_skill_lvl'} = ai_smartHeal($ai_v{'useSelf_skill_lvl'}) if ($skills_rlut{lcCht($ai_v{'useSelf_skill'})} eq "AL_HEAL");
+		if ($config{'useSelf_skill_smartAutospell'} && $skills_rlut{lcCht($ai_v{'useSelf_skill'})} eq "SA_AUTOSPELL") {
 			undef $ai_v{'useSelf_skill_smartAutospell'};
 			$ai_v{'useSelf_skill_smartAutospell'} = ai_getSkillUseID($config{'useSelf_skill_smartAutospell'});
 		}
-		if ($skills_rlut{lc($ai_v{'useSelf_skill'})} eq "AM_PHARMACY") {
+		if ($skills_rlut{lcCht($ai_v{'useSelf_skill'})} eq "AM_PHARMACY") {
 			undef $ai_v{'useSelf_smartAutomake'};
 			$ai_v{'useSelf_smartAutomake'} = 1 if ($config{'useSelf_smartAutomake'});
 		}
-		if ($skills_rlut{lc($ai_v{'useSelf_skill'})} eq "AC_MAKINGARROW") {
+		if ($skills_rlut{lcCht($ai_v{'useSelf_skill'})} eq "AC_MAKINGARROW") {
 			undef $ai_v{'useSelf_smartAutoarrow'};
 			$ai_v{'useSelf_smartAutoarrow'} = 1 if ($config{'useSelf_smartAutoarrow'});
 		}
 		# Change sp judge in here
-		if ($ai_v{'useSelf_skill_lvl'} > 0 && $chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lc($ai_v{'useSelf_skill'})}}{$ai_v{'useSelf_skill_lvl'}}) {
-			$ai_v{'useSelf_skill_ID'} = ($ai_v{'checkEquip'}{'skillID'}) ? $ai_v{'checkEquip'}{'skillID'} : $chars[$config{'char'}]{'skills'}{$skills_rlut{lc($ai_v{'useSelf_skill'})}}{'ID'};
-			print qq~Auto-skill on self: $skills_lut{$skills_rlut{lc($ai_v{'useSelf_skill'})}} (lvl $ai_v{'useSelf_skill_lvl'}) [ID:$ai_v{'useSelf_skill_ID'}]\n~ if ($config{'debug'});
-			if (!ai_getSkillUseType($skills_rlut{lc($ai_v{'useSelf_skill'})})) {
+		if ($ai_v{'useSelf_skill_lvl'} > 0 && $chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lcCht($ai_v{'useSelf_skill'})}}{$ai_v{'useSelf_skill_lvl'}}) {
+			$ai_v{'useSelf_skill_ID'} = ($ai_v{'checkEquip'}{'skillID'}) ? $ai_v{'checkEquip'}{'skillID'} : $chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($ai_v{'useSelf_skill'})}}{'ID'};
+			print qq~Auto-skill on self: $skills_lut{$skills_rlut{lcCht($ai_v{'useSelf_skill'})}} (lvl $ai_v{'useSelf_skill_lvl'}) [ID:$ai_v{'useSelf_skill_ID'}]\n~ if ($config{'debug'});
+			if (!ai_getSkillUseType($skills_rlut{lcCht($ai_v{'useSelf_skill'})})) {
 				ai_skillUse($ai_v{'useSelf_skill_ID'}, $ai_v{'useSelf_skill_lvl'}, $ai_v{'useSelf_skill_maxCastTime'}, $ai_v{'useSelf_skill_minCastTime'}, $accountID, "", $ai_v{'checkEquip'}{'ignorePos'}, "self");
 			} else {
 				ai_skillUse($ai_v{'useSelf_skill_ID'}, $ai_v{'useSelf_skill_lvl'}, $ai_v{'useSelf_skill_maxCastTime'}, $ai_v{'useSelf_skill_minCastTime'}, $chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "self");
@@ -3014,22 +3324,32 @@ sub ai_event_body {
 
 		if (!switchInput($ai_seq[0], "", "follow")) {
 			timeOutStart('ai_sit_idle');
-		} elsif (!$chars[$config{'char'}]{'sitting'} && checkTimeOut('ai_sit_idle') && !$shop{'opened'}) {
+		} elsif (!$chars[$config{'char'}]{'sitting'} && checkTimeOut('ai_sit_idle')) {
 
-			if ($config{'shopAuto_open'}) {
-##				sendLook(\$remote_socket, 4, 0);
-##				sleep(1);
-				sendShopOpen(\$remote_socket);
+			if (!$shop{'opened'}) {
+				if ($config{'shopAuto_open'}) {
+	##				sendLook(\$remote_socket, 4, 0);
+	##				sleep(1);
+					sendShopOpen(\$remote_socket);
 
-#				sit();
+	#				sit();
 
-#				unshift @ai_seq, "shopauto";
-#				unshift @ai_seq_args, {};
+	#				unshift @ai_seq, "shopauto";
+	#				unshift @ai_seq_args, {};
 
+				} else {
+					sit();
+				}
 			} else {
-				sit();
-			}
+				if ($myShop{'shop_look'}) {
+					sendLook(\$remote_socket, $myShop{'shop_look_body'}, $myShop{'shop_look_head'});
+				}
 
+				if ($myShop{'shop_sitAuto'}) {
+					sit('Shop sitAuto');
+					$ai_v{'sitAuto_forceStop'} = 0;
+				}
+			}
 		}
 	}
 
@@ -3134,6 +3454,8 @@ sub ai_event_autoEquip {
 	##### AUTO-EQUIP CHANGE #####
 
 	if (
+		$config{'equipAuto'}
+		&&
 		(
 			switchInput($ai_seq[0]
 				, ""
@@ -3171,9 +3493,402 @@ sub ai_event_skills_use {
 		undef $ai_seq_args[0]{'suspended'};
 	}
 
-	if (
-		!$ai_seq_args[0]{'suspended'}
-		&& $config{'attackAuto_checkSkills'}
+#	if (
+#		!$ai_seq_args[0]{'suspended'}
+#		&& $config{'attackAuto_checkSkills'}
+#		&& $ai_seq_args[0]{'skill_use_target'} ne $accountID
+#		&& $ai_seq_args[0]{'skill_used'}
+#		&& !$ai_seq_args[0]{'skill_success'}
+#		&& timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})
+#	) {
+#
+##		print "$ai_seq_args[0]{'skill_used'} - $ai_v{'temp'}{'castWait'} - $chars[$config{'char'}]{'time_cast'} - $ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} - ".timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})."\n";
+#
+#		if (!$ai_seq_args[0]{'skill_use_first'}) {
+#
+#			my $tmpMsg = "★嘗試施展技能逾時 - 可能卡點 ";
+#			my $tmpCheck = 1;
+#
+##			if ($ai_v{'useParty_skill'} ne "") {
+##				$tmpCheck = 0;
+##			} els
+#			if (%{$monsters{$ai_seq_args[0]{'skill_use_target'}}}) {
+#				if (
+#					$config{'attackAuto_checkSkills'} eq "1"
+#					&& (
+#						$monsters{$ai_seq_args[0]{'skill_use_target'}}{'dmgFromYou'} > 0
+#						|| $monsters{$ai_seq_args[0]{'skill_use_target'}}{'missedFromYou'} > 0
+##						|| $monsters{$ai_v{'ai_attack_ID'}}{'dmgFromYou'} > 0
+##						|| $monsters{$ai_v{'ai_attack_ID'}}{'missedFromYou'} > 0
+#					)
+#				) {
+#
+##					$tmpCheck = 0;
+#					undef $tmpCheck;
+#
+#					ai_shift();
+#
+#				} else {
+#
+#					$monsters{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+#
+#					$tmpMsg .= "目標 $monsters{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+#
+#					$tmpMsg .= " ".getMsgStrings('0080', $monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+#
+#				}
+#			} elsif (%{$monsters_old{$ai_seq_args[0]{'skill_use_target'}}}) {
+##				$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+#
+#				$tmpMsg .= "目標 $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+#
+#				$tmpMsg .= " ".getMsgStrings('0080', $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+#
+#				$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+#
+##				undef $tmpCheck;
+#				$tmpCheck = -1;
+#
+#			} elsif ($ai_seq_args[0]{'skill_use_target_x'} ne "" && $ai_seq_args[0]{'skill_use_target_y'} ne "") {
+#				$tmpMsg .= " 座標 ($ai_seq_args[0]{'skill_use_target_x'}, $ai_seq_args[0]{'skill_use_target_y'})";
+#
+#				if ($ai_seq_args[0]{'skill_use_type'} eq "attack" && %{$monsters{$ai_v{'ai_attack_ID'}}}) {
+##					$monsters{$ai_v{'ai_attack_ID'}}
+#					$monsters{$ai_v{'ai_attack_ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_v{'ai_attack_ID'}}{'nameID'}) eq "");
+#				}
+#			} elsif (%{$players{$ai_seq_args[0]{'skill_use_target'}}}) {
+##				undef $tmpCheck;
+#
+#				$tmpMsg .= "目標 $players{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($players{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+#
+#				$tmpMsg .= " ".getMsgStrings('0080', $players{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($players{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+#
+##				printC("$tmpMsg\n", "alert");
+#
+#				$players{$ai_seq_args[0]{'skill_use_target'}}{'skills_failed'}++;
+#
+#				$tmpCheck = -1;
+#
+#			} elsif (%{$players_old{$ai_seq_args[0]{'skill_use_target'}}}) {
+##				$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+#
+#				$tmpMsg .= "目標 $players_old{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($players_old{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+#
+#				$tmpMsg .= " ".getMsgStrings('0080', $players_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($players_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+#
+#				$players_old{$ai_seq_args[0]{'skill_use_target'}}{'skills_failed'}++;
+#
+#				$tmpCheck = -1;
+#
+##				undef $tmpCheck;
+##				printC("$tmpMsg\n", "alert");
+#
+#			} else {
+#				$tmpMsg .= "不明原因";
+#			}
+#
+##			parseInput("ai");
+#
+#			if ($tmpCheck) {
+#				printC("$tmpMsg\n", "alert");
+#
+#				shift @ai_seq;
+#				shift @ai_seq_args;
+#
+##				my $ai_index = binFind(\@ai_seq, "attack");
+##				$ai_seq_args[$ai_index]{'ai_attack_giveup'}{'time'} -= $ai_seq_args[$ai_index]{'ai_attack_giveup'}{'timeout'} if ($ai_index ne "");
+#
+##				timeOutStart(
+##					 'ai_teleport_search'
+##					,'ai_teleport_idle'
+##				);
+#				timeOutStart(
+#					'ai_teleport_idle'
+#				);
+#
+#				if ($tmpCheck > 0) {
+#					aiRemove("attack") if ($config{'attackAuto_checkSkills'} > 1 || 1);
+#				} elsif ($tmpCheck < 0) {
+#					timeOutStart('ai_skill_party_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "party");
+#					timeOutStart('ai_skill_guild_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "guild");
+#					timeOutStart('ai_resurrect_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "resurrect");
+#				}
+#			}
+#
+#		} else {
+##			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+#			if ($ai_v{'temp'}{'castWait'}) {
+#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $ai_v{'temp'}{'castWait'} + 0.5;
+#			} else {
+#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 0.5;
+##				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 1;
+##				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $timeout{'ai_skill_use_giveup'}{'timeout'};
+#			}
+#
+#			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+#
+##			ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+#
+##			if ($ai_seq_args[0]{'skill_use_first'} < 0) {
+##				undef $ai_seq_args[0]{'skill_use_first'};
+###				$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+##			} elsif ($ai_seq_args[0]{'skill_use_first'} > 0) {
+##				$ai_seq_args[0]{'skill_use_first'} = -1;
+##			}
+#
+#			undef $ai_seq_args[0]{'skill_use_first'};
+#		}
+#	}
+#
+#	return 0 if ($ai_seq[0] ne "skill_use");
+
+	if ($chars[$config{'char'}]{'sitting'}) {
+		ai_setSuspend(0);
+		stand();
+	} elsif (!$ai_seq_args[0]{'skill_used'} || ($ai_seq_args[0]{'skill_use_retry'} && !$ai_seq_args[0]{'skill_success'} && $ai_seq_args[0]{'skill_used'} <= $ai_seq_args[0]{'skill_use_retry'})) {
+		if (checkTimeOut('ai_skill_use_send') || 0) {
+
+#			print "ai_skillUse $ai_seq_args[0]{'skill_use_type'} ".getName("skillsID_lut", $ai_seq_args[0]{'skill_use_id'})."\n" if ($ai_seq_args[0]{'skill_use_type'} eq "cast");
+
+			if ($ai_seq_args[0]{'skill_use_target_x'} ne "") {
+				sendSkillUseLoc(\$remote_socket, $ai_seq_args[0]{'skill_use_id'}, $ai_seq_args[0]{'skill_use_lv'}, $ai_seq_args[0]{'skill_use_target_x'}, $ai_seq_args[0]{'skill_use_target_y'});
+			} else {
+				sendSkillUse(\$remote_socket, $ai_seq_args[0]{'skill_use_id'}, $ai_seq_args[0]{'skill_use_lv'}, $ai_seq_args[0]{'skill_use_target'});
+			}
+			$ai_seq_args[0]{'skill_used'}++;
+			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+			$ai_seq_args[0]{'skill_use_last'} = $chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$ai_seq_args[0]{'skill_use_id'}})}}{'time_used'};
+#Pino Start(控制發送attack)
+			undef $timeout{'ai_attack'}{'time'} if (!$config{'attackAuto_unLock'});
+#Pino End
+			timeOutStart('ai_skill_use_send');
+		}
+	} elsif (
+		(
+			$ai_seq_args[0]{'skill_use_last'} != $chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$ai_seq_args[0]{'skill_use_id'}})}}{'time_used'}
+
+#			|| $ai_seq_args[0]{'skill_success'}
+
+#			|| !$ai_seq_args[0]{'skill_success'}
+
+			|| (
+				timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})
+				&&
+				(
+					!$chars[$config{'char'}]{'time_cast'}
+					||
+					!$ai_seq_args[0]{'skill_use_maxCastTime'}{'timeout'}
+				)
+			)
+			|| (
+				$ai_seq_args[0]{'skill_use_maxCastTime'}{'timeout'}
+				&&
+				timeOut(\%{$ai_seq_args[0]{'skill_use_maxCastTime'}})
+			)
+		)
+		&& timeOut(\%{$ai_seq_args[0]{'skill_use_minCastTime'}})
+#		&& timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})
+		&& checkTimeOut('ai_skill_use_send')
+	) {
+		$chars[$config{'char'}]{'last_skill_used'} = "";
+		$chars[$config{'char'}]{'last_skill_target'} = "";
+
+		if (
+			$config{'attackAuto_checkSkills'}
+			&& !$ai_seq_args[0]{'skill_success'}
+			&& $ai_seq_args[0]{'skill_use_target'} ne $accountID
+#			&& timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})
+		) {
+			if (!$ai_seq_args[0]{'skill_use_first'}) {
+				my $tmpMsg = "☆嘗試施展技能 ".getName("skillsID_lut", $ai_seq_args[0]{'skill_use_id'})."($ai_seq_args[0]{'skill_use_lv'}) 逾時 - 可能卡點 ";
+				my $tmpCheck = 1;
+
+				if (%{$monsters{$ai_seq_args[0]{'skill_use_target'}}}) {
+
+					if (
+						$config{'attackAuto_checkSkills'} eq "1"
+						&& (
+							$monsters{$ai_seq_args[0]{'skill_use_target'}}{'dmgFromYou'} > 0
+							|| $monsters{$ai_seq_args[0]{'skill_use_target'}}{'missedFromYou'} > 0
+	#						|| $monsters{$ai_v{'ai_attack_ID'}}{'dmgFromYou'} > 0
+	#						|| $monsters{$ai_v{'ai_attack_ID'}}{'missedFromYou'} > 0
+						)
+					) {
+
+						$tmpCheck = 0;
+#						undef $tmpCheck;
+
+#						ai_shift();
+
+					} else {
+
+						$monsters{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+
+						$tmpMsg .= "目標怪物 $monsters{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+
+						$tmpMsg .= " ".getMsgStrings('0080', $monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+
+					}
+
+	#				$monsters{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+	#
+	#				$tmpMsg .= "目標 $monsters{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+	#
+	#				$tmpMsg .= " ".getMsgStrings('0080', $monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($monsters{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+				} elsif (%{$monsters_old{$ai_seq_args[0]{'skill_use_target'}}}) {
+	#				$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+
+					$tmpMsg .= "目標怪物 $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+
+					$tmpMsg .= " ".getMsgStrings('0080', $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+
+					$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+
+	#				undef $tmpCheck;
+					$tmpCheck = -1;
+
+				} elsif (%{$players{$ai_seq_args[0]{'skill_use_target'}}}) {
+					$players{$ai_seq_args[0]{'skill_use_target'}}{'skills_failed'}++;
+
+					$tmpMsg .= "目標玩家 $players{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($players{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+
+					$tmpMsg .= " ".getMsgStrings('0080', $players{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($players{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+
+					$tmpCheck = -1;
+				} elsif (%{$players_old{$ai_seq_args[0]{'skill_use_target'}}}) {
+	#				$monsters_old{$ai_seq_args[0]{'skill_use_target'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'skill_use_target'}}{'nameID'}) eq "");
+
+					$tmpMsg .= "目標玩家 $players_old{$ai_seq_args[0]{'skill_use_target'}}{'name'} ($players_old{$ai_seq_args[0]{'skill_use_target'}}{'binID'})";
+
+					$tmpMsg .= " ".getMsgStrings('0080', $players_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'}, 0, 2) if ($players_old{$ai_seq_args[0]{'skill_use_target'}}{'0080'} ne "");
+
+					$players_old{$ai_seq_args[0]{'skill_use_target'}}{'skills_failed'}++;
+
+					$tmpCheck = -1;
+
+	#				undef $tmpCheck;
+	#				printC("$tmpMsg\n", "alert");
+
+				} elsif ($ai_seq_args[0]{'skill_use_target_x'} ne "" && $ai_seq_args[0]{'skill_use_target_y'} ne "") {
+					$tmpMsg .= " 座標 ($ai_seq_args[0]{'skill_use_target_x'}, $ai_seq_args[0]{'skill_use_target_y'})";
+
+					if ($ai_seq_args[0]{'skill_use_type'} eq "attack" && %{$monsters{$ai_v{'ai_attack_ID'}}}) {
+	#					$monsters{$ai_v{'ai_attack_ID'}}
+	#					$monsters{$ai_v{'ai_attack_ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_v{'ai_attack_ID'}}{'nameID'}) eq "");
+
+						if (
+							binFind(\@MVPID, $monsters{$ai_v{'ai_attack_ID'}}{'nameID'}) eq ""
+							&& !(
+								$config{'attackAuto_checkSkills'} eq "1"
+								&& (
+									$monsters{$ai_v{'ai_attack_ID'}}{'dmgFromYou'} > 0
+									|| $monsters{$ai_v{'ai_attack_ID'}}{'missedFromYou'} > 0
+			#						|| $monsters{$ai_v{'ai_attack_ID'}}{'dmgFromYou'} > 0
+			#						|| $monsters{$ai_v{'ai_attack_ID'}}{'missedFromYou'} > 0
+								)
+							)
+						) {
+							$monsters{$ai_v{'ai_attack_ID'}}{'attack_failed'}++;
+						}
+					} else {
+						$tmpCheck = -1;
+					}
+				} else {
+					$tmpMsg .= "不明原因";
+				}
+
+				if ($tmpCheck) {
+					printC("$tmpMsg\n", "alert");
+					timeOutStart(
+						'ai_teleport_idle'
+					);
+
+					if ($tmpCheck > 0) {
+						if ($config{'attackAuto_checkSkills'} > 1 || 1) {
+	#						aiRemove("attack");
+							attackForceStop(\$remote_socket, $ai_v{'ai_attack_ID'}, 1);
+						}
+					} elsif ($tmpCheck < 0) {
+						timeOutStart('ai_skill_party_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "party");
+						timeOutStart('ai_skill_guild_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "guild");
+						timeOutStart('ai_resurrect_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "resurrect");
+					}
+
+					ai_shift();
+				} else {
+#					print "[1]123456789\n";
+					ai_shift();
+				}
+			} else {
+	#			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+				if ($ai_v{'temp'}{'castWait'}) {
+					$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $ai_v{'temp'}{'castWait'} + 0.2;
+				} else {
+					$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 0.2;
+	#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 1;
+	#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $timeout{'ai_skill_use_giveup'}{'timeout'};
+				}
+
+				$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+
+	#			ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+
+	#			if ($ai_seq_args[0]{'skill_use_first'} < 0) {
+	#				undef $ai_seq_args[0]{'skill_use_first'};
+	##				$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+	#			} elsif ($ai_seq_args[0]{'skill_use_first'} > 0) {
+	#				$ai_seq_args[0]{'skill_use_first'} = -1;
+	#			}
+
+				undef $ai_seq_args[0]{'skill_use_first'};
+			}
+#		} elsif (!$ai_seq_args[0]{'skill_success'}) {
+#			print "☆嘗試施展技能 ".getName("skillsID_lut", $ai_seq_args[0]{'skill_use_id'})."($ai_seq_args[0]{'skill_use_lv'}) 逾時 - $ai_seq_args[0]{'skill_success'} : $ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} = ".timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})."\n";
+#
+#			ai_shift();
+		} elsif (!$ai_seq_args[0]{'skill_success'} && $config{'attackAuto_checkSkills'} && $ai_seq_args[0]{'skill_use_first'}) {
+#			print "☆嘗試施展技能 ".getName("skillsID_lut", $ai_seq_args[0]{'skill_use_id'})."($ai_seq_args[0]{'skill_use_lv'}) 逾時 - $ai_seq_args[0]{'skill_success'} : $ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} = ".timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})."\n";
+
+			if ($ai_v{'temp'}{'castWait'}) {
+				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $ai_v{'temp'}{'castWait'} + 0.2;
+			} else {
+				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 0.5;
+#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 1;
+#				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $timeout{'ai_skill_use_giveup'}{'timeout'};
+			}
+
+			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+
+#			ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+
+#			if ($ai_seq_args[0]{'skill_use_first'} < 0) {
+#				undef $ai_seq_args[0]{'skill_use_first'};
+##				$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
+#			} elsif ($ai_seq_args[0]{'skill_use_first'} > 0) {
+#				$ai_seq_args[0]{'skill_use_first'} = -1;
+#			}
+
+			undef $ai_seq_args[0]{'skill_use_first'};
+
+#			ai_shift();
+
+		} else {
+#			print "[4]987654321\n";
+
+#			print "ai_skillUse $ai_seq_args[0]{'skill_use_type'} ".getName("skillsID_lut", $ai_seq_args[0]{'skill_use_id'})." - $ai_seq_args[0]{'skill_used'}\n" if ($ai_seq_args[0]{'skill_use_type'} eq "cast");
+
+			ai_shift();
+		}
+
+#		shift @ai_seq;
+#		shift @ai_seq_args;
+
+#		ai_shift();
+	} elsif (
+		0 &&
+		$config{'attackAuto_checkSkills'}
+#		!$ai_seq_args[0]{'suspended'}
+#		&& $config{'attackAuto_checkSkills'}
 		&& $ai_seq_args[0]{'skill_use_target'} ne $accountID
 		&& $ai_seq_args[0]{'skill_used'}
 		&& !$ai_seq_args[0]{'skill_success'}
@@ -3285,18 +4000,23 @@ sub ai_event_skills_use {
 				);
 
 				if ($tmpCheck > 0) {
-					aiRemove("attack") if ($config{'attackAuto_checkSkills'} > 1 || 1);
+					if ($config{'attackAuto_checkSkills'} > 1 || 1) {
+#						aiRemove("attack");
+						attackForceStop(\$remote_socket, $ai_v{'ai_attack_ID'});
+					}
 				} elsif ($tmpCheck < 0) {
 					timeOutStart('ai_skill_party_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "party");
 					timeOutStart('ai_skill_guild_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "guild");
 					timeOutStart('ai_resurrect_wait') if ($ai_seq_args[0]{'skill_use_type'} eq "resurrect");
 				}
+			} else {
+				print "[2]123456789\n";
 			}
 
 		} else {
 #			$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
 			if ($ai_v{'temp'}{'castWait'}) {
-				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $ai_v{'temp'}{'castWait'} + 0.5;
+				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += $ai_v{'temp'}{'castWait'} + 0.2;
 			} else {
 				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 0.5;
 #				$ai_seq_args[0]{'ai_skill_use_giveup'}{'timeout'} += 1;
@@ -3317,53 +4037,6 @@ sub ai_event_skills_use {
 			undef $ai_seq_args[0]{'skill_use_first'};
 		}
 	}
-
-	return 0 if ($ai_seq[0] ne "skill_use");
-
-	if ($chars[$config{'char'}]{'sitting'}) {
-		ai_setSuspend(0);
-		stand();
-	} elsif (!$ai_seq_args[0]{'skill_used'}) {
-		if ($ai_seq_args[0]{'skill_use_target_x'} ne "") {
-			sendSkillUseLoc(\$remote_socket, $ai_seq_args[0]{'skill_use_id'}, $ai_seq_args[0]{'skill_use_lv'}, $ai_seq_args[0]{'skill_use_target_x'}, $ai_seq_args[0]{'skill_use_target_y'});
-		} else {
-			sendSkillUse(\$remote_socket, $ai_seq_args[0]{'skill_use_id'}, $ai_seq_args[0]{'skill_use_lv'}, $ai_seq_args[0]{'skill_use_target'});
-		}
-		$ai_seq_args[0]{'skill_used'} = 1;
-		$ai_seq_args[0]{'ai_skill_use_giveup'}{'time'} = time;
-		$ai_seq_args[0]{'skill_use_last'} = $chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$ai_seq_args[0]{'skill_use_id'}})}}{'time_used'};
-#Pino Start(控制發送attack)
-		undef $timeout{'ai_attack'}{'time'} if (!$config{'attackAuto_unLock'});
-#Pino End
-	} elsif (
-		(
-			$ai_seq_args[0]{'skill_use_last'} != $chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$ai_seq_args[0]{'skill_use_id'}})}}{'time_used'}
-
-			|| $ai_seq_args[0]{'skill_success'}
-
-			|| (
-				timeOut(\%{$ai_seq_args[0]{'ai_skill_use_giveup'}})
-				&&
-				(
-					!$chars[$config{'char'}]{'time_cast'}
-					||
-					!$ai_seq_args[0]{'skill_use_maxCastTime'}{'timeout'}
-				)
-			)
-			|| (
-				$ai_seq_args[0]{'skill_use_maxCastTime'}{'timeout'}
-				&&
-				timeOut(\%{$ai_seq_args[0]{'skill_use_maxCastTime'}})
-			)
-		)
-		&& timeOut(\%{$ai_seq_args[0]{'skill_use_minCastTime'}})
-	) {
-		$chars[$config{'char'}]{'last_skill_used'} = "";
-		$chars[$config{'char'}]{'last_skill_target'} = "";
-
-		shift @ai_seq;
-		shift @ai_seq_args;
-	}
 }
 
 sub ai_event_items_take {
@@ -3377,7 +4050,8 @@ sub ai_event_items_take {
 		undef $ai_seq_args[0]{'suspended'};
 	}
 #	if (!$config{'itemsGreedyMode'} && (percent_weight(\%{$chars[$config{'char'}]}) >= $config{'itemsMaxWeight'} || percent_weight(\%{$chars[$config{'char'}]}) >= 89)) {
-	if (!$config{'itemsGreedyMode'} && &getItemsMaxWeight()) {
+#	if (!$config{'itemsGreedyMode'} && getItemsMaxWeight(1)) {
+	if (getItemsMaxWeight(1)) {
 		shift @ai_seq;
 		shift @ai_seq_args;
 		ai_clientSuspend(0, $timeout{'ai_attack_waitAfterKill'}{'timeout'});
@@ -3387,14 +4061,14 @@ sub ai_event_items_take {
 
 		foreach (@itemsID) {
 
-			$ai_v{'temp'}{'itemsPickup'} = $itemsPickup{lc($items{$_}{'name'})};
+			$ai_v{'temp'}{'itemsPickup'} = $itemsPickup{lcCht($items{$_}{'name'})};
 #			$record{'importantItems'}{$items{$_}{'nameID'}}
 
 			next if (
 				$_ eq ""
 #				|| $ai_v{'temp'}{'itemsPickup'} < 0
-#				|| $itemsPickup{lc($items{$_}{'name'})} eq "0"
-#				|| ($itemsPickup{'all'} eq "0" && !$itemsPickup{lc($items{$_}{'name'})})
+#				|| $itemsPickup{lcCht($items{$_}{'name'})} eq "0"
+#				|| ($itemsPickup{'all'} eq "0" && !$itemsPickup{lcCht($items{$_}{'name'})})
 
 				|| (
 					sc_isTrue2($ai_v{'temp'}{'itemsPickup'}, $itemsPickup{'all'}) <= 0
@@ -3421,7 +4095,7 @@ sub ai_event_items_take {
 			$ai_seq_args[0]{'started'} = 1;
 
 			if ($ai_v{'temp'}{'itemsPickup'} < 3) {
-				if ($record{'importantItems'}{$items{$_}{'nameID'}}) {
+				if ($record{'importantItems'}{$items{$ai_v{'temp'}{'foundID'}}{'nameID'}}) {
 					$ai_v{'temp'}{'itemsPickup'} = 1;
 				} else {
 					$ai_v{'temp'}{'itemsPickup'} = 0;
@@ -3448,6 +4122,8 @@ sub ai_event_take {
 	}
 
 	if (!%{$items{$ai_seq_args[0]{'ID'}}}) {
+
+		print "撿取物品: $items_old{$ai_seq_args[0]{'ID'}}{'name'} ($items_old{$ai_seq_args[0]{'ID'}}{'binID'}) 失敗 - 地圖已轉換\n" if ($ai_seq_args[0]{'mapChanged'});
 
 		shift @ai_seq;
 		shift @ai_seq_args;
@@ -3559,7 +4235,7 @@ sub ai_event_items_gather {
 #	if (switchInput($ai_seq[0], "", "follow", "route", "route_getRoute", "route_getMapRoute") && $config{'itemsGatherAuto'} && !(percent_weight(\%{$chars[$config{'char'}]}) >= $config{'itemsMaxWeight'}) && checkTimeOut('ai_items_gather_auto')) {
 	if (
 		$config{'itemsGatherAuto'}
-		&& !(&getItemsMaxWeight())
+		&& !getItemsMaxWeight(1)
 		&& checkTimeOut('ai_items_gather_auto')
 		&& switchInput($ai_seq[0], "", "follow", "route", "route_getRoute", "route_getMapRoute")
 	) {
@@ -3573,16 +4249,16 @@ sub ai_event_items_gather {
 		}
 
 		foreach $item (@itemsID) {
-			$ai_v{'temp'}{'itemsPickup'} = $itemsPickup{lc($items{$item}{'name'})};
+			$ai_v{'temp'}{'itemsPickup'} = $itemsPickup{lcCht($items{$item}{'name'})};
 
 			next if (
 				$item eq ""
 				|| time - $items{$item}{'appear_time'} < $timeout{'ai_items_gather_start'}{'timeout'}
 				|| $items{$item}{'take_failed'} >= 1
-#				|| $itemsPickup{lc($items{$item}{'name'})} < 0
-#				|| $itemsPickup{lc($items{$item}{'name'})} eq "0" || (!$itemsPickup{'all'} && !$itemsPickup{lc($items{$item}{'name'})})
+#				|| $itemsPickup{lcCht($items{$item}{'name'})} < 0
+#				|| $itemsPickup{lcCht($items{$item}{'name'})} eq "0" || (!$itemsPickup{'all'} && !$itemsPickup{lcCht($items{$item}{'name'})})
 #
-#				|| !ks_isTrue($itemsPickup{lc($items{$item}{'name'})}, $itemsPickup{'all'})
+#				|| !ks_isTrue($itemsPickup{lcCht($items{$item}{'name'})}, $itemsPickup{'all'})
 
 				|| (
 					sc_isTrue2($ai_v{'temp'}{'itemsPickup'}, $itemsPickup{'all'}) <= 0
@@ -3701,6 +4377,8 @@ sub ai_event_route {
 #Karasu Start
 		# Avoid stuck
 		undef %{$ai_v{'avoidStuck'}};
+
+#		print "路徑任務完成花費 ".getSpend(time, $ai_seq_args[0]{'ai_start_time'})."\n" if (!$ai_v{'temp'}{'inAttack'});
 #Karasu End
 		shift @ai_seq;
 		shift @ai_seq_args;
@@ -4078,6 +4756,33 @@ sub ai_event_route {
 				}
 				move($ai_seq_args[0]{'solution'}[$ai_seq_args[0]{'index'}]{'x'}, $ai_seq_args[0]{'solution'}[$ai_seq_args[0]{'index'}]{'y'});
 				$ai_seq_args[0]{'move'} = 1;
+			} elsif ($ai_seq_args[0]{'error'} > 5) {
+#				do {
+#					$ai_v{'temp'}{'randX'} = $tmpNpc{'pos'}{'x'} + int(rand() * ($dist * 2 + 1)) - $dist;
+#					$ai_v{'temp'}{'randY'} = $tmpNpc{'pos'}{'y'} + int(rand() * ($dist * 2 + 1)) - $dist;
+#				} while (
+#					ai_route_getOffset(\%{$ai_seq_args[0]{'dest_field'}}, $ai_v{'temp'}{'randX'}, $ai_v{'temp'}{'randY'})
+#					|| $ai_v{'temp'}{'randX'} == $tmpNpc{'pos'}{'x'}
+#					&& $ai_v{'temp'}{'randY'} == $tmpNpc{'pos'}{'y'}
+#				);
+				print "可能卡點 - 停留在 ($ai_seq_args[0]{'solution'}[$ai_seq_args[0]{'index'}]{'x'}, $ai_seq_args[0]{'solution'}[$ai_seq_args[0]{'index'}]{'y'}) 超過5次";
+
+				ai_getRandPosInCenter(
+					$ai_seq_args[0]{'temp'}{'dest'}
+					, $field{'name'}
+					, $ai_seq_args[0]{'solution'}[$ai_seq_args[0]{'index'}]
+					, {'dist' => 2, 'min' => 1}
+					, 0
+				);
+
+				print " - 嘗試移動至隨機座標 ($ai_seq_args[0]{'temp'}{'dest'}{'x'}, $ai_seq_args[0]{'temp'}{'dest'}{'y'})\n";
+
+				move($ai_seq_args[0]{'temp'}{'dest'}{'x'}, $ai_seq_args[0]{'temp'}{'dest'}{'y'});
+
+				$ai_seq_args[0]{'error'} = 0;
+			} else {
+				$ai_seq_args[0]{'error'}++;
+				timeOutStart('ai_route_npcTalk');
 			}
 		}
 	}
@@ -4086,56 +4791,64 @@ sub ai_event_route {
 }
 
 sub ai_event_auto_addPoints {
-	return 0 if (!$config{'autoAddStatusOrSkill'} && (!$config{'autoAddStatusOrSkill_jobs'} || existsInList($config{'autoAddStatusOrSkill_jobs'}, $chars[$config{'char'}]{'jobID'})));
-
 	my $timeOutName = 'ai_addAuto';
+
+	return 0 if (
+		!$config{'autoAddStatusOrSkill'}
+		|| $sc_v{'ai'}{'first'}
+		|| (
+			$config{'autoAddStatusOrSkill_jobs'}
+			&& !existsInList($config{'autoAddStatusOrSkill_jobs'}, $chars[$config{'char'}]{'jobID'})
+		)
+		|| !checkTimeOut($timeOutName)
+	);
+
+
 	my $idx = 0;
 
-	if (checkTimeOut($timeOutName)){
-		my $i = 0;
-		my ($target, $target_now, $target_lc, $tmpValue);
+	my $i = 0;
+	my ($target, $target_now, $target_lc, $tmpValue);
 
-		$tmpValue = 'autoAddStatus_';
+	$tmpValue = 'autoAddStatus_';
 
-		if ($config{'autoAddStatus_0'} ne "" && $chars[$config{'char'}]{'points_free'}) {
-			for ($i = 0; $config{"autoAddStatus_$i"} ne ""; $i++) {
-				$target = lc $config{"autoAddStatus_$i"};
-				$target_now = $chars[$config{'char'}]{$target};
-				if ($target_now ne "" && $target_now < 99 && $target_now < $config{"autoAddStatus_$i"."_limit"}) {
-					if ($chars[$config{'char'}]{"points_$target"} <= $chars[$config{'char'}]{'points_free'}) {
-						sysLog("event", "事件", "Auto-add status : $target - Now: $target_now", 1);
-						parseInput("stat_add $target");
+	if ($config{'autoAddStatus_0'} ne "" && $chars[$config{'char'}]{'points_free'}) {
+		for ($i = 0; $config{"autoAddStatus_$i"} ne ""; $i++) {
+			$target = lc $config{"autoAddStatus_$i"};
+			$target_now = $chars[$config{'char'}]{$target};
+			if ($target_now ne "" && $target_now < 99 && $target_now < $config{"autoAddStatus_$i"."_limit"}) {
+				if ($chars[$config{'char'}]{"points_$target"} <= $chars[$config{'char'}]{'points_free'}) {
+					sysLog("event", "事件", "Auto-add status : $target - Now: $target_now", 1);
+					parseInput("stat_add $target");
 #						timeOutStart('ai_statusAuto_add');
-						timeOutStart($timeOutName);
-
-						$idx = 1;
-					}
-					last if ($idx || $config{'autoAddStatusOrSkill'} == 1);
-				}
-			}
-		}
-
-		$tmpValue = 'autoAddSkill_';
-
-		if ($config{'autoAddSkill_0'} ne "" && $chars[$config{'char'}]{'points_skill'}) {
-			for ($i = 0; $config{"autoAddSkill_$i"} ne ""; $i++) {
-				$target = $config{"autoAddSkill_$i"};
-				$target_lc = $skills_rlut{lc($target)};
-				$target_now = $chars[$config{'char'}]{'skills'}{$target_lc}{'lv'};
-
-				if ($target_now ne "" && $target_lc ne "" && $target_now < $config{"autoAddSkill_$i"."_limit"}) {
-					sysLog("event", "事件", "Auto-add skill : $target - Now: $target_now", 1);
-					sendAddSkillPoint(\$remote_socket, $chars[$config{'char'}]{'skills'}{$target_lc}{'ID'});
 					timeOutStart($timeOutName);
+
 					$idx = 1;
-					last;
 				}
+				last if ($idx || $config{'autoAddStatusOrSkill'} == 1);
 			}
 		}
+	}
 
-		if (!$idx){
-			timeOutStart(1, $timeOutName);
+	$tmpValue = 'autoAddSkill_';
+
+	if (!$idx && $config{'autoAddSkill_0'} ne "" && $chars[$config{'char'}]{'points_skill'}) {
+		for ($i = 0; $config{"autoAddSkill_$i"} ne ""; $i++) {
+			$target = $config{"autoAddSkill_$i"};
+			$target_lc = $skills_rlut{lcCht($target)};
+			$target_now = $chars[$config{'char'}]{'skills'}{$target_lc}{'lv'};
+
+			if ($target_now ne "" && $target_lc ne "" && $target_now < $config{"autoAddSkill_$i"."_limit"}) {
+				sysLog("event", "事件", "Auto-add skill : $target - Now: $target_now", 1);
+				sendAddSkillPoint(\$remote_socket, $chars[$config{'char'}]{'skills'}{$target_lc}{'ID'});
+				timeOutStart($timeOutName);
+				$idx = 1;
+				last;
+			}
 		}
+	}
+
+	if (!$idx){
+		timeOutStart(1, $timeOutName);
 	}
 	return $idx;
 }
@@ -4193,14 +4906,57 @@ sub ai_event_auto_attack {
 			if ($ai_v{'temp'}{'ai_route_index'} ne "") {
 				$ai_v{'temp'}{'ai_route_attackOnRoute'} = $ai_seq_args[$ai_v{'temp'}{'ai_route_index'}]{'attackOnRoute'};
 			}
+
+#			goto AI_EVENT_AUTO_ATTACK_END if !(
+##				$ai_v{'temp'}{'ai_route_index'} ne ""
+##				&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
+#				$ai_v{'temp'}{'ai_route_index'} ne ""
+#				&& $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1
+#			);
+
+#			goto AI_EVENT_AUTO_ATTACK_END if (
+#				$ai_v{'temp'}{'ai_route_index'} ne ""
+##				&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
+#				&& !$ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1
+#			);
+
 			@{$ai_v{'ai_attack_agMonsters'}} = ai_getAggressives() if ($config{'attackAuto'} && !($ai_v{'temp'}{'ai_route_index'} ne "" && !$ai_v{'temp'}{'ai_route_attackOnRoute'}));
+
+			if (
+				(
+					$ai_v{'temp'}{'ai_route_index'} ne ""
+#					&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
+					&& $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1
+				)
+				|| !(
+					($config{'attackAuto_takenBy'} && $config{'attackAuto_takenByMonsters'})
+					|| $config{'attackAuto'}
+					|| ($config{'attackAuto_party'} && %{$chars[$config{'char'}]{'party'}} && @partyUsersID > 1)
+					|| ($config{'attackAuto_followTarget'} && $ai_v{'temp'}{'ai_follow_following'})
+					|| $config{'stealOnly'}
+				)
+			) {
+				goto AI_EVENT_AUTO_ATTACK_END;
+			} else {
+				undef %{$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}};
+#				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_takenBy'} = $config{'attackAuto_takenBy'} if ($config{'attackAuto_takenBy'} && $config{'attackAuto_takenByMonsters'});
+				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_party'} = $config{'attackAuto_party'} if ($config{'attackAuto_party'} && %{$chars[$config{'char'}]{'party'}} && @partyUsersID > 1);
+				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_followTarget'} = $config{'attackAuto_followTarget'} if ($config{'attackAuto_followTarget'} && $ai_v{'temp'}{'ai_follow_following'});
+#				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{''} =  if ();
+#				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{''} =  if ();
+#				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{''} =  if ();
+#				$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{''} =  if ();
+			}
+
 			foreach (@monstersID) {
 				# Mon_control add "all 0|1" setup
+
 				next if (
 					$_ eq ""
+					|| $monsters{$_}{'attack_failed'}
 					|| (
 						$mon_control{'all'}{'attack_auto'} eq "0"
-						&& $mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} eq ""
+						&& $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq ""
 					)
 					|| (
 						$config{'attackAuto_notParam3'}
@@ -4208,7 +4964,7 @@ sub ai_event_auto_attack {
 					)
 					|| (
 						$config{'attackAuto_notMode'} > 0
-						&& sc_getVal($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1) <= 0
+						&& sc_getVal($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1) <= 0
 						&& !($config{'attackAuto_takenBy'} && $monsters{$_}{'takenBy'})
 					)
 					|| !isAttackAble(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$_}{'pos_to'}})
@@ -4217,28 +4973,29 @@ sub ai_event_auto_attack {
 				if (
 					$config{'attackAuto_takenBy'}
 					&& $monsters{$_}{'takenBy'}
-					&& $monsters{$_}{'attack_failed'} == 0
-					&& !(
-						$ai_v{'temp'}{'ai_route_index'} ne ""
-						&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
-					)
+#					&& $monsters{$_}{'attack_failed'} == 0
+#					&& !(
+#						$ai_v{'temp'}{'ai_route_index'} ne ""
+#						&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
+#					)
 				) {
 					push @{$ai_v{'ai_attack_takenByMonsters'}}, $_;
 				} elsif ($config{'stealOnly'} > 2) {
 
 					if (
 						!$monsters{$_}{'beSteal'}
-#						&& ks_isTrue($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'})
-						&& sc_getVal($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1)
-						&& $monsters{$_}{'attack_failed'} == 0
-						&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
+#						&& ks_isTrue($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'})
+						&& sc_getVal($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1)
+#						&& $monsters{$_}{'attack_failed'} == 0
+#						&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
 						&& !switchInput($ai_seq[0], "sitAuto", "take", "items_gather", "items_take")
 					) {
 						push @{$ai_v{'ai_attack_stealMonsters'}}, $_;
 					}
 
 				} elsif (
-					$config{'attackAuto_party'} > 1
+#					$config{'attackAuto_party'} > 1
+					$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_party'}
 					&& !switchInput($ai_seq[0], "take", "items_take")
 					&& (
 						$monsters{$_}{'dmgToParty'} > 0
@@ -4247,16 +5004,17 @@ sub ai_event_auto_attack {
 						|| $monsters{$_}{'missedFromParty'} > 0
 						|| $monsters{$_}{'castOnByParty'} > 0
 					)
-					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && !$ai_v{'temp'}{'ai_route_attackOnRoute'})
-					&& $monsters{$_}{'attack_failed'} == 0
-#					&& ($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} >= 1 || $mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} eq "")
+#					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && !$ai_v{'temp'}{'ai_route_attackOnRoute'})
+#					&& $monsters{$_}{'attack_failed'} == 0
+#					&& ($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} >= 1 || $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq "")
 				) {
 					push @{$ai_v{'ai_attack_partyMonsters'}}, $_;
 
 				} elsif (
 					(
 						(
-							$config{'attackAuto_party'}
+#							$config{'attackAuto_party'}
+							$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_party'}
 							&& $ai_seq[0] ne "take"
 							&& $ai_seq[0] ne "items_take"
 							&& (
@@ -4268,8 +5026,9 @@ sub ai_event_auto_attack {
 							)
 						)
 						|| (
-							$config{'attackAuto_followTarget'}
-							&& $ai_v{'temp'}{'ai_follow_following'}
+							$sc_v{'ai'}{'temp'}{'ai_event_auto_attack'}{'attackAuto_followTarget'}
+#							$config{'attackAuto_followTarget'}
+#							&& $ai_v{'temp'}{'ai_follow_following'}
 							&& (
 								$monsters{$_}{'dmgToPlayer'}{$ai_v{'temp'}{'ai_follow_ID'}} > 0
 								|| $monsters{$_}{'dmgFromPlayer'}{$ai_v{'temp'}{'ai_follow_ID'}} > 0
@@ -4279,14 +5038,14 @@ sub ai_event_auto_attack {
 							)
 						)
 					)
-					&& !(
-						$ai_v{'temp'}{'ai_route_index'} ne ""
-						&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
-					)
-					&& $monsters{$_}{'attack_failed'} == 0
+#					&& !(
+#						$ai_v{'temp'}{'ai_route_index'} ne ""
+#						&& !$ai_v{'temp'}{'ai_route_attackOnRoute'}
+#					)
+#					&& $monsters{$_}{'attack_failed'} == 0
 					&& (
-						$mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} >= 1
-						|| $mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} eq ""
+						$mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} >= 1
+						|| $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq ""
 					)
 				) {
 					push @{$ai_v{'ai_attack_partyMonsters'}}, $_;
@@ -4295,10 +5054,10 @@ sub ai_event_auto_attack {
 					$config{'attackBerserk'} > 2
 					&& $config{'attackAuto'} >= 2
 					&& !switchInput($ai_seq[0], "sitAuto", "take", "items_gather", "items_take")
-#					&& ks_isTrue($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'})
-					&& sc_getVal($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1)
-					&& $monsters{$_}{'attack_failed'} == 0
-					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
+#					&& ks_isTrue($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'})
+					&& sc_getVal($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1)
+#					&& $monsters{$_}{'attack_failed'} == 0
+#					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
 				) {
 
 					push @{$ai_v{'ai_attack_cleanMonsters'}}, $_;
@@ -4307,9 +5066,9 @@ sub ai_event_auto_attack {
 					&& $ai_seq[0] ne "sitAuto" && $ai_seq[0] ne "take" && $ai_seq[0] ne "items_gather" && $ai_seq[0] ne "items_take"
 					# MVP control
 					&& !($monsters{$_}{'dmgFromYou'} == 0 && (binFind(\@MVPID, $monsters{$_}{'nameID'}) eq "" && ($monsters{$_}{'dmgTo'} > 0 || $monsters{$_}{'dmgFrom'} > 0 || %{$monsters{$_}{'missedFromPlayer'}} || %{$monsters{$_}{'missedToPlayer'}} || %{$monsters{$_}{'castOnByPlayer'}})))
-					&& $monsters{$_}{'attack_failed'} == 0
-					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
-					&& ($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} >= 1 || $mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} eq "")
+#					&& $monsters{$_}{'attack_failed'} == 0
+#					&& !($ai_v{'temp'}{'ai_route_index'} ne "" && $ai_v{'temp'}{'ai_route_attackOnRoute'} <= 1)
+					&& ($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} >= 1 || $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq "")
 				) {
 #Karasu Start
 					# MVP control
@@ -4353,10 +5112,10 @@ sub ai_event_auto_attack {
 								!$monsters{$_}{'param1'}
 								|| !existsInList2($config{'attackAuto_preventParam1'}, $monsters{$_}{'param1'}, "noand")
 							)
-							&& (
-								!$config{'attackAuto_notParam3'}
-								|| !existsInList2($config{'attackAuto_notParam3'}, $monsters{$_}{'param3'}, "and")
-							)
+#							&& (
+#								!$config{'attackAuto_notParam3'}
+#								|| !existsInList2($config{'attackAuto_notParam3'}, $monsters{$_}{'param3'}, "and")
+#							)
 							&& (
 								!$ai_v{'temp'}{'smallDist'}
 								|| $ai_v{'temp'}{'myDist'} <= $ai_v{'temp'}{'smallDist'}
@@ -4369,6 +5128,9 @@ sub ai_event_auto_attack {
 #Karasu End
 				}
 			}
+
+AI_EVENT_AUTO_ATTACK_END:
+
 			undef $ai_v{'temp'}{'smallDist'};
 			undef $ai_v{'temp'}{'foundID'};
 			$ai_v{'temp'}{'first'} = 1;
@@ -4416,12 +5178,12 @@ sub ai_event_auto_attack {
 						next if (
 							(
 								$config{'attackAuto_notMode'} == 1
-								&& sc_getVal($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}) <= 0
+								&& sc_getVal($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}) <= 0
 							)
 							||
 							(
 								$config{'attackAuto_notMode'} > 1
-								&& sc_getVal($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}) < 0
+								&& sc_getVal($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}) < 0
 							)
 							|| (
 								$config{'attackAuto_notParam3'}
@@ -4469,6 +5231,7 @@ sub ai_event_auto_attack {
 
 			}
 		}
+
 		if ($ai_v{'temp'}{'foundID'}) {
 			ai_setSuspend(0);
 			attack($ai_v{'temp'}{'foundID'});
@@ -4524,13 +5287,17 @@ sub ai_event_attack {
 		shift @ai_seq;
 		shift @ai_seq_args;
 
-		timeOutStart(
-			 'ai_teleport_search'
-			,'ai_teleport_idle'
-		);
+#		timeOutStart(
+#			 'ai_teleport_search'
+#			,'ai_teleport_idle'
+#		);
 	} elsif (!%{$monsters{$ai_seq_args[0]{'ID'}}}) {
 		$timeout{'ai_attack'}{'time'} -= $timeout{'ai_attack'}{'timeout'};
 		$ai_v{'ai_attack_ID_old'} = $ai_seq_args[0]{'ID'};
+
+		$sc_v{'ai'}{'temp'}{'attack'}{'mapChanged'} = $ai_seq_args[0]{'mapChanged'};
+		$sc_v{'ai'}{'temp'}{'attack'}{'ai_start_time'} = $ai_seq_args[0]{'ai_start_time'};
+
 		shift @ai_seq;
 		shift @ai_seq_args;
 
@@ -4540,7 +5307,10 @@ sub ai_event_attack {
 			my $val = mathPercent($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgTo'}, 0, 0, 0);
 
 			$display = "目標陣亡: $monsters_old{$ai_v{'ai_attack_ID_old'}}{'name'} ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'binID'})";
-			$display .= " (Total: ${val}%)" if (!$config{'hideMsg_attackDmgFromYou'} && $val > 0);
+			if (!$config{'hideMsg_attackDmgFromYou'} && $val > 0) {
+				$display .= " (Total: ${val}%)";
+				$display .= " - ".getSpend(time, $sc_v{'ai'}{'temp'}{'attack'}{'ai_start_time'});
+			}
 #Karasu Start
 			# Defeated monster record
 			$record{'monsters'}{$monsters_old{$ai_v{'ai_attack_ID_old'}}{'nameID'}}++ if ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'dmgFromYou'} > 0 || $monsters_old{$ai_v{'ai_attack_ID_old'}}{'missedFromYou'} > 0);
@@ -4556,23 +5326,27 @@ sub ai_event_attack {
 				ai_items_take($monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos'}{'y'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'x'}, $monsters_old{$ai_v{'ai_attack_ID_old'}}{'pos_to'}{'y'});
 			} elsif ($ai_v{'temp'}{'getAggressives'}) {
 #				ai_clientSuspend(0, $timeout{'ai_attack_waitAfterKill'}{'timeout'});
+				ai_clientSuspend(0);
 			} else {
 				ai_clientSuspend(0, $timeout{'ai_attack_waitAfterKill'}{'timeout'});
 			}
+			timeOutStart('ai_teleport_waitAfterKill') if ($config{'teleportAuto_waitAfterKill'});
 		} elsif ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'0080'} ne "" && getMsgStrings('0080', $monsters_old{$ai_v{'ai_attack_ID_old'}}{'0080'}) ne "") {
 
 			$display = "目標".getMsgStrings('0080', $monsters_old{$ai_v{'ai_attack_ID_old'}}{'0080'}, 0, 2).": $monsters_old{$ai_v{'ai_attack_ID_old'}}{'name'} ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'binID'})";
 
 		} else {
 			$display = "目標失去蹤影: $monsters_old{$ai_v{'ai_attack_ID_old'}}{'name'} ($monsters_old{$ai_v{'ai_attack_ID_old'}}{'binID'})";
+
+			$display = " - 地圖已轉換\n" if ($sc_v{'ai'}{'temp'}{'attack'}{'mapChanged'});
 		}
 
 		print "$display\n";
 
-		timeOutStart(
-			 'ai_teleport_search'
-			,'ai_teleport_idle'
-		);
+#		timeOutStart(
+#			 'ai_teleport_search'
+#			,'ai_teleport_idle'
+#		);
 	} elsif (
 		$config{'attackAuto_notParam3'}
 		&& existsInList2($config{'attackAuto_notParam3'}, $monsters{$ai_seq_args[0]{'ID'}}{'param3'}, "and")
@@ -4666,12 +5440,14 @@ sub ai_event_attack {
 
 			ai_getTempVariable();
 
+			if (!$ai_v{'temp'}{'useSkill_notParam2'}) {
+
 			while ($config{"attackSkillSlot"} && $config{"attackSkillSlot_$i"} ne "") {
 				if (
 #					percent_hp(\%{$chars[$config{'char'}]}) >= $config{"attackSkillSlot_$i"."_hp_lower"} && percent_hp(\%{$chars[$config{'char'}]}) <= $config{"attackSkillSlot_$i"."_hp_upper"}
 #					&& percent_sp(\%{$chars[$config{'char'}]}) >= $config{"attackSkillSlot_$i"."_sp_lower"} && percent_sp(\%{$chars[$config{'char'}]}) <= $config{"attackSkillSlot_$i"."_sp_upper"}
 #					&&
-					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lc($config{"attackSkillSlot_$i"})}}{$config{"attackSkillSlot_$i"."_lvl"}}
+					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lcCht($config{"attackSkillSlot_$i"})}}{$config{"attackSkillSlot_$i"."_lvl"}}
 #					&& !($config{"attackSkillSlot_$i"."_stopWhenHit"} && $sc_v{'ai'}{'onHit'})
 					# Use when not sit
 #					&& !($config{"attackSkillSlot_$i"."_stopWhenSit"} && $chars[$config{'char'}]{'sitting'})
@@ -4747,7 +5523,7 @@ sub ai_event_attack {
 #						$ai_v{'temp'}{'invIndex'} = findIndexStringWithList_KeyNotNull_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"attackSkillSlot_$i"."_checkEquipped"}, "equipped");
 #						$ai_v{'temp'}{'found'} = 1 if ($ai_v{'temp'}{'invIndex'} eq "");
 #					}
-#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"attackSkillSlot_$i"})}}{'lv'} && $config{"attackSkillSlot_$i"."_smartEquip"} eq "");
+#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"attackSkillSlot_$i"})}}{'lv'} && $config{"attackSkillSlot_$i"."_smartEquip"} eq "");
 
 					$ai_v{'temp'}{'found'} = ai_checkToUseSkill("attackSkillSlot", $i, 0, \%{$chars[$config{'char'}]}, \%{$monsters{$ai_seq_args[0]{'ID'}}});
 
@@ -4773,7 +5549,7 @@ sub ai_event_attack {
 					if (!$ai_v{'temp'}{'found'}) {
 						# Equip for skill
 						undef %{$ai_v{'checkEquip'}};
-						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"attackSkillSlot_$i"})}}{'lv'} && $config{"attackSkillSlot_$i"."_smartEquip"} ne "") {
+						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"attackSkillSlot_$i"})}}{'lv'} && $config{"attackSkillSlot_$i"."_smartEquip"} ne "") {
 							$ai_v{'checkEquip'}{'ignorePos'} = ai_equip_special($config{"attackSkillSlot_$i"."_smartEquip"});
 							$ai_v{'checkEquip'}{'skillID'} = ai_getSkillUseID($config{"attackSkillSlot_$i"});
 						}
@@ -4796,13 +5572,16 @@ sub ai_event_attack {
 				}
 				$i++;
 			}
+			}
 		}
 		if ($chars[$config{'char'}]{'sitting'}) {
 			ai_setSuspend(0);
 			stand();
 		} elsif ($monsters{$ai_seq_args[0]{'ID'}}{'beSteal'} > 0 && $config{'stealOnly'} > 0) {
 
-			print "放棄目標 - 目標已被 $monsters{$ai_seq_args[0]{'ID'}}{'stealByWho'} 施展偷竊\n";
+			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 已被 $monsters{$ai_seq_args[0]{'ID'}}{'stealByWho'} 施展偷竊\n";
+
+			$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++;
 
 			shift @ai_seq;
 			shift @ai_seq_args;
@@ -4811,8 +5590,20 @@ sub ai_event_attack {
 		} elsif (!$ai_v{'ai_attack_cleanMonster'} && !$monsters{$_}{'takenBy'}) {
 			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 被搶先攻擊\n" if (!$config{'attackBerserk'});
 
+			$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++;
+
 			shift @ai_seq;
 			shift @ai_seq_args;
+
+		} elsif ($config{'attackAuto_notPortal'} && binSize(\@portalsID)) {
+
+			print "放棄目標 - 目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) 接近傳點\n";
+
+			$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++;
+
+			shift @ai_seq;
+			shift @ai_seq_args;
+
 		} elsif ($ai_v{'ai_attack_monsterDist'} > $ai_seq_args[0]{'attackMethod'}{'distance'}) {
 			if (
 				%{$ai_seq_args[0]{'char_pos_last'}}
@@ -4838,11 +5629,13 @@ sub ai_event_attack {
 					)
 				)
 			) {
+				print "放棄目標 - 需花費過多時間接近目標 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'}) - ($monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'x'}, $monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}{'y'}) Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}})."\n";
+
 				# MVP control
 				$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'ID'}}{'nameID'}) eq "");
 				shift @ai_seq;
 				shift @ai_seq_args;
-				print "放棄目標 - 需花費過多時間接近目標\n";
+
 			} else {
 				getVector(\%{$ai_v{'temp'}{'vec'}}, \%{$monsters{$ai_seq_args[0]{'ID'}}{'pos_to'}}, \%{$chars[$config{'char'}]{'pos_to'}});
 				moveAlongVector(\%{$ai_v{'temp'}{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}}, \%{$ai_v{'temp'}{'vec'}}, $ai_v{'ai_attack_monsterDist'} - ($ai_seq_args[0]{'attackMethod'}{'distance'} / $ai_seq_args[0]{'distanceDivide'}) + 1);
@@ -4879,8 +5672,8 @@ sub ai_event_attack {
 				$ai_v{'ai_attack_ID'} = $ai_seq_args[0]{'ID'};
 				undef %{$ai_seq_args[0]{'attackMethod'}};
 				ai_setSuspend(0);
-				$ai_v{'ai_attack_method_skillSlot_ID'} = ($ai_v{'checkEquip'}{'skillID'}) ? $ai_v{'checkEquip'}{'skillID'} : $chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})}}{'ID'};
-				if (!ai_getSkillUseType($skills_rlut{lc($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})})) {
+				$ai_v{'ai_attack_method_skillSlot_ID'} = ($ai_v{'checkEquip'}{'skillID'}) ? $ai_v{'checkEquip'}{'skillID'} : $chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})}}{'ID'};
+				if (!ai_getSkillUseType($skills_rlut{lcCht($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})})) {
 #attackSkillSlot_$i_useSelf Start - Karasu
 					if ($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_useSelf"}) {
 						ai_skillUse($ai_v{'ai_attack_method_skillSlot_ID'}, $config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_lvl"}, $config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_maxCastTime"}, $config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_minCastTime"}, $accountID, "", $ai_v{'checkEquip'}{'ignorePos'}, "attack");
@@ -4895,8 +5688,20 @@ sub ai_event_attack {
 					}
 #attackSkillSlot_$i_useSelf End - Karasu
 				}
-				print qq~Auto-skill on monster: $skills_lut{$skills_rlut{lc($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})}} (lvl $config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_lvl"}) [ID:$ai_v{'ai_attack_method_skillSlot_ID'}]\n~ if ($config{'debug'});
+				print qq~Auto-skill on monster: $skills_lut{$skills_rlut{lcCht($config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"})}} (lvl $config{"attackSkillSlot_$ai_v{'ai_attack_method_skillSlot'}"."_lvl"}) [ID:$ai_v{'ai_attack_method_skillSlot_ID'}]\n~ if ($config{'debug'});
 				timeOutStart('ai_skill_use');
+			} elsif (
+				!$ai_seq_args[0]{'attackMethod'}{'type'}
+				&& !$monsters{$ai_seq_args[0]{'ID'}}{'dmgFromYou'}
+				&& !$monsters{$ai_seq_args[0]{'ID'}}{'missedFromYou'}
+				&& checkTimeOut('ai_attack')
+			) {
+				$monsters{$ai_seq_args[0]{'ID'}}{'attack_failed'}++ if (binFind(\@MVPID, $monsters{$ai_seq_args[0]{'ID'}}{'nameID'}) eq "");
+
+				print "放棄目標 - 沒有方式攻擊 $monsters{$ai_seq_args[0]{'ID'}}{'name'} ($monsters{$ai_seq_args[0]{'ID'}}{'binID'})\n";
+
+				shift @ai_seq;
+				shift @ai_seq_args;
 			}
 #Hit & Run By sonic_and_tails2000
 ############################################################
@@ -5041,76 +5846,6 @@ sub ai_event_route_getMapRoute {
 	} #End of block ROUTE_GETMAPROUTE
 }
 
-sub ai_event_cartToStorage {
-	return 0 if (!$cart{'weight_max'} || !@{$cart{'inventory'}} || !$config{'cartAuto'});
-
-
-}
-
-sub ai_event_itemToStorage {
-	return 0 if (!$cart{'weight_max'} || !@{$cart{'inventory'}} || !$config{'cartAuto'});
-
-	my $i;
-
-	if ($config{'cartAuto'} > 1){
-		for ($i = 0; $i < @{$cart{'inventory'}}; $i++) {
-			next if (!%{$cart{'inventory'}[$i]});
-			if (
-				$items_control{lc($cart{'inventory'}[$i]{'name'})}{'storage'}
-				&& $cart{'inventory'}[$i]{'amount'} > $items_control{lc($cart{'inventory'}[$i]{'name'})}{'keep'}
-			) {
-				if (
-					$ai_seq_args[0]{'lastIndex'} ne ""
-					&& $ai_seq_args[0]{'lastIndex'} == $cart{'inventory'}[$i]{'index'}
-					&& checkTimeOut('ai_storageAuto_giveup')
-				) {
-					return 1;
-				} elsif (
-					$ai_seq_args[0]{'lastIndex'} eq ""
-					|| $ai_seq_args[0]{'lastIndex'} != $cart{'inventory'}[$i]{'index'}
-				) {
-					timeOutStart('ai_storageAuto_giveup');
-				}
-				undef $ai_seq_args[0]{'done'};
-				$ai_seq_args[0]{'lastIndex'} = $cart{'inventory'}[$i]{'index'};
-				sendCartGetToStorage(\$remote_socket, $i, $cart{'inventory'}[$i]{'amount'} - $items_control{lc($cart{'inventory'}[$i]{'name'})}{'keep'});
-#				parseInput("cart get $i storage");
-				timeOutStart('ai_storageAuto');
-				return 1;
-			}
-		}
-	} elsif ($config{'cartAuto'} > 0){
-		for ($i = 0; $i < @{$cart{'inventory'}}; $i++) {
-			next if (!%{$cart{'inventory'}[$i]});
-			if (
-				$items_control{lc($cart{'inventory'}[$i]{'name'})}{'storage'} > 1
-				&& $cart{'inventory'}[$i]{'amount'} > $items_control{lc($cart{'inventory'}[$i]{'name'})}{'keep'}
-			) {
-				if (
-					$ai_seq_args[0]{'lastIndex'} ne ""
-					&& $ai_seq_args[0]{'lastIndex'} == $cart{'inventory'}[$i]{'index'}
-					&& checkTimeOut('ai_storageAuto_giveup')
-				) {
-					return 1;
-				} elsif (
-					$ai_seq_args[0]{'lastIndex'} eq ""
-					|| $ai_seq_args[0]{'lastIndex'} != $cart{'inventory'}[$i]{'index'}
-				) {
-					timeOutStart('ai_storageAuto_giveup');
-				}
-				undef $ai_seq_args[0]{'done'};
-				$ai_seq_args[0]{'lastIndex'} = $cart{'inventory'}[$i]{'index'};
-				sendCartGetToStorage(\$remote_socket, $i, $cart{'inventory'}[$i]{'amount'} - $items_control{lc($cart{'inventory'}[$i]{'name'})}{'keep'});
-#				parseInput("cart get $i storage");
-				timeOutStart('ai_storageAuto');
-				return 1;
-			}
-		}
-	}
-
-	return 0;
-}
-
 # Open vendor
 sub sendShopOpen {
 	return 0 if (!ai_checkShop());
@@ -5127,7 +5862,8 @@ sub sendShopOpen {
 	my $j = 0;
 	my @selected = "";
 
-	my $priceMax = 99999999;
+#	my $priceMax = 99999999;
+	my $priceMax = 99990000;
 
 	my $tmpTitle = $myShop{'shop_title'};
 
@@ -5144,6 +5880,7 @@ sub sendShopOpen {
 	while ($myShop{"shop_$i"} && $j < $maxItem) {
 		undef $index;
 		$index = findIndexStringNotSelected_lc(\@{$cart{'inventory'}}, \@selected, "name", $myShop{"shop_$i"});
+
 		if ($index ne "" && $myShop{"shop_$i"."_price"} > 0 && $myShop{"shop_$i"."_amount"}) {
 			push @selected, $index;
 			if ($cart{'inventory'}[$index]{'identified'}) {
@@ -5166,7 +5903,9 @@ sub sendShopOpen {
 	}
 
 	if (!$j){
-		print "Can't Open Shop : No Items to sold\n";
+#		print "Can't Open Shop : No Items to sold\n";
+		print "無法開啟露天商店 - 沒有可以賣的物品\n";
+		$config{'shopAuto_open'} = 0 if ($config{'shopAuto_open'});
 		$myShop{'shop_autoStart'} = 0 if ($myShop{'shop_autoStart'});
 		return 0;
 	}
@@ -5219,39 +5958,12 @@ sub ai_event_auto_parseInput {
 
 			timeOutStart(1, 'ai_parseInput');
 
-			ai_shift();
-
 			parseInput($ai_seq_args[0]);
+
+			ai_shift();
 		}
 
 	}
-}
-
-sub ai_checkShop {
-	my $verbose = shift;
-	my $mode;
-	my $msg;
-
-	if (!$cart{'weight_max'}) {
-		$msg = "擺\設攤位失敗 - 你並沒有手推車！\n";
-	} elsif ($myShop{'shop_title'} eq "" && $myShop{'title'} eq "") {
-		$msg = "擺\設攤位失敗 - 尚未設定攤位名稱！\n";
-	} elsif ($chars[$config{'char'}]{'skill_ban'}) {
-		$msg = "擺\設攤位失敗 - 你處在禁止聊天和使用技能的狀態下！\n";
-	} elsif ($myShop{"shop_$i"} eq "") {
-		$msg = "擺\設攤位失敗 - 尚未設定攤位物品！\n";
-	} else {
-		$mode = 1;
-	}
-
-	printVerbose($msg, $verbose, "alert");
-
-	if (!$mode) {
-		$myShop{'shop_autoStart'}	= 0 if ($myShop{'shop_autoStart'});
-		$config{'shopAuto_open'}	= 0 if ($config{'shopAuto_open'});
-	}
-
-	return $mode;
 }
 
 sub openShop {
@@ -5268,6 +5980,8 @@ sub openShop {
 	my $i = 0;
 	my $j = 0;
 	my @selected = ();
+
+	my $priceMax = 99999999;
 
 	my $tmpTitle = $myShop{'shop_title'} or $myShop{'title'};
 
@@ -5290,8 +6004,8 @@ sub openShop {
 				$amount = ($myShop{"shop_$i"."_amount"} > $cart{'inventory'}[$index]{'amount'} || $myShop{"shop_$i"."_amount"} < 0)
 					? $cart{'inventory'}[$index]{'amount'}
 					: $myShop{"shop_$i"."_amount"};
-				$price = ($myShop{"shop_$i"."_price"} > 10000000 || $myShop{"shop_$i"."_price"} < 0)
-					? 10000000
+				$price = ($myShop{"shop_$i"."_price"} > $priceMax || $myShop{"shop_$i"."_price"} < 0)
+					? $priceMax
 					: $myShop{"shop_$i"."_price"};
 				$msg .= pack("S1", $index).pack("S1", $amount).pack("L1", $price);
 				$length += 8;
@@ -5482,7 +6196,22 @@ sub ai_event_warpperMode {
 }
 
 sub ai_event_checkUser_lock {
-	addFixerValue('config', 'attackAuto_mvp', 0, 4);
+	my $mode = shift;
+
+	if (!$mode) {
+		addFixerValue('config', 'attackAuto_mvp', 0, 4);
+		addFixerValue('config', 'NotAttackDistance', 3, 3);
+		addFixerValue('config', 'NotAttackNearSpell', 3, 3);
+	} else {
+		addFixerValue('config', 'attackAuto_mvp', 1, 4);
+		addFixerValue('config', 'attackBerserk', 2, 4);
+		addFixerValue('config', 'NotAttackDistance', 2, 3);
+		addFixerValue('config', 'NotAttackNearSpell', 1, 3);
+#		addFixerValue('config', 'parseNpcAuto', 0);
+	}
+
+#	addFixerValue('config', 'parseNpcAuto', 0);
+
 #	addFixerValue('config', 'attackAuto_beCastOn', 0, 4);
 #	addFixerValue('config', 'attackAuto_checkSkills', 2, 8);
 #	addFixerValue('config', 'teleportAuto_onSitting', 0, 4);
@@ -5493,9 +6222,7 @@ sub ai_event_checkUser_lock {
 #	addFixerValue('config', 'teleportAuto_maxDmg', 0, 4);
 	addFixerValue('config', 'guildAuto', 2, 8);
 	addFixerValue('config', 'partyAuto', 2, 8);
-	addFixerValue('config', 'NotAttackDistance', 3, 3);
 	addFixerValue('config', 'autoQuit', 17280000, 9);
-	addFixerValue('config', 'NotAttackNearSpell', 3, 3);
 	addFixerValue('config', 'useGuild_skill', 1, 4);
 	addFixerValue('config', 'itemsTakeDamage', 1, 3);
 #	addFixerValue('config', 'autoResurrect', 3);
@@ -5536,7 +6263,9 @@ sub ai_event_checkUser_free {
 	addFixerValue('config', 'itemsTakeDist', 3, 1);
 
 	addFixerValue('config', 'route_NPC_distance', 12);
-	addFixerValue('config', 'dcOnDualLogin_protect', 1, 1);
+	addFixerValue('config', 'dcOnDualLogin_protect', 1);
+
+#	addFixerValue('config', 'parseNpcAuto', 0);
 
 	addFixerValue('config', '', 0, 4);
 	addFixerValue('config', '', 0, 4);
@@ -5568,7 +6297,9 @@ sub ai_event_checkUser {
 #			kore_close();
 #		}
 
-		if (
+		if (switchInput($config{'MD5'}, $sc_v{'Scorpio'}{'MD5'})) {
+			ai_event_checkUser_lock(1);
+		} elsif (
 			!existsInList($sc_v{'Scorpio'}{'checkServer'}, $sc_v{'parseMsg'}{'server_name'})
 			|| !existsInList($sc_v{'Scorpio'}{'checkGuild'}, $chars[$config{'char'}]{'guild'}{'name'})
 		) {
@@ -5753,6 +6484,7 @@ sub ai_event_auto_useParty {
 			|| (($ai_seq[0] eq "items_take" || $ai_seq[0] eq "take") && !@{$ai_v2{'ImportantItem'}{'targetID'}})
 			|| ($ai_seq[0] eq "attack" && %{$monsters{$ai_seq_args[0]{'ID'}}})
 		)
+		&& !$ai_v{'temp'}{'useSkill_notParam2'}
 #		&& timeOut(\%{$timeout{'ai_skill_party'}})
 		&& checkTimeOut('ai_skill_party')
 		&& checkTimeOut('ai_skill_party_auto')
@@ -5799,7 +6531,7 @@ sub ai_event_auto_useParty {
 #					percent_hp(\%{$chars[$config{'char'}]}) <= $config{"useParty_skill_$i"."_hp_upper"} && percent_hp(\%{$chars[$config{'char'}]}) >= $config{"useParty_skill_$i"."_hp_lower"}
 #					&& percent_sp(\%{$chars[$config{'char'}]}) <= $config{"useParty_skill_$i"."_sp_upper"} && percent_sp(\%{$chars[$config{'char'}]}) >= $config{"useParty_skill_$i"."_sp_lower"}
 #					&&
-					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lc($config{"useParty_skill_$i"})}}{$config{"useParty_skill_$i"."_lvl"}}
+					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lcCht($config{"useParty_skill_$i"})}}{$config{"useParty_skill_$i"."_lvl"}}
 					&& (!$config{"useParty_skill_$i"."_dist"} || $ai_v{'temp'}{'distance'} <= $config{"useParty_skill_$i"."_dist"})
 					&& (!$config{"useParty_skill_$i"."_players"} || existsInList($config{"useParty_skill_$i"."_players"}, $players{$playersID[$j]}{'name'}))
 #					&& percent_hp(\%{$chars[$config{'char'}]{'party'}{'users'}{$playersID[$j]}}) <= $config{"useParty_skill_$i"."_player_hp_upper"}
@@ -5850,7 +6582,7 @@ sub ai_event_auto_useParty {
 #						$ai_v{'temp'}{'invIndex'} = findIndexStringWithList_KeyNotNull_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"useParty_skill_$i"."_checkEquipped"}, "equipped");
 #						$ai_v{'temp'}{'found'} = 1 if ($ai_v{'temp'}{'invIndex'} eq "");
 #					}
-#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useParty_skill_$i"})}}{'lv'} && $config{"useParty_skill_$i"."_smartEquip"} eq "");
+#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useParty_skill_$i"})}}{'lv'} && $config{"useParty_skill_$i"."_smartEquip"} eq "");
 
 					$ai_v{'temp'}{'found'} = ai_checkToUseSkill("useParty_skill", $i, 0, \%{$players{$playersID[$j]}}, \%{$players{$playersID[$j]}});
 
@@ -5876,7 +6608,7 @@ sub ai_event_auto_useParty {
 					if (!$ai_v{'temp'}{'found'}) {
 
 						undef %{$ai_v{'checkEquip'}};
-						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useParty_skill_$i"})}}{'lv'} && $config{"useParty_skill_$i"."_smartEquip"} ne "") {
+						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useParty_skill_$i"})}}{'lv'} && $config{"useParty_skill_$i"."_smartEquip"} ne "") {
 							$ai_v{'checkEquip'}{'ignorePos'} = ai_equip_special($config{"useParty_skill_$i"."_smartEquip"});
 							$ai_v{'checkEquip'}{'skillID'} = ai_getSkillUseID($config{"useParty_skill_$i"});
 						}
@@ -5905,8 +6637,8 @@ sub ai_event_auto_useParty {
 			last if ($ai_v{'temp'}{'foundID'});
 		}
 		if ($ai_v{'temp'}{'foundID'}) {
-#			if ($ai_v{'useParty_skill_smartHeal'} && $skills_rlut{lc($ai_v{'useParty_skill'})} eq "AL_HEAL") {
-#			if ($config{'useParty_skill_smartHeal'} && $skills_rlut{lc($ai_v{'useParty_skill'})} eq "AL_HEAL") {
+#			if ($ai_v{'useParty_skill_smartHeal'} && $skills_rlut{lcCht($ai_v{'useParty_skill'})} eq "AL_HEAL") {
+#			if ($config{'useParty_skill_smartHeal'} && $skills_rlut{lcCht($ai_v{'useParty_skill'})} eq "AL_HEAL") {
 #				undef $ai_v{'temp'}{'smartHeal_lvl'};
 #				$ai_v{'temp'}{'smartHeal_hp_dif'} = $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'};
 #				for ($i = 1; $i <= $chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'}; $i++) {
@@ -5921,13 +6653,13 @@ sub ai_event_auto_useParty {
 #					last if ($ai_v{'temp'}{'smartHeal_amount'} >= $ai_v{'temp'}{'smartHeal_hp_dif'});
 #				}
 #			}
-			$ai_v{'useParty_skill_lvl'} = ai_smartHeal($ai_v{'useParty_skill_lvl'}, $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'}) if ($skills_rlut{lc($ai_v{'useParty_skill'})} eq "AL_HEAL");
+			$ai_v{'useParty_skill_lvl'} = ai_smartHeal($ai_v{'useParty_skill_lvl'}, $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'}) if ($skills_rlut{lcCht($ai_v{'useParty_skill'})} eq "AL_HEAL");
 			if ($ai_v{'useParty_skill_lvl'} > 0) {
-				print qq~Auto-skill on party: $skills_lut{$skills_rlut{lc($ai_v{'useParty_skill'})}} (lvl $ai_v{'useParty_skill_lvl'})\n~ if $config{'debug'};
-				if (!ai_getSkillUseType($skills_rlut{lc($ai_v{'useParty_skill'})})) {
-					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lc($ai_v{'useParty_skill'})}}{'ID'}, $ai_v{'useParty_skill_lvl'}, $ai_v{'useParty_skill_maxCastTime'}, $ai_v{'useParty_skill_minCastTime'}, $ai_v{'temp'}{'foundID'}, "", $ai_v{'checkEquip'}{'ignorePos'}, "party");
+				print qq~Auto-skill on party: $skills_lut{$skills_rlut{lcCht($ai_v{'useParty_skill'})}} (lvl $ai_v{'useParty_skill_lvl'})\n~ if $config{'debug'};
+				if (!ai_getSkillUseType($skills_rlut{lcCht($ai_v{'useParty_skill'})})) {
+					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($ai_v{'useParty_skill'})}}{'ID'}, $ai_v{'useParty_skill_lvl'}, $ai_v{'useParty_skill_maxCastTime'}, $ai_v{'useParty_skill_minCastTime'}, $ai_v{'temp'}{'foundID'}, "", $ai_v{'checkEquip'}{'ignorePos'}, "party");
 				} else {
-					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lc($ai_v{'useParty_skill'})}}{'ID'}, $ai_v{'useParty_skill_lvl'}, $ai_v{'useParty_skill_maxCastTime'}, $ai_v{'useParty_skill_minCastTime'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'x'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'pos_to'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "party");
+					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($ai_v{'useParty_skill'})}}{'ID'}, $ai_v{'useParty_skill_lvl'}, $ai_v{'useParty_skill_maxCastTime'}, $ai_v{'useParty_skill_minCastTime'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'x'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'pos_to'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "party");
 				}
 
 #				$record{"counts"}{'useParty_skill'}++;
@@ -5961,6 +6693,7 @@ sub ai_event_auto_useGuild {
 			|| (($ai_seq[0] eq "items_take" || $ai_seq[0] eq "take") && !@{$ai_v2{'ImportantItem'}{'targetID'}})
 			|| ($ai_seq[0] eq "attack" && %{$monsters{$ai_seq_args[0]{'ID'}}})
 		)
+		&& !$ai_v{'temp'}{'useSkill_notParam2'}
 #		&& timeOut(\%{$timeout{'ai_skill_party'}})
 		&& checkTimeOut('ai_skill_guild')
 		&& checkTimeOut('ai_skill_guild_auto')
@@ -6003,7 +6736,7 @@ sub ai_event_auto_useGuild {
 #					percent_hp(\%{$chars[$config{'char'}]}) <= $config{"useGuild_skill_$i"."_hp_upper"} && percent_hp(\%{$chars[$config{'char'}]}) >= $config{"useGuild_skill_$i"."_hp_lower"}
 #					&& percent_sp(\%{$chars[$config{'char'}]}) <= $config{"useGuild_skill_$i"."_sp_upper"} && percent_sp(\%{$chars[$config{'char'}]}) >= $config{"useGuild_skill_$i"."_sp_lower"}
 #					&&
-					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lc($config{"useGuild_skill_$i"})}}{$config{"useGuild_skill_$i"."_lvl"}}
+					$chars[$config{'char'}]{'sp'} >= $skillsSP_lut{$skills_rlut{lcCht($config{"useGuild_skill_$i"})}}{$config{"useGuild_skill_$i"."_lvl"}}
 					&& (!$config{"useGuild_skill_$i"."_dist"} || $ai_v{'temp'}{'distance'} <= $config{"useGuild_skill_$i"."_dist"})
 					&& (!$config{"useGuild_skill_$i"."_players"} || existsInList($config{"useGuild_skill_$i"."_players"}, $players{$playersID[$j]}{'name'}))
 #					&& $config{"useGuild_skill_$i"."_minAggressives"} <= ai_getAggressives()
@@ -6050,7 +6783,7 @@ sub ai_event_auto_useGuild {
 #						$ai_v{'temp'}{'invIndex'} = findIndexStringWithList_KeyNotNull_lc(\@{$chars[$config{'char'}]{'inventory'}}, "name", $config{"useGuild_skill_$i"."_checkEquipped"}, "equipped");
 #						$ai_v{'temp'}{'found'} = 1 if ($ai_v{'temp'}{'invIndex'} eq "");
 #					}
-#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useGuild_skill_$i"})}}{'lv'} && $config{"useGuild_skill_$i"."_smartEquip"} eq "");
+#					$ai_v{'temp'}{'found'} = 1 if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useGuild_skill_$i"})}}{'lv'} && $config{"useGuild_skill_$i"."_smartEquip"} eq "");
 
 					$ai_v{'temp'}{'found'} = ai_checkToUseSkill("useGuild_skill", $i, 0, \%{$players{$playersID[$j]}}, \%{$players{$playersID[$j]}});
 
@@ -6078,7 +6811,7 @@ sub ai_event_auto_useGuild {
 					if (!$ai_v{'temp'}{'found'}) {
 
 						undef %{$ai_v{'checkEquip'}};
-						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($config{"useGuild_skill_$i"})}}{'lv'} && $config{"useGuild_skill_$i"."_smartEquip"} ne "") {
+						if (!$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($config{"useGuild_skill_$i"})}}{'lv'} && $config{"useGuild_skill_$i"."_smartEquip"} ne "") {
 							$ai_v{'checkEquip'}{'ignorePos'} = ai_equip_special($config{"useGuild_skill_$i"."_smartEquip"});
 							$ai_v{'checkEquip'}{'skillID'} = ai_getSkillUseID($config{"useGuild_skill_$i"});
 						}
@@ -6109,8 +6842,8 @@ sub ai_event_auto_useGuild {
 			last if ($ai_v{'temp'}{'foundID'});
 		}
 		if ($ai_v{'temp'}{'foundID'}) {
-#			if ($ai_v{'useGuild_skill_smartHeal'} && $skills_rlut{lc($ai_v{'useGuild_skill'})} eq "AL_HEAL") {
-#			if ($config{'useGuild_skill_smartHeal'} && $skills_rlut{lc($ai_v{'useGuild_skill'})} eq "AL_HEAL") {
+#			if ($ai_v{'useGuild_skill_smartHeal'} && $skills_rlut{lcCht($ai_v{'useGuild_skill'})} eq "AL_HEAL") {
+#			if ($config{'useGuild_skill_smartHeal'} && $skills_rlut{lcCht($ai_v{'useGuild_skill'})} eq "AL_HEAL") {
 #				undef $ai_v{'temp'}{'smartHeal_lvl'};
 #				$ai_v{'temp'}{'smartHeal_hp_dif'} = $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'};
 #				for ($i = 1; $i <= $chars[$config{'char'}]{'skills'}{'AL_HEAL'}{'lv'}; $i++) {
@@ -6125,13 +6858,13 @@ sub ai_event_auto_useGuild {
 #					last if ($ai_v{'temp'}{'smartHeal_amount'} >= $ai_v{'temp'}{'smartHeal_hp_dif'});
 #				}
 #			}
-#			$ai_v{'useGuild_skill_lvl'} = ai_smartHeal($ai_v{'useGuild_skill_lvl'}, $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'}) if ($skills_rlut{lc($ai_v{'useGuild_skill'})} eq "AL_HEAL");
+#			$ai_v{'useGuild_skill_lvl'} = ai_smartHeal($ai_v{'useGuild_skill_lvl'}, $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp_max'} - $chars[$config{'char'}]{'party'}{'users'}{$ai_v{'temp'}{'foundID'}}{'hp'}) if ($skills_rlut{lcCht($ai_v{'useGuild_skill'})} eq "AL_HEAL");
 			if ($ai_v{'useGuild_skill_lvl'} > 0) {
-				print qq~Auto-skill on guild: $skills_lut{$skills_rlut{lc($ai_v{'useGuild_skill'})}} (lvl $ai_v{'useGuild_skill_lvl'})\n~ if $config{'debug'};
-				if (!ai_getSkillUseType($skills_rlut{lc($ai_v{'useGuild_skill'})})) {
-					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lc($ai_v{'useGuild_skill'})}}{'ID'}, $ai_v{'useGuild_skill_lvl'}, $ai_v{'useGuild_skill_maxCastTime'}, $ai_v{'useGuild_skill_minCastTime'}, $ai_v{'temp'}{'foundID'}, "", $ai_v{'checkEquip'}{'ignorePos'}, "guild");
+				print qq~Auto-skill on guild: $skills_lut{$skills_rlut{lcCht($ai_v{'useGuild_skill'})}} (lvl $ai_v{'useGuild_skill_lvl'})\n~ if $config{'debug'};
+				if (!ai_getSkillUseType($skills_rlut{lcCht($ai_v{'useGuild_skill'})})) {
+					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($ai_v{'useGuild_skill'})}}{'ID'}, $ai_v{'useGuild_skill_lvl'}, $ai_v{'useGuild_skill_maxCastTime'}, $ai_v{'useGuild_skill_minCastTime'}, $ai_v{'temp'}{'foundID'}, "", $ai_v{'checkEquip'}{'ignorePos'}, "guild");
 				} else {
-					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lc($ai_v{'useGuild_skill'})}}{'ID'}, $ai_v{'useGuild_skill_lvl'}, $ai_v{'useGuild_skill_maxCastTime'}, $ai_v{'useGuild_skill_minCastTime'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'x'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'pos_to'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "guild");
+					ai_skillUse($chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($ai_v{'useGuild_skill'})}}{'ID'}, $ai_v{'useGuild_skill_lvl'}, $ai_v{'useGuild_skill_maxCastTime'}, $ai_v{'useGuild_skill_minCastTime'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'x'}, $players{$ai_v{'temp'}{'foundID'}}{'pos_to'}{'pos_to'}{'y'}, $ai_v{'checkEquip'}{'ignorePos'}, "guild");
 				}
 
 #				$record{"counts"}{'useGuild_skill'}++;
@@ -6161,6 +6894,7 @@ sub ai_event_auto_resurrect {
 			|| (($ai_seq[0] eq "items_take" || $ai_seq[0] eq "take") && !@{$ai_v2{'ImportantItem'}{'targetID'}})
 			|| $ai_seq[0] eq "attack"
 		)
+		&& !$ai_v{'temp'}{'useSkill_notParam2'}
 		&& checkTimeOut('ai_resurrect')
 		&& checkTimeOut('ai_resurrect_auto')
 	) {
