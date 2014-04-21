@@ -174,7 +174,7 @@ EOM
 
 close(FILE);
 
-print `perl Scorpio-Backup.pl`;
+print `perl Scorpio-Backup.pl --hide`;
 
 print "\t§¹¦¨.";
 
