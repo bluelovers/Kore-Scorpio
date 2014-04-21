@@ -146,7 +146,7 @@ if ($sc_v{'guild'} && 0) {
 
 my $tmp = "--icon $make{'icon'} --info CompanyName=$make{'CompanyName'};FileDescription=$make{'FileDescription'};LegalCopyright=$make{'LegalCopyright'};LegalTrademarks=$make{'LegalTrademarks'};FileVersion=$make{'FileVersion'};InternalName=$make{'InternalName'};OriginalFilename=$make{'OriginalFilename'};ProductName=$make{'ProductName'};ProductVersion=$make{'ProductVersion'} --force -o=$make{'output'} $make{'input'}";
 
-#$tmp = "--xclude $tmp";
+$tmp = "--xclude $tmp";
 
 print ".\n".("-"x79)."\n";
 
