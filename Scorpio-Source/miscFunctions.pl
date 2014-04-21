@@ -31,6 +31,8 @@ sub initConnectVars {
 
 	undef %{$chars[$config{'char'}]{'guild'}{'users'}};
 
+	$sc_v{'ai'}{'first'} = 1;
+
 	# Reset attackSkillslot/useSelf_skill/useSelf_item timeout
 	resetTimeout();
 #Ayon End
@@ -65,6 +67,10 @@ sub initMapChangeVars {
 		'ai_resurrect_wait',
 		'ai_warpTo_wait'
 	);
+
+	undef %{$chars[$config{'char'}]{'useSelf_skill_uses'}};
+
+	undef $chars[$config{'char'}]{'last_skill_used'};
 
 	undef $ai_v{'temp'}{'inPortal'};
 
@@ -393,7 +399,10 @@ sub updateDamageTables {
 			} elsif ($monsters{$ID2}{'param1'}) {
 				$monsters{$ID2}{'param1'} = 0;
 			}
-			if (binFind(\@MVPID, $monsters{$ID2}{'nameID'}) ne "") {
+			if (
+				binFind(\@MVPID, $monsters{$ID2}{'nameID'}) ne ""
+				|| ($config{'recordMonsterInfo_mvp'} > 1 && binFind(\@RMID, $monsters{$ID2}{'nameID'}) ne "")
+			) {
 				$record{'mvp'}{$monsters{$ID2}{'nameID'}}{'dmgTo'}{'time'} = time;
 				$record{'mvp'}{$monsters{$ID2}{'nameID'}}{'dmgTo'}{'map'} += $damage;
 			}
@@ -417,7 +426,10 @@ sub updateDamageTables {
 			}
 			timeOutStart('ai_event_onHit');
 
-			if (binFind(\@MVPID, $monsters{$ID1}{'nameID'}) ne "") {
+			if (
+				binFind(\@MVPID, $monsters{$ID1}{'nameID'}) ne ""
+				|| ($config{'recordMonsterInfo_mvp'} > 1 &&  binFind(\@RMID, $monsters{$ID1}{'nameID'}) ne "")
+			) {
 				$record{'mvp'}{$monsters{$ID1}{'nameID'}}{'dmgFrom'}{'time'} = time;
 				$record{'mvp'}{$monsters{$ID1}{'nameID'}}{'dmgFrom'}{'map'} += $damage;
 			}
@@ -515,6 +527,8 @@ sub updateDamageTables {
 				$monsters{$ID2}{'dmgFromParty'} += $damage;
 				$monsters{$ID1}{'missedFromParty'}++ if ($damage == 0);
 			}
+
+#			print "getPlayerType $players{$accountID}{'name'} = ".getPlayerType($accountID, -1, 0, 2)."\n";
 		}
 	}
 }
@@ -724,11 +738,13 @@ sub avoidStuck {
 		$isStuck = 1;
 	}
 	if ($isStuck) {
-		aiRemove("move");
-		aiRemove("route");
-		aiRemove("route_getRoute");
-		aiRemove("route_getMapRoute");
-		ai_clientSuspend(0, 5);
+#		aiRemove("move");
+#		aiRemove("route");
+#		aiRemove("route_getRoute");
+#		aiRemove("route_getMapRoute");
+#		ai_clientSuspend(0, 5);
+
+		ai_route_clear();
 
 		if ($isStuck == 3 || ($isStuck == 2 && $map_control{lc($field{'name'})}{'teleport_allow'} != 1)) {
 			print "◆可能卡點: 似乎無法以 瞬間移動解決, 採取最後手段 重新載入DLL檔！\n";
@@ -791,14 +807,14 @@ sub getImportantItems {
 	my $name	= $items{$ID}{'name'};
 	my $nameID	= $items{$ID}{'nameID'};
 	my $tmpVal	= $record{'importantItems'}{$nameID};
-	my $tmpPick	= $itemsPickup{lc($items{$ID}{'name'})};
+	my $tmpPick	= $itemsPickup{lc($name)};
 
 	if ($tmpPick >= 3) {
 #		$found = 3;
 		$found = $tmpPick;
 	} elsif ($tmpVal > 0){
 		$found = 2;
-	} elsif ($tmpVal < 0 || ($tmpPick <= 0 && $tmpPick ne "")){
+	} elsif ($tmpVal <= -1 || ($tmpPick <= 1 && $tmpPick ne "")){
 		$found = 0;
 	} else {
 		$found = -1;
@@ -820,9 +836,12 @@ sub getImportantItems {
 			}
 			unshift @{$ai_v2{'ImportantItem'}{'targetID'}}, $ID;
 			$config{'attackAuto'} = 0;
-			sendAttackStop(\$remote_socket);
-			aiRemove("attack");
-			aiRemove("skill_use");
+#			sendAttackStop(\$remote_socket);
+#			aiRemove("attack");
+#			aiRemove("skill_use");
+
+			ai_attack_clear();
+
 			take($ID, $found);
 			sendTake(\$remote_socket, $ID);
 
@@ -850,9 +869,10 @@ sub getImportantItems {
 		}
 		unshift @{$ai_v2{'ImportantItem'}{'targetID'}}, $ID;
 		$config{'attackAuto'} = 0;
-		sendAttackStop(\$remote_socket);
-		aiRemove("attack");
-		aiRemove("skill_use");
+#		sendAttackStop(\$remote_socket);
+#		aiRemove("attack");
+#		aiRemove("skill_use");
+		ai_attack_clear();
 		take($ID, $found);
 		sendTake(\$remote_socket, $ID);
 
@@ -866,33 +886,15 @@ sub getImportantItems {
 #		chatLog("", "重要物品: $items{$ID}{'name'} $msg距離你 $dist格的地上, 立即撿取！", "ii");
 		sysLog("ii", "", "重要物品: $items{$ID}{'name'} $msg距離你 $dist格的地上, 立即撿取！");
 	}
-}
 
-sub importDynaLib {
-	undef $CalcPath_init;
-	undef $CalcPath_pathStep;
-	undef $CalcPath_destroy;
-
-	if (!$config{'buildType'}) {
-		$CalcPath_init = new Win32::API("Tools", "CalcPath_init", "PPNNPPN", "N");
-		die "Could not locate Tools.dll" if (!$CalcPath_init);
-
-		$CalcPath_pathStep = new Win32::API("Tools", "CalcPath_pathStep", "N", "N");
-		die "Could not locate Tools.dll" if (!$CalcPath_pathStep);
-
-		$CalcPath_destroy = new Win32::API("Tools", "CalcPath_destroy", "N", "V");
-		die "Could not locate Tools.dll" if (!$CalcPath_destroy);
-	} elsif ($config{'buildType'} == 1) {
-		$ToolsLib = new C::DynaLib("./Tools.so");
-
-		$CalcPath_init = $ToolsLib->DeclareSub("CalcPath_init", "L", "p","p","L","L","p","p","L");
-		die "Could not locate Tools.so" if (!$CalcPath_init);
-
-		$CalcPath_pathStep = $ToolsLib->DeclareSub("CalcPath_pathStep", "L", "L");
-		die "Could not locate Tools.so" if (!$CalcPath_pathStep);
-
-		$CalcPath_destroy = $ToolsLib->DeclareSub("CalcPath_destroy", "", "L");
-		die "Could not locate Tools.so" if (!$CalcPath_destroy);
+	if ($found > 0) {
+		timeOutStart(
+			'ai_teleport_idle'
+			, 'ai_teleport_search'
+			, 'ai_teleport_portal'
+			, 'teleportAuto_spell'
+			, 'teleportAuto_search_portal'
+		);
 	}
 }
 
