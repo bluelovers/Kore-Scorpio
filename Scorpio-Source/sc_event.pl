@@ -158,7 +158,7 @@ sub event_online {
 }
 
 sub event_chat {
-	my ($type, $uesr, $msg, $ID, $options) = @_;
+	my ($type, $user, $msg, $ID, $options) = @_;
 	my ($tag, $tag2, $display, $type_c);
 
 	my $c = " : ";
@@ -166,7 +166,7 @@ sub event_chat {
 	$type = lc $type;
 	$type_c = $type;
 
-	$uesr	= $uesr;
+	$user	= $user;
 	$msg	= $msg;
 
 	if ($type eq "p"){
@@ -176,10 +176,10 @@ sub event_chat {
 	} elsif ($type eq "s"){
 		$tag = "公告";
 
-		$uesr = $msg if ($user eq "");
-		$msg = $uesr if ($msg eq "");
+		$user = $msg if ($user eq "");
+		$msg = $user if ($msg eq "");
 
-		$uesr = $msg;
+		$user = $msg;
 		$msg = "";
 
 		undef $c;
@@ -212,10 +212,12 @@ sub event_chat {
 			}
 		}
 
-		$tag2 = "($tag2 $uesr)";
+		$tag2 = "($tag2 $user)";
 
 		undef $options;
 		undef $ID;
+		
+#		print "user = $user\n";
 	} else {
 		if ($currentChatRoom ne "") {
 			$tag = "聊天室";
@@ -226,12 +228,12 @@ sub event_chat {
 		}
 
 		if (%{$players{$ID}}) {
-			$tag2 = "$uesr ($players{$ID}{'binID'})";
+			$tag2 = "$user ($players{$ID}{'binID'})";
 			$options = "(GID:".unpack("L1", $ID)."/".sprintf("%2d", $players{$ID}{'lv'})."等/".substr($jobs_lut{$players{$ID}{'jobID'}}, 0, 4)."/$sex_lut{$players{$ID}{'sex'}}/".sprintf("%2d", int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$players{$ID}{'pos_to'}})))."格)";
 		}
 	}
 
-	$tag2 = $uesr if (!$tag2);
+	$tag2 = $user if (!$tag2);
 	$tag2 = "$options $tag2" if ($options);
 
 	$display = "${tag2}${c}${msg}" if (!$display);
@@ -242,12 +244,20 @@ sub event_chat {
 	sysLog($type, $tag, $display);
 
 	if (!switchInput($type, "s")) {
-		if ($config{'autoAdmin'}) {
+#		print "user = $user\n";
+		
+		if ($config{'autoAdmin'} && $user ne $chars[$config{'char'}]{'name'}) {
+			
+#			print "user = $user\n";
+			
 			$ai_cmdQue[$ai_cmdQue]{'type'}	= $type;
 			$ai_cmdQue[$ai_cmdQue]{'ID'}	= $ID;
 			$ai_cmdQue[$ai_cmdQue]{'user'}	= $user;
 			$ai_cmdQue[$ai_cmdQue]{'msg'}	= $msg;
 			$ai_cmdQue[$ai_cmdQue]{'time'}	= time;
+			
+#			print "$ai_cmdQue[$ai_cmdQue]{'user'} = $user\n$ai_cmdQue[$ai_cmdQue]{'msg'} = $msg\n";
+			
 			$ai_cmdQue++;
 		}
 
@@ -262,7 +272,7 @@ sub event_chat {
 
 #		$msg = uc $msg;
 
-		$msg = $uesr if (!$msg);
+		$msg = $user if (!$msg);
 
 		splitUseArray(\@array, $config{(switchInput($type, "s") ? 'dcOnSysWord' : 'dcOnChatWord')}, $seperate);
 
@@ -622,7 +632,13 @@ sub event_mvp {
 			$monsters{$ID}{'mvp'} = 1;
 
 			if (!$chars[$config{'char'}]{'mvp'}) {
-				attack($ID);
+				my $ai_index = binFind(\@ai_seq, "attack");
+				if ($ai_index ne "" && $ID ne $ai_seq_args[$ai_index]{'ID'}) {
+					attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'});
+					undef $ai_index;
+				}
+				
+				attack($ID) if ($ai_index eq "");
 			}
 #		} elsif (
 #			switchInput($switch, "0080")
@@ -685,7 +701,7 @@ sub event_spell {
 #			&& (!$config{"useCast_spell_$i"."_dist"} || $s_cDist < $config{"useCast_spell_$i"."_dist"})
 #			&& ($config{"useCast_spell_$i"."_inCity"} || !$cities_lut{$field{'name'}.'.rsw'})
 #		) {
-#
+#			
 #		}
 #		$i++;
 #	}
@@ -720,7 +736,7 @@ sub event_spell {
 					."◆啟動 teleportAuto_spell - 隨機移動！\n"
 					, "tele"
 				);
-				sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！");
+				sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！", 0, !$config{'recordEvent_escape'});
 
 				last;
 			} else {
@@ -735,7 +751,7 @@ sub event_spell {
 					."◆啟動 teleportAuto_spell - 瞬間移動！\n"
 					, "tele"
 				);
-				sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只有 $s_cDist格, 瞬間移動！");
+				sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只有 $s_cDist格, 瞬間移動！", 0, !$config{'recordEvent_escape'});
 
 			}
 		}
