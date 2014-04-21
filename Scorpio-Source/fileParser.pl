@@ -204,34 +204,73 @@ sub parseDataFile_lc {
 	close(FILE);
 }
 
+#sub parseDataFile2 {
+#	my $file = shift;
+#	my $r_hash = shift;
+#	undef %{$r_hash};
+#	my ($key, $value);
+#	open(FILE, $file);
+#	foreach (<FILE>) {
+#		next if (/^#/);
+##		s/[\r\n]//g;
+##		s/\s+$//g;
+#
+#		getString(\$_, 1);
+#
+#		($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
+##		$key =~ s/\s//g;
+#
+#		getString(\$key);
+#		getString(\$value);
+#
+#		if ($key eq "") {
+#			($key) = $_ =~ /([\s\S]*)$/;
+#			$key =~ s/\s//g;
+#		}
+#		if ($key ne "") {
+#			$$r_hash{$key} = $value;
+#		}
+#	}
+#	close(FILE);
+#}
+
 sub parseDataFile2 {
-	my $file = shift;
-	my $r_hash = shift;
+	my $file	= shift;
+	my $r_hash	= shift;
 	undef %{$r_hash};
-	my ($key, $value);
-	open(FILE, $file);
-	foreach (<FILE>) {
-		next if (/^#/);
-#		s/[\r\n]//g;
-#		s/\s+$//g;
+	my ($key, $value, $line);
 
-		getString(\$_, 1);
+	my $plus	= shift;
+	my @plus_file;
+	@plus_file = glob $plus if ($plus ne "");
 
-		($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
-#		$key =~ s/\s//g;
+	foreach $line ($file, @plus_file) {
 
-		getString(\$key);
-		getString(\$value);
+#		print "\n$line\n";
 
-		if ($key eq "") {
-			($key) = $_ =~ /([\s\S]*)$/;
-			$key =~ s/\s//g;
+		next unless (-e "$line");
+
+		open(FILE, $line);
+		foreach (<FILE>) {
+			next if (/^#/);
+
+			getString(\$_, 1);
+
+			($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
+
+			getString(\$key);
+			getString(\$value);
+
+			if ($key eq "") {
+				($key) = $_ =~ /([\s\S]*)$/;
+				$key =~ s/\s//g;
+			}
+			if ($key ne "") {
+				$$r_hash{$key} = $value;
+			}
 		}
-		if ($key ne "") {
-			$$r_hash{$key} = $value;
-		}
+		close(FILE);
 	}
-	close(FILE);
 }
 
 sub parseItemsControl {
@@ -784,7 +823,8 @@ sub load {
 				}
 			}
 		}
-		&{$$_{'function'}}("$$_{'file'}", $$_{'hash'});
+
+		&{$$_{'function'}}("$$_{'file'}", $$_{'hash'}, $$_{'plus'});
 	}
 
 	parseFixer();
@@ -963,13 +1003,15 @@ sub addParseFiles {
 	my $function	= shift;
 	my $desc	= shift;
 	my $quit	= shift;
+	my @plus	= @_;
 
 	my %t_hash = (
 		file		=> $file,
 		hash		=> $hash,
 		function	=> $function,
 		desc		=> $desc,
-		quit		=> $quit
+		quit		=> $quit,
+		plus		=> @plus
 	);
 
 	push @{$sc_v{'parseFiles'}}, \%t_hash;
