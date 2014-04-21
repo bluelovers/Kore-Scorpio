@@ -47,9 +47,9 @@ sub ai_getAggressives {
 	} else {
 
 		foreach (@monstersID) {
-			next if ($_ eq "" || ($mon_control{'all'}{'attack_auto'} eq "0" && $mon_control{lc($monsters{$_}{'name'})}{'attack_auto'} eq "") || $monsters_old{$_}{'disappeared'} || $monsters_old{$_}{'dead'});
+			next if ($_ eq "" || ($mon_control{'all'}{'attack_auto'} eq "0" && $mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'} eq "") || $monsters_old{$_}{'disappeared'} || $monsters_old{$_}{'dead'});
 			if (
-				ks_isTrue($mon_control{lc($monsters{$_}{'name'})}{'attack_auto'})
+				ks_isTrue($mon_control{lcCht($monsters{$_}{'name'})}{'attack_auto'})
 				&&
 				($monsters{$_}{'dmgToYou'} > 0 || $monsters{$_}{'missedYou'} > 0)
 				&& $monsters{$_}{'attack_failed'} <= 1
@@ -188,8 +188,8 @@ sub ai_sellAutoCheck {
 			|| $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne ""
 		);
 		if (
-			$items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'sell'}
-			&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
+			$items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'sell'}
+			&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
 		) {
 			return 1;
 		}
@@ -223,6 +223,7 @@ sub ai_skillUse {
 	my $y = shift;
 	my $ignorePos = shift;
 	my $type = shift;
+	my $retry = shift;
 	my %args;
 	$args{'ai_skill_use_giveup'}{'time'} = time;
 	$args{'ai_skill_use_giveup'}{'timeout'} = $timeout{'ai_skill_use_giveup'}{'timeout'};
@@ -234,6 +235,7 @@ sub ai_skillUse {
 	$args{'skill_use_minCastTime'}{'timeout'} = $minCastTime;
 
 	$args{'skill_use_type'} = $type;
+	$args{'skill_use_retry'} = $retry;
 
 	$args{'skill_use_first'} = 1;
 	$args{'skill_success'} = 0;
@@ -246,12 +248,16 @@ sub ai_skillUse {
 	}
 	$args{'skill_use_ignorePos'} = $ignorePos;
 
+#	print "ai_skillUse $args{'skill_use_type'}\n" if ($args{'skill_use_type'} eq "cast");
+
 	unshift @ai_seq, "skill_use";
 	unshift @ai_seq_args, \%args;
 	# Equip when skill use
-	my $ai_index_attack = binFind(\@ai_seq, "attack");
-	ai_equip($ai_index_attack, 0, 0);
-	timeOutStart('ai_equip_auto');
+	if ($config{'equipAuto'}) {
+		my $ai_index_attack = binFind(\@ai_seq, "attack");
+		ai_equip($ai_index_attack, 0, 0);
+		timeOutStart('ai_equip_auto');
+	}
 }
 
 #storageAuto for items_control - chobit andy 20030210
@@ -262,8 +268,8 @@ sub ai_storageAutoCheck {
 			|| $chars[$config{'char'}]{'inventory'}[$i]{'equipped'} ne ""
 		);
 		if (
-			$items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
-			&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lc($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
+			$items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'storage'}
+			&& $chars[$config{'char'}]{'inventory'}[$i]{'amount'} > $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$i]{'name'})}{'keep'}
 		) {
 			return 1;
 		}
@@ -291,7 +297,9 @@ sub attack {
 	%{$args{'pos_to'}} = %{$monsters{$ID}{'pos_to'}};
 	%{$args{'pos'}} = %{$monsters{$ID}{'pos'}};
 
-	$args{'takenBy'} = $modeEx;
+	$args{'ai_start_time'} = time;
+
+	$args{'takenBy'} = ($modeEx || $monsters{$ID}{'takenBy'});
 
 	unshift @ai_seq, "attack";
 	unshift @ai_seq_args, \%args;
@@ -315,25 +323,31 @@ sub attack {
 	timeOutStart(-1, 'ai_hitAndRun');
 	# Equip when attack
 #	if ($config{'autoSwitch'}){
+	if ($config{'equipAuto'}) {
 		ai_equip(0, "", 1);
 		timeOutStart('ai_equip_auto');
+	}
 #	}
 }
 
 # Stop attacking
 sub attackForceStop {
-	my $r_socket = shift;
-	my $ID = shift;
+	my $r_socket	= shift;
+	my $ID		= shift;
+	my $stop	= shift;
 	return if (binFind(\@ai_seq, "attack") eq "");
 
-	$tmp = "⊙停止攻擊目標: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})";
-	$tmp .= getTotal($accountID, $ID2) if (!$config{'hideMsg_attackDmgFromYou'});
-	$tmp .= " - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ID}{'pos_to'}});
+	if ($ID ne "" && %{$monsters{$ID}}) {
 
-	print "$tmp\n";
+		$tmp = "⊙停止攻擊目標: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})";
+		$tmp .= getTotal($accountID, $ID2) if (!$config{'hideMsg_attackDmgFromYou'});
+		$tmp .= " - Dist: ".distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$monsters{$ID}{'pos_to'}});
+
+		printC("$tmp\n");
+		sendAttackStop($r_socket) if ($config{'attackUseWeapon'});
+	}
 
 	aiRemove("attack");
-	sendAttackStop($r_socket);
 }
 
 sub aiRemove {
@@ -363,7 +377,7 @@ sub gather {
 	%{$args{'pos'}} = %{$items{$ID}{'pos'}};
 	unshift @ai_seq, "items_gather";
 	unshift @ai_seq_args, \%args;
-	print "Targeting for Gather: $items{$ID}{'name'} ($items{$ID}{'binID'})\n" if ($config{'debug'});
+	printC("Targeting for Gather: $items{$ID}{'name'} ($items{$ID}{'binID'})\n") if ($config{'debug'});
 
 #	sendTake(\$remote_socket, $ID);
 }
@@ -449,6 +463,9 @@ sub ai_equip {
 	my $ai_index_attack = shift;
 	my $ai_index_skill_use = shift;
 	my $checkDefaultWeapon = shift;
+
+#	print "ai_equip( $ai_index_attack , $ai_index_skill_use , $checkDefaultWeapon)\n";
+
 	my $prefix;
 	my ($i, $j, $k);
 	$i = 0;
@@ -684,7 +701,7 @@ sub handyMove {
 		$step_y = 0 - $step;
 	}
 
-	print "往$dir移動 $step 格, ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})." -> ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'} + $step_x, $chars[$config{'char'}]{'pos_to'}{'y'} + $step_y)."\n";
+	printC "往$dir移動 $step 格, ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'}, $chars[$config{'char'}]{'pos_to'}{'y'})." -> ".getFormattedCoords($chars[$config{'char'}]{'pos_to'}{'x'} + $step_x, $chars[$config{'char'}]{'pos_to'}{'y'} + $step_y)."\n";
 	$ai_v{'temp'}{'x'} = $chars[$config{'char'}]{'pos_to'}{'x'} + $step_x;
 	$ai_v{'temp'}{'y'} = $chars[$config{'char'}]{'pos_to'}{'y'} + $step_y;
 	if (abs($step_x) <= 15 && abs($step_y) <= 10) {
