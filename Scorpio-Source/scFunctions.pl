@@ -1913,13 +1913,13 @@ sub sysLog {
 
 		$title = "[$title] " if ($title ne "");
 
-		open CHAT, ">> $sc_v{'path'}{'def_logs'}${filename}";
-
-		foreach (@message) {
-			print CHAT "$tagTime$title$_\n";
-		}
-
-		close CHAT;
+#		open CHAT, ">> $sc_v{'path'}{'def_logs'}${filename}";
+#
+#		foreach (@message) {
+#			print CHAT "$tagTime$title$_\n";
+#		}
+#
+#		close CHAT;
 	}
 
 	if ($p) {
