@@ -198,7 +198,7 @@ sub parseDataFile_lc {
 
 		($key, $value) = $_ =~ /([\s\S]*) ([\s\S]*?)$/;
 		if ($key ne "" && $value ne "") {
-			$$r_hash{lc($key)} = $value;
+			$$r_hash{lcCht($key)} = $value;
 		}
 	}
 	close(FILE);
@@ -288,12 +288,17 @@ sub parseItemsControl {
 		getString(\$_);
 
 		($key, $args) = $_ =~ /([\s\S]+?) (\d+[\s\S]*)/;
-		@args = split / /, $args;
+#		@args = split / /, $args;
+
+		splitUseArray(\@args, $args, " ");
+
 		if ($key ne "") {
-			$$r_hash{lc($key)}{'keep'} = $args[0];
-			$$r_hash{lc($key)}{'storage'} = $args[1];
-			$$r_hash{lc($key)}{'sell'} = $args[2];
-			$$r_hash{lc($key)}{'cart'} = $args[3];
+			$key = lcCht($key);
+
+			$$r_hash{$key}{'keep'} = $args[0];
+			$$r_hash{$key}{'storage'} = $args[1];
+			$$r_hash{$key}{'sell'} = $args[2];
+			$$r_hash{$key}{'cart'} = $args[3];
 		}
 	}
 	close(FILE);
@@ -314,8 +319,11 @@ sub parseNPCs {
 
 		getString(\$_, 1);
 
-		@args = split /\s/, $_;
-		if (@args > 4) {
+#		@args = split /\s/, $_;
+
+		splitUseArray(\@args, $_, " ");
+
+		if (@args >= 4) {
 			$$r_hash{$args[0]}{'map'} = $args[1];
 			$$r_hash{$args[0]}{'pos'}{'x'} = $args[2];
 			$$r_hash{$args[0]}{'pos'}{'y'} = $args[3];
@@ -323,7 +331,12 @@ sub parseNPCs {
 			for ($i = 5; $i < @args; $i++) {
 				$string .= " $args[$i]";
 			}
+
+			$string = "<none>" if ($string eq "");
+
 			$$r_hash{$args[0]}{'name'} = $string;
+
+#			print "$args[0] $args[1] $args[2] $args[3] $string = @args\n";
 		}
 	}
 	close(FILE);
@@ -343,13 +356,20 @@ sub parseMonControl {
 		getString(\$_);
 
 		($key, $args) = $_ =~ /([\s\S]+?) (-?\d+[\s\S]*)/;
-		@args = split / /, $args;
+#		@args = split / /, $args;
+
+		splitUseArray(\@args, $args, " ");
+
 		if ($key ne "") {
-			$$r_hash{lc($key)}{'attack_auto'} = $args[0];
-			$$r_hash{lc($key)}{'teleport_auto'} = $args[1];
-			$$r_hash{lc($key)}{'teleport_search'} = $args[2];
-			$$r_hash{lc($key)}{'teleport_extra'} = $args[3];
-			$$r_hash{lc($key)}{'teleport_extra2'} = $args[4];
+			$key = lcCht($key);
+
+			$$r_hash{$key}{'attack_auto'} = $args[0];
+			$$r_hash{$key}{'teleport_auto'} = $args[1];
+			$$r_hash{$key}{'teleport_search'} = $args[2];
+			$$r_hash{$key}{'teleport_extra'} = $args[3];
+			$$r_hash{$key}{'teleport_extra2'} = $args[4];
+
+#			print "$key, [$$r_hash{lcCht($key)}{'attack_auto'}], [$$r_hash{lcCht($key)}{'teleport_auto'}], [$$r_hash{lcCht($key)}{'teleport_search'}], [$$r_hash{lcCht($key)}{'teleport_extra'}], [$$r_hash{lcCht($key)}{'teleport_extra2'}]\n";
 		}
 	}
 	close(FILE);
@@ -595,26 +615,65 @@ sub parseResponses {
 	close(FILE);
 }
 
+#sub parseROLUT {
+#	my $file = shift;
+#	my $r_hash = shift;
+#	undef %{$r_hash};
+#	my @stuff;
+#	open(FILE, $file);
+#	foreach (<FILE>) {
+#		s/\r//g;
+#		next if /^\/\//;
+#		@stuff = split /#/, $_;
+##Karasu Start
+##		$stuff[1] =~ s/_/ /g;
+#		# Avoid display errors
+#		replaceUnderToSpace(\$stuff[1]);
+##Karasu End
+#		if ($stuff[0] ne "" && $stuff[1] ne "") {
+#			$$r_hash{$stuff[0]} = $stuff[1];
+#		}
+#	}
+#	close(FILE);
+#}
+
 sub parseROLUT {
 	my $file = shift;
 	my $r_hash = shift;
 	undef %{$r_hash};
 	my @stuff;
-	open(FILE, $file);
-	foreach (<FILE>) {
-		s/\r//g;
-		next if /^\/\//;
-		@stuff = split /#/, $_;
-#Karasu Start
-#		$stuff[1] =~ s/_/ /g;
-		# Avoid display errors
-		replaceUnderToSpace(\$stuff[1]);
-#Karasu End
-		if ($stuff[0] ne "" && $stuff[1] ne "") {
-			$$r_hash{$stuff[0]} = $stuff[1];
+
+	my $plus	= shift;
+	my @plus_file;
+	my $line;
+	@plus_file = glob $plus if ($plus ne "");
+
+	foreach $line ($file, @plus_file) {
+
+#		print "\n$line\n";
+
+		next unless (-e "$line");
+
+		open(FILE, $line);
+
+		foreach (<FILE>) {
+#			s/\r//g;
+
+			getString(\$_, 1);
+
+			next if /^\/\//;
+			@stuff = split /#/, $_;
+	#Karasu Start
+	#		$stuff[1] =~ s/_/ /g;
+			# Avoid display errors
+			replaceUnderToSpace(\$stuff[1]);
+	#Karasu End
+			if ($stuff[0] ne "" && $stuff[1] ne "") {
+				$$r_hash{$stuff[0]} = $stuff[1];
+			}
 		}
+		close(FILE);
 	}
-	close(FILE);
 }
 
 sub parseRODescLUT {
@@ -651,6 +710,9 @@ sub parseROSlotsLUT {
 	my $ID;
 	open(FILE, $file);
 	foreach (<FILE>) {
+		getString(\$_, 1);
+		next if (/^\/\// || $_ eq "");
+
 		if (!$ID) {
 			($ID) = /(\d+)#/;
 		} else {
@@ -670,6 +732,8 @@ sub parseSkillsLUT {
 	open(FILE, $file);
 	$i = 1;
 	foreach (<FILE>) {
+		next if /^\/\//;
+
 		@stuff = split /#/, $_;
 #Karasu Start
 #		$stuff[1] =~ s/_/ /g;
@@ -693,6 +757,8 @@ sub parseSkillsIDLUT {
 	open(FILE, $file);
 	$i = 1;
 	foreach (<FILE>) {
+		next if /^\/\//;
+
 		@stuff = split /#/, $_;
 #Karasu Start
 #		$stuff[1] =~ s/_/ /g;
@@ -718,6 +784,8 @@ sub parseSkillsReverseLUT_lc {
 	open(FILE, $file);
 	$i = 1;
 	foreach (<FILE>) {
+		next if /^\/\//;
+
 		@stuff = split /#/, $_;
 #Karasu Start
 #		$stuff[1] =~ s/_/ /g;
@@ -725,7 +793,9 @@ sub parseSkillsReverseLUT_lc {
 		replaceUnderToSpace(\$stuff[1]);
 #Karasu End
 		if ($stuff[0] ne "" && $stuff[1] ne "") {
-			$$r_hash{lc($stuff[1])} = $stuff[0];
+			$$r_hash{lcCht($stuff[1])} = $stuff[0];
+
+#			print lcCht($stuff[1])." = ".lcCht($stuff[1])."\n" if (lcCht($stuff[1]) ne lcCht($stuff[1]));
 		}
 		$i++;
 	}
@@ -849,6 +919,8 @@ sub updateMonsterLUT {
 	open(FILE, ">> $file");
 	print FILE "$ID $name\n";
 	close(FILE);
+
+	sysLog("update", "怪物", "自動新增 $ID $name ", 1);
 }
 
 sub updatePortalLUT {
@@ -856,6 +928,8 @@ sub updatePortalLUT {
 	open(FILE, ">> $file");
 	print FILE "$src $x1 $y1 $dest $x2 $y2\n";
 	close(FILE);
+
+	sysLog("update", "傳點", "自動新增 $src $x1 $y1 $dest $x2 $y2", 1);
 }
 
 sub updateNPCLUT {
@@ -863,6 +937,8 @@ sub updateNPCLUT {
 	open(FILE, ">> $file");
 	print FILE "$ID $map $x $y $name \n";
 	close(FILE);
+
+	sysLog("update", "NPC", "自動新增 $ID $map $x $y $name ");
 }
 
 sub load {
@@ -878,8 +954,8 @@ sub load {
 				printC("Error:\tCouldn't load $$_{'file'}".(($$_{'desc'} eq "")?"":" : $$_{'desc'}")."\n", "error");
 
 				if ($$_{'quit'}) {
-					quit(1, 1);
 					printC("◇Please download the file \'$$_{'file'}\'\n", "WHITE");
+					quit(1, 1);
 				}
 			}
 		}
@@ -887,6 +963,7 @@ sub load {
 		&{$$_{'function'}}("$$_{'file'}", $$_{'hash'}, $$_{'plus'});
 	}
 
+	parseFixerEx();
 	parseFixer();
 	parseFixerEx();
 
@@ -903,6 +980,34 @@ sub load {
 		}
 
 		$itemsPickup{'all'} = 1 if ($itemsPickup{'all'} eq "");
+
+		if ($config{'teleportAuto_search'}) {
+			undef $sc_v{'ai'}{'temp'}{'found'};
+			$sc_v{'ai'}{'temp'}{'found'} = 0;
+
+			foreach (keys %mon_control) {
+				if ($mon_control{$_}{'teleport_search'}) {
+					$sc_v{'ai'}{'temp'}{'found'} = $config{'teleportAuto_search'};
+					last;
+				}
+			}
+
+			$config{'teleportAuto_search'} = $sc_v{'ai'}{'temp'}{'found'};
+		}
+
+		if ($config{'teleportAuto_away'}) {
+			undef $sc_v{'ai'}{'temp'}{'found'};
+			$sc_v{'ai'}{'temp'}{'found'} = 0;
+
+			foreach (keys %mon_control) {
+				if ($mon_control{$_}{'teleport_auto'}) {
+					$sc_v{'ai'}{'temp'}{'found'} = $config{'teleportAuto_away'};
+					last;
+				}
+			}
+
+			$config{'teleportAuto_away'} = $sc_v{'ai'}{'temp'}{'found'};
+		}
 
 	}
 
@@ -947,7 +1052,10 @@ sub parseMsgStrings {
 		getString(\$_);
 
 		next if /^\/\//;
-		@stuff = split /#/, $_;
+#		@stuff = split /#/, $_;
+
+		splitUseArray(\@stuff, $_, "\#");
+
 		if ($stuff[0] ne "" && $stuff[1] ne "" && $stuff[2] ne "") {
 			$$r_hash{$stuff[0]}{$stuff[1]} = $stuff[2];
 		}
@@ -1002,11 +1110,14 @@ sub parseMapControl {
 
 		getString(\$_);
 
-		($key, $args) = $_ =~ /([\s\S]+?) (\d+[\s\S]*)/;
+#		($key, $args) = $_ =~ /([\s\S]+?) (\d+[\s\S]*)/;
+
+		($key, $args) = $_ =~ /([\s\S]+?) (-?\d+[\s\S]*)/;
+
 		@args = split / /, $args;
 		if ($key ne "") {
-			$$r_hash{lc($key)}{'teleport_allow'} = $args[0];
-			$$r_hash{lc($key)}{'restrict_map'} = $args[1];
+			$$r_hash{lcCht($key)}{'teleport_allow'} = $args[0];
+			$$r_hash{lcCht($key)}{'restrict_map'} = $args[1];
 		}
 	}
 	close(FILE);
@@ -1133,6 +1244,7 @@ sub updateNPCLUTIntactEx {
 	my $data;
 	my $key;
 	my $string;
+	my $found;
 	open(FILE, $file);
 	foreach (<FILE>) {
 		if (/^#/ || $_ =~ /^\n/ || $_ =~ /^\r/) {
@@ -1142,33 +1254,49 @@ sub updateNPCLUTIntactEx {
 
 		getString(\$_, 1);
 
-		@args = split /\s/, $_;
-		if (@args > 4) {
+#		@args = split /\s/, $_;
+
+		splitUseArray(\@args, $_, " ");
+
+		if (@args >= 4) {
 			$string = $args[4];
 			for ($i = 5; $i < @args; $i++) {
 				$string .= " $args[$i]";
 			}
 
+			getString(\$args[1], 1);
+
 			if (
-				$npcs{$ID}{'nameID'} ne $args[0]
-				&& $npcs{$ID}{'map'} eq $args[1]
+#				$npcs{$ID}{'nameID'} ne $args[0]
+#				&&
+				$npcs{$ID}{'map'} eq $args[1]
 				&& $npcs{$ID}{'pos'}{'x'} == $args[2]
 				&& $npcs{$ID}{'pos'}{'y'} == $args[3]
 			) {
-				print "$args[0] $args[1] $args[2] $args[3] $string \n";
-				print "= $npcs{$ID}{'nameID'} $npcs{$ID}{'map'} $npcs{$ID}{'pos'}{'x'} $npcs{$ID}{'pos'}{'y'} $npcs{$ID}{'name'} \n";
+				if ($npcs{$ID}{'nameID'} ne $args[0]) {
+					$string = "<none>" if ($string eq "");
 
-				binRemove(\@npcsID, $args[0]);
-				undef %{$npcs{$args[0]}};
-				undef %{$npcs_lut{$args[0]}};
+#					print "$args[0] $args[1] $args[2] $args[3] $string "
+#						."= $npcs{$ID}{'nameID'} $npcs{$ID}{'map'} $npcs{$ID}{'pos'}{'x'} $npcs{$ID}{'pos'}{'y'} $npcs{$ID}{'name'} \n";
 
-				$args[0] = $npcs{$ID}{'nameID'};
-				$npcs_lut{$args[0]}{'map'} = $args[1];
-				$npcs_lut{$args[0]}{'pos'}{'x'} = $args[2];
-				$npcs_lut{$args[0]}{'pos'}{'y'} = $args[3];
-				$npcs_lut{$args[0]}{'name'} = $string;
+					binRemove(\@npcsID, $args[0]);
+					undef %{$npcs{$args[0]}};
+					undef %{$npcs_lut{$args[0]}};
 
-				$data .= "$npcs{$ID}{'nameID'} $args[1] $args[2] $args[3] $string";
+					$args[0] = $npcs{$ID}{'nameID'};
+					$key = ($config{'updateNPC'}?$npcs{$ID}{'nameID'}:"<auto>");
+
+					$npcs_lut{$args[0]}{'map'} = $args[1];
+					$npcs_lut{$args[0]}{'pos'}{'x'} = $args[2];
+					$npcs_lut{$args[0]}{'pos'}{'y'} = $args[3];
+					$npcs_lut{$args[0]}{'name'} = $string;
+
+					$data .= "$key $args[1] $args[2] $args[3] $string ";
+				} else {
+					$data .= $_;
+				}
+
+				$found = 1;
 			} else {
 				$data .= $_;
 			}
@@ -1198,6 +1326,18 @@ sub updateNPCLUTIntactEx {
 #		} else {
 #			$data .= $_;
 #		}
+	}
+
+	if (!$found) {
+		$key = ($config{'updateNPC'}?$npcs{$ID}{'nameID'}:"<auto>");
+		$data .= "$key $npcs{$ID}{'map'} $npcs{$ID}{'pos'}{'x'} $npcs{$ID}{'pos'}{'y'} $npcs{$ID}{'name'} \n";
+
+		undef %{$npcs_lut{$npcs{$ID}{'nameID'}}};
+
+		$npcs_lut{$npcs{$ID}{'nameID'}}{'map'} = $npcs{$ID}{'map'};
+		$npcs_lut{$npcs{$ID}{'nameID'}}{'pos'}{'x'} = $npcs{$ID}{'pos'}{'x'};
+		$npcs_lut{$npcs{$ID}{'nameID'}}{'pos'}{'y'} = $npcs{$ID}{'pos'}{'y'};
+		$npcs_lut{$npcs{$ID}{'nameID'}}{'name'} = $npcs{$ID}{'name'};
 	}
 
 	close(FILE);
@@ -1247,11 +1387,14 @@ sub convertGatField {
 sub dumpData {
 	my $msg		= shift;
 	my $mode	= shift;
+	my $isSend	= shift;
+	my $desc	= shift;
 	my $dump;
 	my $i;
 	my $switch = uc(unpack("H2", substr($msg, 1, 1))) . uc(unpack("H2", substr($msg, 0, 1)));
 
 	$dump = "\n\n================================================\n".getFormattedDate(int(time))."\n\nSwitch: ".$switch."\n\n".length($msg)." bytes\n\n";
+	$dump .= "DESC: $desc\n\n" if ($desc ne "");
 	for ($i=0; $i + 15 < length($msg);$i += 16) {
 		$dump .= getHex(substr($msg, $i,8))."    ".getHex(substr($msg, $i+8,8))."\n";
 	}
@@ -1261,11 +1404,15 @@ sub dumpData {
 		$dump .= getHex(substr($msg, $i,length($msg) - $i))."\n";
 	}
 
-	open(DUMP, ">> $sc_v{'path'}{'def_control_'}"."DUMP.txt");
+	my $file = "DUMP";
+	$file .= "_Send" if ($isSend);
+
+	open(DUMP, ">> $sc_v{'path'}{'def_control_'}${file}.txt");
 	print DUMP $dump;
 	close(DUMP);
 	print "$dump\n" if ($config{'debug'} >= 2 || $mode);
-	print "將封包內容傾印至: DUMP.txt！\n";
+	print "將封包[ $switch ]內容傾印至: ${file}.txt！\n";
+	print "DESC: $desc\n" if ($desc ne "");
 }
 
 #sub getField {
@@ -1314,6 +1461,9 @@ sub getField {
 	my ($i, $data);
 	my $alias;
 	undef %{$r_hash};
+
+	$file =~ s/ /_/g;
+
 	if ($file =~ /\//) {
 		($$r_hash{'name'}) = $file =~ /\/([\s\S]*)\./;
 	} else {
@@ -1326,7 +1476,8 @@ sub getField {
 		$file =~ s/$$r_hash{'name'}/$alias/;
 	}
 	if (!(-e $file)) {
-		print "無法載入地圖檔($file), 你必須安裝Kore Field Pack！\n\n";
+#		print "無法載入地圖檔($file), 你必須安裝Kore Field Pack！\n\n";
+		sysLog("error", "Field", "無法載入地圖檔($file), 你必須安裝Kore Field Pack！", 1);
 		return;
 	}
 #Karasu End
@@ -1458,6 +1609,336 @@ sub parseItemsPrices {
 		}
 	}
 	close(FILE);
+}
+
+sub parsePacketsFile {
+	my $file	= shift;
+	my $r_hash	= shift;
+	undef %{$r_hash};
+	my ($key, $value, $desc, $line);
+
+	open(FILE, $file);
+	foreach (<FILE>) {
+		next if (/^#/);
+
+		getString(\$_, 1);
+
+		$line = $_;
+		($key, $value) = $line =~ /^([\d\S]+) ([\d\S]+)/;
+		($desc) = $line =~ /^[\d\S]+ [\d\S]+ ([\s\S]*)$/;
+
+		$key =~ s/\s//g;
+		$desc =~ s/^\s+//g;
+
+		getString(\$value, 1);
+
+		if ($key eq "") {
+			($key) = $_ =~ /([\s\S]*)$/;
+			$key =~ s/\s//g;
+
+			getString(\$key, 1);
+		}
+		if ($key ne "") {
+			$$r_hash{$key} = $value;
+#			print "$key = $value\n";
+		}
+	}
+	close(FILE);
+}
+
+sub parseDataFile2_new {
+	my $file = shift;
+	my $r_hash = shift;
+	undef %{$r_hash};
+	my ($key, $value, $inBlock, $commentBlock, %blocks);
+
+	my $plus	= shift;
+	my @plus_file;
+	my $line;
+	@plus_file = glob $plus if ($plus ne "");
+
+	foreach $line ($file, @plus_file) {
+
+#		print "\n$line\n";
+
+		next unless (-e "$line");
+
+		open(FILE, $line);
+		foreach (<FILE>) {
+			next if (/^\s*\#/ || /^\s*[\r\n]/);
+			s/\s*$//;
+			s/^\s*//;
+
+			getString(\$_, 1);
+
+			next if ($_ eq "");
+
+			if (!defined $commentBlock && /^\/\*/) {
+				$commentBlock = 1;
+
+			} elsif (defined $commentBlock) {
+				undef $commentBlock if (/\*\/$/);
+
+			} elsif (!defined $inBlock && /\s+{$/) {
+				s/\s+{$//;
+				next if ($_ eq "");
+				($key, $value) = $_ =~ /^(.*?)(?:\s+(.*))?$/;
+
+				getString(\$value, 1);
+
+				if (!exists $blocks{$key}) {
+					$blocks{$key} = 0;
+				} else {
+					$blocks{$key}++;
+				}
+				$inBlock = "${key}_$blocks{$key}";
+				while (exists $$r_hash{$inBlock}) {
+					$blocks{$key}++;
+					$inBlock = "${key}_$blocks{$key}";
+				}
+				$$r_hash{$inBlock} = $value;
+
+	#			print "$inBlock $value\n";
+
+			} elsif (defined $inBlock && $_ eq "}") {
+				# End of block
+				undef $inBlock;
+
+			} else {
+				# Option
+				($key, $value) = $_ =~ /^(.*?)(?:\s+(.*))?$/;
+
+				getString(\$value, 1);
+
+				$key = "${inBlock}_${key}" if (defined $inBlock);
+				$$r_hash{$key} = $value;
+
+	#			print "$key $value\n";
+			}
+		}
+		close(FILE);
+	}
+}
+
+sub updateDataFile2_new {
+	my $file = shift;
+	my $r_hash = shift;
+	my ($data, $key, $value, $result, $inBlock, $commentBlock, %blocks, %hash_temp);
+	$result = 0;
+
+	open(FILE,"< $file");
+	foreach (<FILE>) {
+		if (/^\s*\#/ || /^\s*[\n\r]/) {
+			$data .= $_ if (!$option{'delete_fileDesc'});
+			next;
+		}
+
+		if (!defined $commentBlock && /^\s*\/\*/) {
+			$commentBlock = 1;
+
+			$_ = "" if ($option{'delete_fileDesc'});
+
+		} elsif (defined $commentBlock) {
+
+			undef $commentBlock if (/\*\/\s*$/);
+
+			$_ = "" if ($option{'delete_fileDesc'});
+
+		} elsif (!defined $inBlock && /\s+{\s*$/) {
+			($key, $value) = $_ =~ /^(?:\s*)(.*?)(?:\s+(.*))?\s+{\s*$/;
+			if ($key eq "") {
+				$data .= $_;
+				next;
+			}
+
+			getString(\$value, 1);
+
+			if (!exists $blocks{$key}) {
+				$blocks{$key} = 0;
+			} else {
+				$blocks{$key}++;
+			}
+			$inBlock = "${key}_$blocks{$key}";
+			while (exists $hash_temp{$inBlock}) {
+				$blocks{$key}++;
+				$inBlock = "${key}_$blocks{$key}";
+			}
+			$hash_temp{$inBlock} = $value;
+			if (exists $$r_hash{$inBlock} && $value ne $$r_hash{$inBlock}) {
+				if ($_ =~ /^(\s*\S+)\s*?(\s+{\s*)$/) {
+					$_ = "$1 $$r_hash{$inBlock}$2";
+#					print "000 $_\n";
+				} else {
+					$_ =~ s/^(\s*\S+)(\s+)(?:.*?)(\s+{\s*)$/$1$2$$r_hash{$inBlock}$3/;
+#					print "010 $_\n";
+				}
+				$result = 1;
+			}
+
+			getString(\$_, 1);
+
+#			$_ = RTrim($_)."\n";
+
+			$_ .= "\n";
+
+		} elsif (defined $inBlock && /^\s*}\s*$/) {
+			undef $inBlock;
+
+		} else {
+			($key, $value) = $_ =~ /^(?:\s*)(.*?)(?:\s+(.*?))?\s*$/;
+			$key = "${inBlock}_${key}" if (defined $inBlock);
+
+			$hash_temp{$key} = $value;
+			if (exists $$r_hash{$key} && $value ne $$r_hash{$key}) {
+				if ($_ =~ /^(\s*\S+)\s*?([\r\n]*)$/) {
+					$_ = "$1 $$r_hash{$key}$2";
+				} else {
+					$_ =~ s/^(\s*\S+)(\s+)(?:.*?)([\r\n]*)$/$1$2$$r_hash{$key}$3/;
+				}
+				$result = 1;
+			}
+
+			$_ = RTrim($_)."\n";
+
+#			getString(\$_, 1);
+#
+#			$_ .= "\n";
+		}
+		$data .= $_;
+	}
+	close FILE;
+
+	if ($result) {
+		if (!$option{'delete_fileDesc'}) {
+
+			open(FILE, "> $file");
+			print FILE $data;
+			close FILE;
+
+		} else {
+
+			open(FILE, "> $file");
+			foreach (sort keys (%hash_temp)) {
+				$data = "$_ $hash_temp{$_}";
+				next if (getString(\$data, 1) eq "");
+				print FILE "$data\n";
+			}
+			close FILE;
+
+		}
+	}
+}
+
+sub updateDataFile2_id {
+	my ($file, $r_hash) = @_;
+	my $data;
+	my %r_hash2;
+
+#	foreach (%{$r_hash}) {
+#		next if ($$r_hash{$_}{'name'} eq "" || $_ eq "");
+#
+#		$r_hash2{getID($_)} = $$r_hash{$_}{'name'};
+#		print getID($_)." $$r_hash{$_}{'name'}\n";
+#	}
+
+#	open(FILE, $file);
+#	foreach (<FILE>) {
+#		if (/^#/ || $_ =~ /^\n/ || $_ =~ /^\r/) {
+#			next;
+#		}
+#
+#		getString(\$_, 1);
+#		@args = split /\s/, $_;
+#
+#		if ($args[0] ne "" && $args[1] ne "") {
+##			$$r_hash{$args[0]}{'name'} = $args[1];
+#			$r_hash2{$args[0]} = $args[1];
+#		}
+#	}
+#	close(FILE);
+
+	open(FILE, "> $file");
+	foreach (sort sortNum keys (%{$r_hash})) {
+		next if ($_ eq "" || $$r_hash{$_} eq "");
+
+		print FILE "$_ $$r_hash{$_}\n";
+	}
+	close(FILE);
+}
+
+sub updateDataFile2_guild {
+	my ($file, $r_hash) = @_;
+	my %r_hash2;
+
+#	foreach (%{$r_hash}) {
+#		next if ($$r_hash{$_}{'name'} eq "" || $_ eq "");
+#
+#		$r_hash2{getID($_)} = $$r_hash{$_}{'name'};
+#		print getID($_)." $$r_hash{$_}{'name'}\n";
+#	}
+
+#	open(FILE, $file);
+#	foreach (<FILE>) {
+#		if (/^#/ || $_ =~ /^\n/ || $_ =~ /^\r/) {
+#			next;
+#		}
+#
+#		getString(\$_, 1);
+#		@args = split /\s/, $_;
+#
+#		if ($args[0] ne "" && $args[1] ne "") {
+##			$$r_hash{$args[0]}{'name'} = $args[1];
+#			$r_hash2{$args[0]} = $args[1];
+#		}
+#	}
+#	close(FILE);
+
+	my $data;
+	my ($key, $value);
+
+	$data .= "\# [ ".getFormattedDate(int(time))." ]\n";
+	$data .= "\# [ ".$sc_v{'parseMsg'}{'server_name'}." ]\n\n";
+
+	open(FILE, $file);
+	foreach (<FILE>) {
+		next if (/^#/);
+
+		getString(\$_, 1);
+
+		($key, $value) = $_ =~ /([\s\S]*?) ([\s\S]*)$/;
+
+		getString(\$key);
+		getString(\$value);
+
+		if ($key eq "") {
+			($key) = $_ =~ /([\s\S]*)$/;
+			$key =~ s/\s//g;
+		}
+		if ($key ne "") {
+#			$$r_hash{$key} = $value;
+
+			$data .= "$key $value\n";
+
+			delete $$r_hash{$key};
+		}
+	}
+	close(FILE);
+
+	foreach (sort sortNum keys (%{$r_hash})) {
+		next if ($_ eq "" || $$r_hash{$_} eq "");
+
+		$data .= "$_ $$r_hash{$_}\n";
+
+		$result = 1;
+	}
+
+#	$data .= "\n";
+
+	if ($result) {
+		open(FILE, "> $file");
+		print FILE $data;
+		close(FILE);
+	}
 }
 
 1;
