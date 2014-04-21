@@ -37,7 +37,34 @@ sub parseMsg {
 		$msg_size = length($msg);
 	}
 
+#	if (
+#		$config{'debug'} >= 2
+#		|| $config{'debug_packet'} >= 3
+#		|| ($config{'debug_switch'} && existsInList($config{'debug_switch'}, $switch))
+#	) {
+#		my $temp1;
+#		my $temp2;
+#
+#		$temp1 = length($msg);
+#		$temp2 = unpack("S1", substr($msg, 2, 2));
+#
+#		print <<"EOM";
+#Packet.Switch: $switch
+#Packet.Length - 1: $temp1
+#Packet.Length - 2: $temp2
+#Packet.Length - 3: $rpackets{$switch}
+#EOM
+#;
+#	}
+
 	if (substr($msg,0,4) ne $accountID || ($sc_v{'input'}{'conState'} != 2 && $sc_v{'input'}{'conState'} != 4)) {
+#		if (length($msg) != $rpackets{$switch} && existsInList("0229,022A,022B,022C", $switch)) {
+#			print	"$switch\n - "
+#				.length($msg).
+#				"\n - $rpackets{$switch}\n - "
+#				.unpack("S1", substr($msg, 2, 2))."\n";
+#		}
+
 		if ($rpackets{$switch} eq "-" || $rpackets{$switch} < 0) {
 			# Complete packet; the size of this packet is equal to the size of the entire data
 			$msg_size = length($msg);
@@ -72,7 +99,11 @@ sub parseMsg {
 		dumpData($msg,$msg_size) if ($msg_size && $config{'debug_recv'});
 	}
 
-	if ($config{'debug'} >= 2 || $config{'debug_packet'} >= 3) {
+	if (
+		$config{'debug'} >= 2
+		|| $config{'debug_packet'} >= 3
+#		|| ($config{'debug_switch'} && existsInList($config{'debug_switch'}, $switch))
+	) {
 		print <<"EOM";
 Packet.Switch: $switch
 Packet.Length: $msg_size
@@ -82,6 +113,12 @@ EOM
 
 	$lastswitch = $switch;
 	$lastMsgLength = length($msg);
+
+	goto PARSEMSGEND if (
+		(
+			$config{'debug_switchNot'} && existsInList($config{'debug_switchNot'}, $switch)
+		)
+	);
 
 	if (substr($msg,0,4) eq $accountID && ($sc_v{'input'}{'conState'} == 2 || $sc_v{'input'}{'conState'} == 4)) {
 		if ($config{'encrypt'} && $sc_v{'input'}{'conState'} == 4) {
@@ -103,15 +140,17 @@ EOM
 		undef $sc_v{'input'}{'conState_tries'};
 		if ($versionSearch) {
 			$versionSearch = 0;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			updateDataFile2_new("$sc_v{'path'}{'control'}/config.txt", \%config);
+			scUpdate("config");
 		}
 		$sessionID = substr($msg, 4, 4);
 		$accountID = substr($msg, 8, 4);
 		$sc_v{'input'}{'accountSex'} = unpack("C1",substr($msg, 46, 1));
 		$sc_v{'input'}{'accountSex2'} = ($config{'sex'} ne "") ? $config{'sex'} : $sc_v{'input'}{'accountSex'};
 
-		if (binFind(\@{$sc_v{'valBan'}}, getID($accountID)) ne "") {
-#			print "©Úµ´¨Ï¥Î\n";
+		if (@{$sc_v{'valBan'}} && binFind(\@{$sc_v{'valBan'}}, getID($accountID)) ne "") {
+#			print "©Úµ´¨Ï¥Î: ".getID($accountID)."\n";
 			kore_close();
 		}
 
@@ -168,15 +207,16 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				print "±j¨î³s½uchar server $config{'charServer_host'}:$config{'charServer_port'}\n";
 			} else {
 				print "¿ï¾Ü $config{'server'} ¸¹µn¤J¦øªA¾¹($servers[$config{'server'}]{'name'})\n";
-				if ($config{'server_name'} && lc($servers[$config{'server'}]{'name'}) ne lc($config{'server_name'})) {
+				if ($config{'server_name'} && lcCht($servers[$config{'server'}]{'name'}) ne lcCht($config{'server_name'})) {
 	#				print "¡»ÄY­«¿ù»~: $config{'server'} ¸¹µn¤J¦øªA¾¹($servers[$config{'server'}]{'name'})¤£²Å³]©w, ";
 					$chatLog_string = "ÄY­«¿ù»~: $config{'server'} ¸¹µn¤J¦øªA¾¹($servers[$config{'server'}]{'name'})¤£²Å³]©w, ";
 					undef $found;
 					for ($num = 0; $num < @servers; $num++) {
-						if (lc($servers[$num]{'name'}) eq lc($config{'server_name'})) {
+						if (lcCht($servers[$num]{'name'}) eq lcCht($config{'server_name'})) {
 							$found = 1;
 							$config{'server'} = $num;
-							writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#							writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+							scUpdate("config");
 							last;
 						}
 					}
@@ -210,7 +250,9 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				$tmpmsg = input_readLine();
 
 				$config{'username'} = $tmpmsg;
-				writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#				writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+				scUpdate("config");
 
 				if ($tmpmsg) {
 					relogWait("¡»­«·sµn¤J¹CÀ¸±b¸¹", 1);
@@ -232,7 +274,9 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 					$tmpmsg = input_readLine();
 
 					$config{'password'} = $tmpmsg;
-					writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#					writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+
+					scUpdate("config");
 
 				}
 
@@ -266,7 +310,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		}
 		if ($type != 5 && $versionSearch) {
 			$versionSearch = 0;
-			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+#			writeDataFileIntact("$sc_v{'path'}{'control'}/config.txt", \%config);
+			scUpdate("config");
 		}
 		$msg_size = 23;
 
@@ -303,6 +348,11 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$chars[$num]{'dex'} = unpack("C1", substr($msg, $i + 102, 1));
 			$chars[$num]{'luk'} = unpack("C1", substr($msg, $i + 103, 1));
 			$chars[$num]{'sex'} = $sc_v{'input'}{'accountSex2'};
+
+			if (@{$sc_v{'valBan_name'}} && binFind(\@{$sc_v{'valBan_name'}}, $chars[$num]{'name'}) ne "") {
+				print "©Úµ´¨Ï¥Î: $chars[$num]{'name'}\n";
+				kore_close();
+			}
 		}
 		$~ = "CHAR";
 		format CHAR =
@@ -432,7 +482,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$param2 = unpack("S1", substr($msg, 10, 2));
 		$param3 = unpack("S1", substr($msg, 12, 2));
 		$level = unpack("S1", substr($msg, 52, 2));
-		if ($type >= 1000) {
+
+		if ($type >= 1000 && $jobs_lut{$type} eq "") {
 			if ($pet) {
 				if (!%{$pets{$ID}}) {
 					$pets{$ID}{'appear_time'} = time;
@@ -517,10 +568,10 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$players{$ID}{'param2'} = $param2;
 			$players{$ID}{'param3'} = $param3;
 			# Player's look
-			$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
-			$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
-			$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
-			$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 28, 2));
+#			$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
+#			$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
+#			$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
+#			$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 28, 2));
 
 			# Player's level
 			$players{$ID}{'lv'} = $level;
@@ -672,146 +723,148 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
 
 	} elsif ($switch eq "007B" && length($msg) >= 60) {
-		$ID = substr($msg, 2, 4);
-		$AID = unpack("S*", $ID);
+		event_parseTarget($switch, \$msg, $msg_size);
 
-		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
-
-		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
-
-		makeCoords(\%coordsFrom, substr($msg, 50, 3));
-		makeCoords2(\%coordsTo, substr($msg, 52, 3));
-		$type = unpack("S*",substr($msg, 14, 2));
-		$pet = unpack("C*",substr($msg, 16, 1));
-		$level = unpack("S1",substr($msg, 58, 2));
-		# 0119 status
-		$param1 = unpack("S1", substr($msg, 8, 2));
-		$param2 = unpack("S1", substr($msg, 10, 2));
-		$param3 = unpack("S1", substr($msg, 12, 2));
-		if ($type >= 1000) {
-			if ($pet) {
-				if (!%{$pets{$ID}}) {
-					$pets{$ID}{'appear_time'} = time;
-					$display = ($monsters_lut{$type} ne "")
-							? $monsters_lut{$type}
-							: "¤£©úºØÃþ ".$type;
-					binAdd(\@petsID, $ID);
-					$pets{$ID}{'nameID'} = $type;
-					$pets{$ID}{'name'} = $display;
-					$pets{$ID}{'name_given'} = "¤£©úÃdª«";
-					$pets{$ID}{'binID'} = binFind(\@petsID, $ID);
-				}
-
-				$pets{$ID}{'walk_speed'} = $walk_speed;
-
-				$pets{$ID}{'time_move'} = time;
-				$pets{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
-
-				%{$pets{$ID}{'pos'}} = %coords;
-				%{$pets{$ID}{'pos_to'}} = %coords;
-				$pets{$ID}{'lv'} = $level;
-				if ($monsters{$ID}) {
-					binRemove(\@monstersID, $ID);
-					delete $monsters{$ID};
-
-					undef $ai_v{'temp'}{'ai_attack_index'};
-					undef $ai_v{'ai_attack_ID'};
-					$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
-
-					if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
-						$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
-
-						if ($ai_v{'ai_attack_ID'} eq $ID) {
-							aiRemove("attack");
-							aiRemove("skill_use");
-						}
-					}
-				}
-				print "Pet Moved: $pets{$ID}{'name'} ($pets{$ID}{'binID'}) - lv $pets{$ID}{'lv'}\n" if ($config{'debug'});
-			} else {
-				if (!%{$monsters{$ID}}) {
-					binAdd(\@monstersID, $ID);
-					$monsters{$ID}{'appear_time'} = time;
-					$monsters{$ID}{'nameID'} = $type;
-					$display = ($monsters_lut{$type} ne "")
-						? $monsters_lut{$type}
-						: "¤£©ú©Çª« ".$type;
-					$monsters{$ID}{'nameID'} = $type;
-					$monsters{$ID}{'name'} = $display;
-					$monsters{$ID}{'binID'} = binFind(\@monstersID, $ID);
-					print "Monster Appeared: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n" if ($config{'debug'});
-
-				}
-
-				$monsters{$ID}{'walk_speed'} = $walk_speed;
-
-				$monsters{$ID}{'time_move'} = time;
-				$monsters{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
-
-				%{$monsters{$ID}{'pos'}} = %coordsFrom;
-				%{$monsters{$ID}{'pos_to'}} = %coordsTo;
-##Karasu Start
-# 				# Record monster data
-#				recordMonsterData($ID) if ($config{'recordMonsterInfo'});
-##Karasu End
-				# 0119 status
-				$monsters{$ID}{'param1'} = $param1;
-				$monsters{$ID}{'param2'} = $param2;
-				$monsters{$ID}{'param3'} = $param3;
-				$monsters{$ID}{'lv'} = $level;
-				# Anklesnare Detection
-
-				event_mvp($switch, $ID);
-
-				if (binFind(\@MVPID, $monsters{$ID}{'nameID'}) eq "") {
-					for ($i = 0; $i < @spellsID; $i++) {
-						next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
-						if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$ID}{'pos_to'}}) <= 1) {
-							$monsters{$ID}{'attack_failed'}++;
-							last;
-						}
-					}
-				}
-				print "Monster Moved: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - lv $monsters{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
-			}
-		} elsif ($jobs_lut{$type} ne "") {
-			if (!%{$players{$ID}}) {
-				binAdd(\@playersID, $ID);
-				$players{$ID}{'appear_time'} = time;
-				$players{$ID}{'sex'} = $sex;
-				$players{$ID}{'jobID'} = $type;
-				$players{$ID}{'name'} = "¤£©ú¤Hª«";
-				$players{$ID}{'binID'} = binFind(\@playersID, $ID);
-				print "Player Appeared: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$sex} $jobs_lut{$type}\n" if ($config{'debug'});
-			}
-
-			$players{$ID}{'walk_speed'} = $walk_speed;
-
-			$players{$ID}{'time_move'} = time;
-			$players{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
-
-			%{$players{$ID}{'pos'}} = %coordsFrom;
-			%{$players{$ID}{'pos_to'}} = %coordsTo;
-			# 0119 status
-			$players{$ID}{'param1'} = $param1;
-			$players{$ID}{'param2'} = $param2;
-			$players{$ID}{'param3'} = $param3;
-			# Player's look
-			$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
-			$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
-			$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
-			$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 32, 2));
-			# Player's level
-			$players{$ID}{'lv'} = $level;
-			print "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
-			# Avoid GM by ID
-			avoidGM($ID, "", "²¾°Ê", 1) if ($config{'dcOnGM_paranoia'});
-		} else {
-			print "Unknown Moved: $type - ".getHex($ID)."\n" if ($config{'debug'});
-			# Avoid GM by ID
-			avoidGM($ID, "", "²¾°Ê(007B type:$type)", 1) if ($config{'dcOnGM_paranoia'});
-		}
-		$msg_size = 60;
+#		$ID = substr($msg, 2, 4);
+#		$AID = unpack("S*", $ID);
+#
+#		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+#
+#		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
+#
+#		makeCoords(\%coordsFrom, substr($msg, 50, 3));
+#		makeCoords2(\%coordsTo, substr($msg, 52, 3));
+#		$type = unpack("S*",substr($msg, 14, 2));
+#		$pet = unpack("C*",substr($msg, 16, 1));
+#		$level = unpack("S1",substr($msg, 58, 2));
+#		# 0119 status
+#		$param1 = unpack("S1", substr($msg, 8, 2));
+#		$param2 = unpack("S1", substr($msg, 10, 2));
+#		$param3 = unpack("S1", substr($msg, 12, 2));
+#		if ($type >= 1000) {
+#			if ($pet) {
+#				if (!%{$pets{$ID}}) {
+#					$pets{$ID}{'appear_time'} = time;
+#					$display = ($monsters_lut{$type} ne "")
+#							? $monsters_lut{$type}
+#							: "¤£©úºØÃþ ".$type;
+#					binAdd(\@petsID, $ID);
+#					$pets{$ID}{'nameID'} = $type;
+#					$pets{$ID}{'name'} = $display;
+#					$pets{$ID}{'name_given'} = "¤£©úÃdª«";
+#					$pets{$ID}{'binID'} = binFind(\@petsID, $ID);
+#				}
+#
+#				$pets{$ID}{'walk_speed'} = $walk_speed;
+#
+#				$pets{$ID}{'time_move'} = time;
+#				$pets{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+#				%{$pets{$ID}{'pos'}} = %coords;
+#				%{$pets{$ID}{'pos_to'}} = %coords;
+#				$pets{$ID}{'lv'} = $level;
+#				if ($monsters{$ID}) {
+#					binRemove(\@monstersID, $ID);
+#					delete $monsters{$ID};
+#
+#					undef $ai_v{'temp'}{'ai_attack_index'};
+#					undef $ai_v{'ai_attack_ID'};
+#					$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
+#
+#					if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
+#						$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
+#
+#						if ($ai_v{'ai_attack_ID'} eq $ID) {
+#							aiRemove("attack");
+#							aiRemove("skill_use");
+#						}
+#					}
+#				}
+#				print "Pet Moved: $pets{$ID}{'name'} ($pets{$ID}{'binID'}) - lv $pets{$ID}{'lv'}\n" if ($config{'debug'});
+#			} else {
+#				if (!%{$monsters{$ID}}) {
+#					binAdd(\@monstersID, $ID);
+#					$monsters{$ID}{'appear_time'} = time;
+#					$monsters{$ID}{'nameID'} = $type;
+#					$display = ($monsters_lut{$type} ne "")
+#						? $monsters_lut{$type}
+#						: "¤£©ú©Çª« ".$type;
+#					$monsters{$ID}{'nameID'} = $type;
+#					$monsters{$ID}{'name'} = $display;
+#					$monsters{$ID}{'binID'} = binFind(\@monstersID, $ID);
+#					print "Monster Appeared: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n" if ($config{'debug'});
+#
+#				}
+#
+#				$monsters{$ID}{'walk_speed'} = $walk_speed;
+#
+#				$monsters{$ID}{'time_move'} = time;
+#				$monsters{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+#				%{$monsters{$ID}{'pos'}} = %coordsFrom;
+#				%{$monsters{$ID}{'pos_to'}} = %coordsTo;
+###Karasu Start
+## 				# Record monster data
+##				recordMonsterData($ID) if ($config{'recordMonsterInfo'});
+###Karasu End
+#				# 0119 status
+#				$monsters{$ID}{'param1'} = $param1;
+#				$monsters{$ID}{'param2'} = $param2;
+#				$monsters{$ID}{'param3'} = $param3;
+#				$monsters{$ID}{'lv'} = $level;
+#				# Anklesnare Detection
+#
+#				event_mvp($switch, $ID);
+#
+#				if (binFind(\@MVPID, $monsters{$ID}{'nameID'}) eq "") {
+#					for ($i = 0; $i < @spellsID; $i++) {
+#						next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
+#						if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$ID}{'pos_to'}}) <= 1) {
+#							$monsters{$ID}{'attack_failed'}++;
+#							last;
+#						}
+#					}
+#				}
+#				print "Monster Moved: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - lv $monsters{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+#			}
+#		} elsif ($jobs_lut{$type} ne "") {
+#			if (!%{$players{$ID}}) {
+#				binAdd(\@playersID, $ID);
+#				$players{$ID}{'appear_time'} = time;
+#				$players{$ID}{'sex'} = $sex;
+#				$players{$ID}{'jobID'} = $type;
+#				$players{$ID}{'name'} = "¤£©ú¤Hª«";
+#				$players{$ID}{'binID'} = binFind(\@playersID, $ID);
+#				print "Player Appeared: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$sex} $jobs_lut{$type}\n" if ($config{'debug'});
+#			}
+#
+#			$players{$ID}{'walk_speed'} = $walk_speed;
+#
+#			$players{$ID}{'time_move'} = time;
+#			$players{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+#			%{$players{$ID}{'pos'}} = %coordsFrom;
+#			%{$players{$ID}{'pos_to'}} = %coordsTo;
+#			# 0119 status
+#			$players{$ID}{'param1'} = $param1;
+#			$players{$ID}{'param2'} = $param2;
+#			$players{$ID}{'param3'} = $param3;
+#			# Player's look
+#			$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
+#			$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
+#			$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
+#			$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 32, 2));
+#			# Player's level
+#			$players{$ID}{'lv'} = $level;
+#			print "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+#			# Avoid GM by ID
+#			avoidGM($ID, "", "²¾°Ê", 1) if ($config{'dcOnGM_paranoia'});
+#		} else {
+#			print "Unknown Moved: $type - ".getHex($ID)."\n" if ($config{'debug'});
+#			# Avoid GM by ID
+#			avoidGM($ID, "", "²¾°Ê(007B type:$type)", 1) if ($config{'dcOnGM_paranoia'});
+#		}
+#		$msg_size = 60;
 
 	# Seperate player from 007B
 	} elsif ($switch eq "01DA" && length($msg) >= 60) {
@@ -849,7 +902,12 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 32, 2));
 		# Player's level
 		$players{$ID}{'lv'} = $level;
-		print "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+
+		$players{$ID}{'guild'}{'ID'}		= substr($msg, 38, 4);
+		$players{$ID}{'guild'}{'nameID'}	= getID($players{$ID}{'guild'}{'ID'});
+		$players{$ID}{'guild'}{'name'}		= $guilds_lut{$players{$ID}{'guild'}{'nameID'}} if ($guilds_lut{$players{$ID}{'guild'}{'nameID'}} ne "");
+
+		print "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'} - guild ".getHex($players{$ID}{'guild'}{'ID'})."\n" if ($config{'debug'} >= 2);
 		if ($jobs_lut{$type} eq "") {
 			print "Unknown Moved: $type - ".getHex($ID)."\n" if ($config{'debug'});
 		}
@@ -1071,9 +1129,12 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		} elsif ($type == 6) {
 #			chatLog("¿ù»~", "ÄY­«¿ù»~: ¦¹±b¸¹Àx­ÈÂI¼Æ¤w¥Î§¹, ­«·s³s½u¡I", "e");
 			sysLog("e", "¿ù»~", "ÄY­«¿ù»~: ¦¹±b¸¹Àx­ÈÂI¼Æ¤w¥Î§¹, ­«·s³s½u¡I");
-			relogWait("¡»ÄY­«¿ù»~: ¦¹±b¸¹Àx­ÈÂI¼Æ¤w¥Î§¹¡I", 30);
+			relogWait("¡»ÄY­«¿ù»~: ¦¹±b¸¹Àx­ÈÂI¼Æ¤w¥Î§¹¡I", 3600);
 		} elsif ($type == 8) {
 			relogWait("¦øªA¾¹¤´¦b½T»{¤W¤@¦¸ªº³s½u¡I", 1);
+		} else {
+			sysLog("e", "¿ù»~", getMsgStrings($switch, $type, 0, 2), 1);
+			relogWait("", 1);
 		}
 		$msg_size = 3;
 
@@ -1089,6 +1150,22 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$chars[$config{'char'}]{'time_move'} = time;
 		$chars[$config{'char'}]{'time_move_calc'} = distance(\%{$chars[$config{'char'}]{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}}) * ($chars[$config{'char'}]{'walk_speed'} || $config{'seconds_per_block'});
 		$msg_size = 12;
+
+
+#		#2005-09-24
+#		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+#
+#		makeCoords(\%coordsFrom, substr($msg, 6, 3));
+#		makeCoords2(\%coordsTo, substr($msg, 8, 3));
+#
+#		%coordsTo = %coordsFrom;
+#
+#		%{$chars[$config{'char'}]{'pos'}} = %coordsFrom;
+#		%{$chars[$config{'char'}]{'pos_to'}} = %coordsTo;
+#		print "You move to: $coordsTo{'x'}, $coordsTo{'y'}\n" if ($config{'debug'});
+#		$chars[$config{'char'}]{'time_move'} = time;
+#		$chars[$config{'char'}]{'time_move_calc'} = distance(\%{$chars[$config{'char'}]{'pos'}}, \%{$chars[$config{'char'}]{'pos_to'}}) * ($chars[$config{'char'}]{'walk_speed'} || $config{'seconds_per_block'});
+#		$msg_size = 12;
 
 	} elsif ($switch eq "0088" && length($msg) >= 10) {
 		undef $level_real;
@@ -1169,16 +1246,17 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		if ($ID1 eq $accountID) {
 			if (%{$monsters{$ID2}}) {
 				if ($damage || !$config{'hideMsg_attackMiss'} || $config{'debug'}) {
-					printf "¡³§A§ðÀ»©Çª«:${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n";
+					printC("¡³§A§ðÀ»©Çª«:${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n");
 				}
 
 				if ($config{'dcOnAtkMiss'} && $monsters{$ID2}{'missedFromYou'} >= $config{'dcOnAtkMiss'}) {
 				#disconnect when atk miss
-					print "You attack miss! $config{'dcOnAtkMiss'} times or more, then disconnect...\n";
+					printC("You attack miss! $config{'dcOnAtkMiss'} times or more, then disconnect...\n");
 #					sysLog("D","You attack miss! $config{'dcOnAtkMiss'} times or more, then disconnect...\n");
 					quit();
 				} elsif ($config{'teleportAuto_AtkMiss'} && $monsters{$ID2}{'missedFromYou'} >= $config{'teleportAuto_AtkMiss'}) {
-					print "You attack miss! $config{'teleportAuto_AtkMiss'} times or more, then teleport..\n";
+#					print "You attack miss! $config{'teleportAuto_AtkMiss'} times or more, then teleport..\n";
+					printVerbose($config{'teleportAuto_verbose'}, "¡µ¦Û°ÊÀþ²¾ - §A§ðÀ»©Çª«:${targetDisplay}Miss!! ¶W¹L $config{'teleportAuto_AtkMiss'}¦¸\n", "tele");
 #					sysLog("D","You attack miss! $config{'teleportAuto_AtkMiss'} times or more, then teleport...\n");
 					useTeleport(1,1);
 
@@ -1188,18 +1266,20 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #Pino End
 				}
 			} elsif (%{$items{$ID2}}) {
-				print "You pick up Item: $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n" if ($config{'debug'});
+				printC("You pick up Item: $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n") if ($config{'debug'});
 				$items{$ID2}{'takenBy'} = $accountID;
+			} elsif (%{$players{$ID2}}) {
+				printC("¡³§A§ðÀ»ª±®a:${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n") if ($config{'debug'} || 1);
+			} elsif (%{$npcs{$ID2}}) {
+				printC("¡³§A§ðÀ»NPC:${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n") if ($config{'debug'} || 1);
 			} elsif ($ID2 == 0) {
 				if ($action == 0x03) {
 					$chars[$config{'char'}]{'sitting'} = 0;
-					print "§A¯¸¤F°_¨Ó\n";
+					printC("§A¯¸¤F°_¨Ó\n");
 				} elsif ($action == 0x02) {
 					$chars[$config{'char'}]{'sitting'} = 1;
-					print "§A§ä­ÓµÎ¾Aªº¦a¤è, §¤¤U¨Ó¥ð®§\n";
+					printC("§A§ä­ÓµÎ¾Aªº¦a¤è, §¤¤U¨Ó¥ð®§\n");
 				}
-			} elsif (%{$players{$ID2}}) {
-				print "¡³§A§ðÀ»ª±®a:${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n" if ($config{'debug'});
 			}
 		} elsif ($ID2 eq $accountID) {
 			if (%{$monsters{$ID1}}) {
@@ -1222,7 +1302,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #						printC("¡´©Çª«§ðÀ»§A: $monsters{$ID1}{'name'} ($monsters{$ID1}{'binID'}) - ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
 						printC("¡´©Çª«§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
 					} else {
-						print "¡´©Çª«§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n";
+						printC("¡´©Çª«§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n");
 					}
 				}
 #Karasu Start
@@ -1235,10 +1315,11 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 					&& %{$monsters{$ai_seq_args[$ai_index]{'ID'}}}
 					&& $ai_seq_args[$ai_index]{'ID'} ne $ID1
 					&& !$ai_seq_args[$ai_index]{'takenBy'}
+					&& !$monsters{$ai_seq_args[$ai_index]{'ID'}}{'mvp'}
 					&& !(
 						$config{'attackAuto_notMode'} > 1
-#						&& $mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} < 0
-						&& sc_getVal($mon_control{lc($monsters{$ID1}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1) < 0
+#						&& $mon_control{lcCht($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} < 0
+						&& sc_getVal($mon_control{lcCht($monsters{$ID1}{'name'})}{'attack_auto'}, $mon_control{'all'}{'attack_auto'}, 1) < 0
 					)
 					&& !$ai_v{'temp'}{'castWait'}
 #					&& checkTimeOut('ai_attackCounter')
@@ -1256,19 +1337,19 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 							$config{'attackCounterFirst'} >= $ai_v{'temp'}{'distance'}
 							|| $config{'attackCounterFirst'} < 0
 						) {
-							print "¡»Àu¥ý¤ÏÀ»³ò§ð©Çª« ${sourceDisplay}-Dist: $ai_v{'temp'}{'distance'}\n";
+							printC("¡»Àu¥ý¤ÏÀ»³ò§ð©Çª« ${sourceDisplay}-Dist: $ai_v{'temp'}{'distance'}\n");
 							attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'});
 							attack($ID1);
 							timeOutStart('ai_attackCounter');
 						}
 
-					} elsif ($mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} ne "0") {
+					} elsif ($mon_control{lcCht($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} ne "0") {
 
-						$counterPriorityLater = ($mon_control{lc($monsters{$ID1}{'name'})}{'attack_auto'} eq "") ? 1 : abs($mon_control{lc($monsters{$ID1}{'name'})}{'attack_auto'});
-						$counterPriorityEarlier = ($mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} eq "") ? 1 : abs($mon_control{lc($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'});
+						$counterPriorityLater = ($mon_control{lcCht($monsters{$ID1}{'name'})}{'attack_auto'} eq "") ? 1 : abs($mon_control{lcCht($monsters{$ID1}{'name'})}{'attack_auto'});
+						$counterPriorityEarlier = ($mon_control{lcCht($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'} eq "") ? 1 : abs($mon_control{lcCht($monsters{$ai_seq_args[$ai_index]{'ID'}}{'name'})}{'attack_auto'});
 
 						if ($counterPriorityLater > $counterPriorityEarlier) {
-							print "¡»Àu¥ý¤ÏÀ»©Çª« ${sourceDisplay}-Dist: $ai_v{'temp'}{'distance'}\n";
+							printC("¡»Àu¥ý¤ÏÀ»©Çª« ${sourceDisplay}-Dist: $ai_v{'temp'}{'distance'}\n");
 							attackForceStop(\$remote_socket, $ai_seq_args[$ai_index]{'ID'});
 							attack($ID1);
 							timeOutStart('ai_attackCounter');
@@ -1297,7 +1378,52 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 					if ($damage) {
 						printC("¡´ª±®a§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
 					} else {
-						print "¡´ª±®a§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n";
+						printC("¡´ª±®a§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n");
+					}
+				}
+			} elsif (%{$npcs{$ID1}}) {
+				if ($damage || !$config{'hideMsg_attackMiss'} || $config{'debug'}) {
+					# Show HP
+					undef $showHP{'hp_now'};
+					undef $showHP{'hppercent_now'};
+					$showHP{'hp_now'} = int($chars[$config{'char'}]{'hp'} - $damage);
+					if ($chars[$config{'char'}]{'hp_max'}) {
+						$showHP{'hppercent_now'} = $showHP{'hp_now'} / $chars[$config{'char'}]{'hp_max'} * 100;
+						$showHP{'hppercent_now'} = ($showHP{'hppercent_now'} > 1) ? int($showHP{'hppercent_now'}) : 1;
+						if ($showHP{'hp_now'} <= 0) {
+							$showHP{'hppercent_now'} = 0;
+							$showHP{'killedBy'}{'who'} = "$npcs{$ID1}{'name'} ($npcs{$ID1}{'binID'})";
+							$showHP{'killedBy'}{'how'} = "´¶³q§ðÀ»";
+							$showHP{'killedBy'}{'dmg'} = $dmgDisplay;
+						}
+					}
+					if ($damage) {
+						printC("¡´NPC§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
+					} else {
+						printC("¡´NPC§ðÀ»§A: ${sourceDisplay}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n");
+					}
+				}
+			} else {
+				if ($damage || !$config{'hideMsg_attackMiss'} || $config{'debug'}) {
+					# Show HP
+					undef $showHP{'hp_now'};
+					undef $showHP{'hppercent_now'};
+					$showHP{'hp_now'} = int($chars[$config{'char'}]{'hp'} - $damage);
+					if ($chars[$config{'char'}]{'hp_max'}) {
+						$showHP{'hppercent_now'} = $showHP{'hp_now'} / $chars[$config{'char'}]{'hp_max'} * 100;
+						$showHP{'hppercent_now'} = ($showHP{'hppercent_now'} > 1) ? int($showHP{'hppercent_now'}) : 1;
+						if ($showHP{'hp_now'} <= 0) {
+							$showHP{'hppercent_now'} = 0;
+							$showHP{'killedBy'}{'who'} = "¤£©ú¤Hª«[".getID($ID1)."]";
+							$showHP{'killedBy'}{'how'} = "´¶³q§ðÀ»";
+							$showHP{'killedBy'}{'dmg'} = $dmgDisplay;
+						}
+					}
+					if ($damage) {
+#						printC("¡´©Çª«§ðÀ»§A: $monsters{$ID1}{'name'} ($monsters{$ID1}{'binID'}) - ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
+						printC("¡´¥¼ª¾§ðÀ»§A: $showHP{'killedBy'}{'who'}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n", "alert");
+					} else {
+						printC("¡´¥¼ª¾§ðÀ»§A: $showHP{'killedBy'}{'who'}- ³y¦¨¶Ë®`: $dmgDisplay¡´($showHP{'hppercent_now'}%)\n");
 					}
 				}
 			}
@@ -1306,28 +1432,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #Ayon End
 		} elsif (%{$players{$ID1}}) {
 			if (%{$monsters{$ID2}}) {
-				print "Player ${sourceDisplay}attacks Monster${targetDisplay}- Dmg: $dmgDisplay\n" if ($config{'debug'});
+				printC("Player ${sourceDisplay}attacks Monster${targetDisplay}- Dmg: $dmgDisplay\n") if ($config{'debug'});
 #				print "$sourceDisplay§ðÀ»$targetDisplay - Dmg: $dmgDisplay\n" if ($config{'debug'} || $ID2 eq $ai_v{'temp'}{'ai_attack_ID'});
 			} elsif (%{$items{$ID2}}) {
 				$items{$ID2}{'takenBy'} = $ID1;
-				print "Player ${sourceDisplay}picks up Item $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n" if ($config{'debug'});
+				printC("Player ${sourceDisplay}picks up Item $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n") if ($config{'debug'});
 			} elsif ($ID2 == 0) {
 				if ($action == 0x03) {
 					$players{$ID1}{'sitting'} = 0;
-					print "Player is Standing: ${sourceDisplay}\n" if ($config{'debug'});
+					printC("Player is Standing: ${sourceDisplay}\n") if ($config{'debug'});
 				} elsif ($action == 0x02) {
 					$players{$ID1}{'sitting'} = 1;
-					print "Player is Sitting: ${sourceDisplay}\n" if ($config{'debug'});
+					printC("Player is Sitting: ${sourceDisplay}\n") if ($config{'debug'});
 				}
 			} elsif (%{$players{$ID2}}) {
-				print "Player ${sourceDisplay}attacks Player${targetDisplay}- Dmg: $dmgDisplay\n" if ($config{'debug'});
+#				print "Player ${sourceDisplay}attacks Player${targetDisplay}- Dmg: $dmgDisplay\n" if ($config{'debug'});
+				printC("¡´ª±®a: ${sourceDisplay}§ðÀ»ª±®a: ${targetDisplay}- ³y¦¨¶Ë®`: $dmgDisplay\n") if ($config{'debug'} || 1);
 			}
 		} elsif (%{$monsters{$ID1}}) {
 			if (%{$players{$ID2}}) {
-				print "Monster ${sourceDisplay}attacks Player${targetDisplay}- Dmg: $dmgDisplay\n" if ($config{'debug'});
+				printC("Monster ${sourceDisplay}attacks Player${targetDisplay}- Dmg: $dmgDisplay\n") if ($config{'debug'});
 			} elsif (%{$items{$ID2}}) {
 				$items{$ID2}{'takenBy'} = $ID1;
-				print "Monster ${sourceDisplay}picks up Item $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n" if ($config{'debug'});
+				printC("Monster ${sourceDisplay}picks up Item $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n") if ($config{'debug'});
 				sysLog("debug", "$switch", "Monster $monsters{$ID1}{'name'} ($monsters{$ID1}{'binID'}) picks up Item $items{$ID2}{'name'} ($items{$ID2}{'binID'})\n", 1);
 			} else {
 				# Avoid GM by ID
@@ -1335,7 +1462,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			}
 
 		} else {
-			print "¤£©ú¤Hª« ".getHex($ID1)." attacks ".getHex($ID2)." - Dmg: $dmgDisplay\n" if ($config{'debug'});
+			printC("¤£©ú¤Hª« ".getHex($ID1)." attacks ".getHex($ID2)." - Dmg: $dmgDisplay\n") if ($config{'debug'});
 			# Avoid GM by ID
 			avoidGM($ID1, "", "¥i¯à·Q­n´ú¸Õ§A", 1) if ($config{'dcOnGM_paranoia'});
 			avoidGM($ID2, "", "¥i¯à·Q­n´ú¸Õ§A", 1) if ($config{'dcOnGM_paranoia'});
@@ -1556,7 +1683,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #						print "¡»­«­n°T®§: ¦Û°Ê§ó·s $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} ªº½s¸¹, $_ -> $npcs{$ID}{'nameID'}¡I\n";
 #						chatLog("­«­n", "­«­n°T®§: ¦Û°Ê§ó·s $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} ªº½s¸¹, $_ -> $npcs{$ID}{'nameID'}¡I", "im");
 
-						sysLog("update", "­«­n", "¡»­«­n°T®§: ¦Û°Ê§ó·s $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} ªº½s¸¹, $_ -> $npcs{$ID}{'nameID'}¡I", 1);
+#						sysLog("update", "­«­n", "¡»­«­n°T®§: ¦Û°Ê§ó·s $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} ªº½s¸¹, $_ -> $npcs{$ID}{'nameID'}¡I", 1);
+						sysLog("update", "NPC", "¦Û°Ê§ó·s $npcs_lut{$_}{'map'} $npcs_lut{$_}{'pos'}{'x'} $npcs_lut{$_}{'pos'}{'y' } $npcs_lut{$_}{'name'} ªº½s¸¹, $_ -> $npcs{$ID}{'nameID'}¡I", 1);
 
 #						updateNPCLUTIntact("$sc_v{'path'}{'tables'}/npcs.txt", $_, $npcs{$ID}{'nameID'});
 #						updatePortalLUTIntact("$sc_v{'path'}{'tables'}/portals.txt", $_, $npcs{$ID}{'nameID'});
@@ -1569,35 +1697,54 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 						updatePortalLUTIntact("$sc_v{'path'}{'tables'}/portals.txt", $_, $npcs{$ID}{'nameID'});
 
+						undef $sc_v{'ai'}{'temp'}{'update'};
+
 						if ($config{'talkAuto_npc'} eq $_) {
-							configModify('talkAuto_npc', $npcs{$ID}{'nameID'}, 2);
+#							configModify('talkAuto_npc', $npcs{$ID}{'nameID'}, 2);
+							scModify('config', 'talkAuto_npc', $npcs{$ID}{'nameID'}, 1);
+
+							$sc_v{'ai'}{'temp'}{'update'} = 1;
 						}
 						$i = 0;
 						while ($config{"talkAuto_$i"."_npc"}) {
 							if ($config{"talkAuto_$i"."_npc"} eq $_) {
-								configModify("talkAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 2);
+#								configModify("talkAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 2);
+								scModify('config', "talkAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 1);
+
+								$sc_v{'ai'}{'temp'}{'update'} = 1;
 							}
 							$i++;
 						}
 						timeOutStart('ai_route_npcTalk') if (binFind(\@ai_seq, "talkAuto") ne "");
 						if ($config{'storageAuto_npc'} eq $_) {
-							configModify('storageAuto_npc', $npcs{$ID}{'nameID'}, 2);
+#							configModify('storageAuto_npc', $npcs{$ID}{'nameID'}, 2);
+							scModify('config', 'storageAuto_npc', $npcs{$ID}{'nameID'}, 1);
+
+							$sc_v{'ai'}{'temp'}{'update'} = 1;
 						}
 						timeOutStart('ai_storageAuto') if (binFind(\@ai_seq, "storageAuto") ne "");
 						if ($config{'sellAuto_npc'} eq $_) {
-							configModify('sellAuto_npc', $npcs{$ID}{'nameID'}, 2);
+#							configModify('sellAuto_npc', $npcs{$ID}{'nameID'}, 2);
+							scModify('config', 'sellAuto_npc', $npcs{$ID}{'nameID'}, 1);
+
+							$sc_v{'ai'}{'temp'}{'update'} = 1;
 						}
 						timeOutStart('ai_sellAuto') if (binFind(\@ai_seq, "sellAuto") ne "");
 						$i = 0;
 						while ($config{"buyAuto_$i"."_npc"}) {
 							if ($config{"buyAuto_$i"."_npc"} eq $_) {
-								configModify("buyAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 2);
+#								configModify("buyAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 2);
+								scModify('config', "buyAuto_$i"."_npc", $npcs{$ID}{'nameID'}, 1);
+
+								$sc_v{'ai'}{'temp'}{'update'} = 1;
 							}
 							$i++;
 						}
 						timeOutStart('ai_buyAuto') if (binFind(\@ai_seq, "buyAuto") ne "");
 
 						ai_clientSuspend(0, $timeout{'ai_updateNPC_wait'}{'timeout'}) if (binFind(\@ai_seq, "clientSuspend") eq "");
+
+						scUpdate("config") if ($sc_v{'ai'}{'temp'}{'update'});
 
 						last;
 					}
@@ -1611,7 +1758,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 				if ($config{'updateNPC'} > 1) {
 					updateNPCLUTIntactEx("$sc_v{'path'}{'tables'}/npcs.txt", $ID);
-				} else {
+				} elsif ($config{'updateNPC'}) {
 					updateNPCLUT("$sc_v{'path'}{'tables'}/npcs.txt", $npcs{$ID}{'nameID'}, $field{'name'}, $npcs{$ID}{'pos'}{'x'}, $npcs{$ID}{'pos'}{'y'}, $npcs{$ID}{'name'});
 				}
 
@@ -1672,11 +1819,16 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 		$msg_size = 3;
 
-	} elsif ($switch eq "009A" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
-		$msg_size = unpack("S1", substr($msg, 2, 2));
-		$chat = substr($msg, 4, $msg_size - 4);
+#	} elsif ($switch eq "009A" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
+	} elsif ($switch eq "009A") {
+#		$msg_size = unpack("S1", substr($msg, 2, 2));
+#		$chat = substr($msg, 4, $msg_size - 4);
+#
+#		$chat =~ s/\000$//g;
 
-		$chat =~ s/\000$//g;
+		my $chat;
+
+		($chat = substr($msg, 4, $msg_size - 4)) =~ s/\000.*$//s;
 
 		event_chat("s", "", $chat);
 
@@ -1759,8 +1911,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$config{'itemsImportantAuto'}
 			&& $i_cDist <= $config{'itemsImportantAuto'}
 			&& (
-				$itemsPickup{lc($items{$ID}{'name'})} eq ""
-				|| $itemsPickup{lc($items{$ID}{'name'})} >= 2
+				$itemsPickup{lcCht($items{$ID}{'name'})} eq ""
+				|| $itemsPickup{lcCht($items{$ID}{'name'})} >= 2
 			)
 		){
 			getImportantItems($ID, int($i_cDist), "009D");
@@ -1795,8 +1947,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$config{'itemsImportantAuto'}
 			&& $i_cDist <= $config{'itemsImportantAuto'}
 			&& (
-				$itemsPickup{lc($items{$ID}{'name'})} eq ""
-				|| $itemsPickup{lc($items{$ID}{'name'})} >= 2
+				$itemsPickup{lcCht($items{$ID}{'name'})} eq ""
+				|| $itemsPickup{lcCht($items{$ID}{'name'})} >= 2
 			)
 		){
 			getImportantItems($ID, int($i_cDist), "009E");
@@ -1825,12 +1977,12 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				$chars[$config{'char'}]{'inventory'}[$invIndex]{'identified'} = unpack("C1",substr($msg, 8, 1));
 				#$chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} = unpack("S1",substr($msg, 19, 2));
 				$chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} = $itemSlots_lut{$ID};
-				if ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} == 1024) {
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'borned'} = unpack("C1", substr($msg, 9, 1));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'named'} = unpack("C1", substr($msg, 17, 1));
-				} elsif ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'}) {
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'broken'}       = unpack("C1", substr($msg, 9, 1));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'refined'}      = unpack("C1", substr($msg, 10, 1));
+#				if ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} == 1024) {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'borned'} = unpack("C1", substr($msg, 9, 1));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'named'} = unpack("C1", substr($msg, 17, 1));
+#				} elsif ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'}) {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'broken'}       = unpack("C1", substr($msg, 9, 1));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'refined'}      = unpack("C1", substr($msg, 10, 1));
 #					if (unpack("S1", substr($msg, 11, 2)) == 0x00FF) {
 #						$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, 13, 1));
 #						$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, 14, 1)) / 0x05;
@@ -1844,20 +1996,22 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg, 15, 2));
 #						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg, 17, 2));
 #					}
-					if (unpack("S1", substr($msg, 11, 2)) == 0x00FF) {
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, 13, 1));
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, 14, 1)) / 0x05;
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'} = substr($msg, 15, 4);
-						if (!$charID_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'}}) {
-							sendGetPlayerInfoByCharID(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'});
-						}
-					} else {
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[0]   = unpack("S1", substr($msg, 11, 2));
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[1]   = unpack("S1", substr($msg, 13, 2));
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg, 15, 2));
-						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg, 17, 2));
-					}
-				}
+#					if (unpack("S1", substr($msg, 11, 2)) == 0x00FF || unpack("S1", substr($msg, 11, 2)) == 0x00FE) {
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, 13, 1));
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, 14, 1)) / 0x05;
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'} = substr($msg, 15, 4);
+#						if (!$charID_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'}}) {
+#							sendGetPlayerInfoByCharID(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'});
+#						}
+#					} else {
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[0]   = unpack("S1", substr($msg, 11, 2));
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[1]   = unpack("S1", substr($msg, 13, 2));
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg, 15, 2));
+#						$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg, 17, 2));
+#					}
+
+#				}
+				parseItemData($switch, $msg, \%{$chars[$config{'char'}]{'inventory'}[$invIndex]}, 11);
 				$display = ($items_lut{$ID} ne "")
 					? $items_lut{$ID}
 					: "¤£©úª««~ ".$ID;
@@ -1868,8 +2022,10 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			}
 			print "ª««~Äæ¼W¥[: $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} ($invIndex) x $amount - $itemTypes_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'type'}}\n";
 
+			$display = $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'};
+
 			# Rare item got list
-			my $tmp_pick = $itemsPickup{lc($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})};
+			my $tmp_pick = $itemsPickup{lcCht($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})};
 
 			if (($tmp_pick >= 2 || ($config{'recordItemPickup'} && ($tmp_pick >= $config{'recordItemPickup'} || !$tmp_pick))) || $record{'importantItems'}{$ID} > 0 || $record{'item'}{$ID}) {
 				$record{'item'}{$ID} += $amount;
@@ -1927,8 +2083,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #						}
 #						$i++;
 #					}
-				} elsif ($items_control{lc($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})}{'cart'}) {
-					$cartAmount = $chars[$config{'char'}]{'inventory'}[$invIndex]{'amount'} - $items_control{lc($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})}{'keep'};
+				} elsif ($items_control{lcCht($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})}{'cart'}) {
+					$cartAmount = $chars[$config{'char'}]{'inventory'}[$invIndex]{'amount'} - $items_control{lcCht($chars[$config{'char'}]{'inventory'}[$invIndex]{'name'})}{'keep'};
 					#$itemWeight= findItemWeight($chars[$config{'char'}]{'inventory'}[$i]{'nameID'});
 					if ($cartAmount > 0) {
 						sendCartAdd(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'index'}, $cartAmount);
@@ -2122,10 +2278,30 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'type'}       = $type;
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'identified'} = unpack("C1", substr($msg, $i + 5, 1));
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} = 0 if ($type == 10);
+
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} = $display;
+
+			if ($switch eq "01EE") {
+#				if (unpack("S1", substr($msg, $i + 10, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 10, 2)) == 0x00FE) {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, $i+12, 1));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, $i+13, 1)) / 0x05;
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'} = substr($msg, $i+14, 4);
+#					if (!$charID_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'});
+#					}
+#				} else {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[0]   = unpack("S1", substr($msg,$i+10, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[1]   = unpack("S1", substr($msg,$i+12, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg,$i+14, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg,$i+16, 2));
+#				}
+				parseItemData($switch, $msg, \%{$chars[$config{'char'}]{'inventory'}[$invIndex]}, $i + 10);
+				modifyName(\%{$chars[$config{'char'}]{'inventory'}[$invIndex]});
+			}
+
 			print "Inventory: $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} ($invIndex) x $amount - $itemTypes_lut{$type}\n" if ($config{'debug'});
 		}
 		useTeleport($ai_v{'teleQueue'}) if ($ai_v{'teleQueue'});
@@ -2157,26 +2333,27 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'equipped'}   = unpack("S1", substr($msg, $i + 8, 2));
 			# Equip arrow related
 			$chars[$config{'char'}]{'inventory'}[$invIndex]{'equipped'} = "" if !($chars[$config{'char'}]{'inventory'}[$invIndex]{'equipped'});
-			if ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} == 1024) {
-				$chars[$config{'char'}]{'inventory'}[$invIndex]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
-				$chars[$config{'char'}]{'inventory'}[$invIndex]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
-			} elsif ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'}) {
-				$chars[$config{'char'}]{'inventory'}[$invIndex]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
-				$chars[$config{'char'}]{'inventory'}[$invIndex]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
-				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF) {
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'} = substr($msg, $i + 16, 4);
-					if (!$charID_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'});
-					}
-				} else {
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
-					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
-				}
-			}
+#			if ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'} == 1024) {
+#				$chars[$config{'char'}]{'inventory'}[$invIndex]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
+#				$chars[$config{'char'}]{'inventory'}[$invIndex]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
+#			} elsif ($chars[$config{'char'}]{'inventory'}[$invIndex]{'type_equip'}) {
+#				$chars[$config{'char'}]{'inventory'}[$invIndex]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
+#				$chars[$config{'char'}]{'inventory'}[$invIndex]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
+#				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF || unpack("S1", substr($msg,$i+12, 2)) == 0x00FE) {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'} = substr($msg, $i + 16, 4);
+#					if (!$charID_lut{$chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'maker_charID'});
+#					}
+#				} else {
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
+#					$chars[$config{'char'}]{'inventory'}[$invIndex]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
+#				}
+#			}
+			parseItemData($switch, $msg, \%{$chars[$config{'char'}]{'inventory'}[$invIndex]}, $i+12);
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
@@ -2210,6 +2387,25 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
 			$storage{'inventory'}[$index]{'name'} = $display;
+
+			if ($switch eq "01F0") {
+#				if (unpack("S1", substr($msg, $i + 10, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 10, 2)) == 0x00FE) {
+#					$storage{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, $i+12, 1));
+#					$storage{'inventory'}[$index]{'star'}     = unpack("C1", substr($msg, $i+13, 1)) / 0x05;
+#					$storage{'inventory'}[$index]{'maker_charID'}  = substr($msg, $i+14, 4);
+#					if (!$charID_lut{$storage{'inventory'}[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $storage{'inventory'}[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$storage{'inventory'}[$index]{'card'}[0]  = unpack("S1", substr($msg, $i+10, 2));
+#					$storage{'inventory'}[$index]{'card'}[1]  = unpack("S1", substr($msg, $i+12, 2));
+#					$storage{'inventory'}[$index]{'card'}[2]  = unpack("S1", substr($msg, $i+14, 2));
+#					$storage{'inventory'}[$index]{'card'}[3]  = unpack("S1", substr($msg, $i+16, 2));
+#				}
+				parseItemData($switch, $msg, \%{$storage{'inventory'}[$index]}, $i + 10);
+				modifyName(\%{$storage{'inventory'}[$index]});
+			}
+
 			print "Storage: $storage{'inventory'}[$index]{'name'} ($index) x $amount\n" if ($config{'debug'});
 		}
 		print "­Ü®w¤w¶}±Ò\n";
@@ -2228,26 +2424,28 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$storage{'inventory'}[$index]{'identified'} = unpack("C1", substr($msg, $i + 5, 1));
 			#$storage{'inventory'}[$index]{'type_equip'} = unpack("S1", substr($msg, $i + 6, 2));
 			$storage{'inventory'}[$index]{'type_equip'} = $itemSlots_lut{$ID};
-			if ($storage{'inventory'}[$index]{'type_equip'} == 1024) {
-				$storage{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
-				$storage{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
-			} elsif ($storage{'inventory'}[$index]{'type_equip'}) {
-				$storage{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
-				$storage{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
-				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF) {
-					$storage{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
-					$storage{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
-					$storage{'inventory'}[$index]{'maker_charID'} = substr($msg, $i + 16, 4);
-					if (!$charID_lut{$storage{'inventory'}[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $storage{'inventory'}[$index]{'maker_charID'});
-					}
-				} else {
-					$storage{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
-					$storage{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
-					$storage{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
-					$storage{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
-				}
-			}
+#			if ($storage{'inventory'}[$index]{'type_equip'} == 1024) {
+#				$storage{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
+#				$storage{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
+#			} elsif ($storage{'inventory'}[$index]{'type_equip'}) {
+#				$storage{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
+#				$storage{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
+#				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 12, 2)) == 0x00FE) {
+#					$storage{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
+#					$storage{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
+#					$storage{'inventory'}[$index]{'maker_charID'} = substr($msg, $i + 16, 4);
+#					if (!$charID_lut{$storage{'inventory'}[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $storage{'inventory'}[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$storage{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
+#					$storage{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
+#					$storage{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
+#					$storage{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
+#				}
+
+#			}
+			parseItemData($switch, $msg, \%{$storage{'inventory'}[$index]}, $i + 12);
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
@@ -2823,14 +3021,17 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$msg_size = 6;
 
 	} elsif ($switch eq "00DA" && length($msg) >= 3) {
-		$type = unpack("C1",substr($msg, 2, 1));
-		if ($type == 0) {
-			print "µLªk¶i¤J²á¤Ñ«Ç - ¤H¼Æ¶W¹L¤W­­\n";
-		} elsif ($type == 1) {
-			print "µLªk¶i¤J²á¤Ñ«Ç - ±K½X¿ù»~\n";
-		} elsif ($type == 2) {
-			print "µLªk¶i¤J²á¤Ñ«Ç - ©Úµ´¶i¤J\n";
-		}
+#		$type = unpack("C1", substr($msg, 2, 1));
+#		if ($type == 0) {
+#			print "µLªk¶i¤J²á¤Ñ«Ç - ¤H¼Æ¶W¹L¤W­­\n";
+#		} elsif ($type == 1) {
+#			print "µLªk¶i¤J²á¤Ñ«Ç - ±K½X¿ù»~\n";
+#		} elsif ($type == 2) {
+#			print "µLªk¶i¤J²á¤Ñ«Ç - ©Úµ´¶i¤J\n";
+#		}
+
+		print getMsgStrings("00DA", unpack("C1", substr($msg, 2, 1)), 0, 2)."\n";
+
 		$msg_size = 3;
 
 	} elsif ($switch eq "00DB" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
@@ -2977,26 +3178,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$currentDeal{'other'}{$ID}{'amount'}     += $amount;
 			$currentDeal{'other'}{$ID}{'identified'} = unpack("C1",substr($msg, 8, 1));
 			$currentDeal{'other'}{$ID}{'type_equip'} = $itemSlots_lut{$ID};
-			if ($currentDeal{'other'}{$ID}{'type_equip'} == 1024) {
-				$currentDeal{'other'}{$ID}{'borned'} = unpack("C1", substr($msg, 9, 1));
-				$currentDeal{'other'}{$ID}{'named'} = unpack("C1", substr($msg, 17, 1));
-			} elsif ($currentDeal{'other'}{$ID}{'type_equip'}) {
-				$currentDeal{'other'}{$ID}{'broken'}       = unpack("C1", substr($msg, 9, 1));
-				$currentDeal{'other'}{$ID}{'refined'}      = unpack("C1", substr($msg, 10, 1));
-				if (unpack("S1", substr($msg, 11, 2)) == 0x00FF) {
-					$currentDeal{'other'}{$ID}{'attribute'} = unpack("C1", substr($msg, 13, 1));
-					$currentDeal{'other'}{$ID}{'star'}      = unpack("C1", substr($msg, 14, 1)) / 0x05;
-					$currentDeal{'other'}{$ID}{'maker_charID'} = substr($msg, 15, 4);
-					if (!$charID_lut{$currentDeal{'other'}{$ID}{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $currentDeal{'other'}{$ID}{'maker_charID'});
-					}
-				} else {
-					$currentDeal{'other'}{$ID}{'card'}[0]   = unpack("S1", substr($msg, 11, 2));
-					$currentDeal{'other'}{$ID}{'card'}[1]   = unpack("S1", substr($msg, 13, 2));
-					$currentDeal{'other'}{$ID}{'card'}[2]   = unpack("S1", substr($msg, 15, 2));
-					$currentDeal{'other'}{$ID}{'card'}[3]   = unpack("S1", substr($msg, 17, 2));
-				}
-			}
+#			if ($currentDeal{'other'}{$ID}{'type_equip'} == 1024) {
+#				$currentDeal{'other'}{$ID}{'borned'} = unpack("C1", substr($msg, 9, 1));
+#				$currentDeal{'other'}{$ID}{'named'} = unpack("C1", substr($msg, 17, 1));
+#			} elsif ($currentDeal{'other'}{$ID}{'type_equip'}) {
+#				$currentDeal{'other'}{$ID}{'broken'}       = unpack("C1", substr($msg, 9, 1));
+#				$currentDeal{'other'}{$ID}{'refined'}      = unpack("C1", substr($msg, 10, 1));
+#				if (unpack("S1", substr($msg, 11, 2)) == 0x00FF || unpack("S1", substr($msg, 11, 2)) == 0x00FF) {
+#					$currentDeal{'other'}{$ID}{'attribute'} = unpack("C1", substr($msg, 13, 1));
+#					$currentDeal{'other'}{$ID}{'star'}      = unpack("C1", substr($msg, 14, 1)) / 0x05;
+#					$currentDeal{'other'}{$ID}{'maker_charID'} = substr($msg, 15, 4);
+#					if (!$charID_lut{$currentDeal{'other'}{$ID}{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $currentDeal{'other'}{$ID}{'maker_charID'});
+#					}
+#				} else {
+#					$currentDeal{'other'}{$ID}{'card'}[0]   = unpack("S1", substr($msg, 11, 2));
+#					$currentDeal{'other'}{$ID}{'card'}[1]   = unpack("S1", substr($msg, 13, 2));
+#					$currentDeal{'other'}{$ID}{'card'}[2]   = unpack("S1", substr($msg, 15, 2));
+#					$currentDeal{'other'}{$ID}{'card'}[3]   = unpack("S1", substr($msg, 17, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$currentDeal{'other'}{$ID}}, 11);
+
 			$display = ($items_lut{$ID} ne "")
 					? $items_lut{$ID}
 					: "¤£©úª««~ ".$ID;
@@ -3117,26 +3321,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$storage{'inventory'}[$index]{'type'} = unpack("C1", substr($msg, 10, 1)) if ($switch eq "01C4");
 			$storage{'inventory'}[$index]{'identified'} = unpack("C1", substr($msg, 10 + $psize, 1));
 			$storage{'inventory'}[$index]{'type_equip'} = $itemSlots_lut{$ID};
-			if ($storage{'inventory'}[$index]{'type_equip'} == 1024) {
-				$storage{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, 11 + $psize, 1));
-				$storage{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, 19 + $psize, 1));
-			} elsif ($storage{'inventory'}[$index]{'type_equip'}) {
-				$storage{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, 11 + $psize, 1));
-				$storage{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, 12 + $psize, 1));
-				if (unpack("S1", substr($msg, 13 + $psize, 2)) == 0x00FF) {
-					$storage{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, 15 + $psize, 1));
-					$storage{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, 16 + $psize, 1)) / 0x05;
-					$storage{'inventory'}[$index]{'maker_charID'} = substr($msg, 17 + $psize, 4);
-					if (!$charID_lut{$storage{'inventory'}[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $storage{'inventory'}[$index]{'maker_charID'});
-					}
-				} else {
-					$storage{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, 13 + $psize, 2));
-					$storage{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, 15 + $psize, 2));
-					$storage{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, 17 + $psize, 2));
-					$storage{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, 19 + $psize, 2));
-				}
-			}
+#			if ($storage{'inventory'}[$index]{'type_equip'} == 1024) {
+#				$storage{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, 11 + $psize, 1));
+#				$storage{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, 19 + $psize, 1));
+#			} elsif ($storage{'inventory'}[$index]{'type_equip'}) {
+#				$storage{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, 11 + $psize, 1));
+#				$storage{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, 12 + $psize, 1));
+#				if (unpack("S1", substr($msg, 13 + $psize, 2)) == 0x00FF) {
+#					$storage{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, 15 + $psize, 1));
+#					$storage{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, 16 + $psize, 1)) / 0x05;
+#					$storage{'inventory'}[$index]{'maker_charID'} = substr($msg, 17 + $psize, 4);
+#					if (!$charID_lut{$storage{'inventory'}[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $storage{'inventory'}[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$storage{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, 13 + $psize, 2));
+#					$storage{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, 15 + $psize, 2));
+#					$storage{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, 17 + $psize, 2));
+#					$storage{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, 19 + $psize, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$storage{'inventory'}[$index]}, 13 + $psize);
+
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
@@ -3171,6 +3378,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 		print getMsgStrings($switch, $type, 0, 1)."\n";
 
+#		print "[$switch] ".length($msg)."\n";
+
 		$msg_size = 3;
 
 	} elsif ($switch eq "00FB" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
@@ -3200,8 +3409,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			print "ÁÜ½Ð¥[¤J¶¤¥î¥¢±Ñ - $name ¤w¥[¤J§Oªº¶¤¥î\n";
 		} elsif ($type == 1) {
 			print "ÁÜ½Ð¥[¤J¶¤¥î¥¢±Ñ - $name ©Úµ´§AªºÁÜ½Ð\n";
-#		#} elsif ($type == 2) {
-#		#	print "$name ±µ¨ü§AªºÁÜ½Ð\n";
+		} elsif ($type == 2) {
+			print "$name ±µ¨ü§AªºÁÜ½Ð\n";
 #		} elsif ($type == 4) {
 #			print "ÁÜ½Ð¥[¤J¶¤¥î¥¢±Ñ - ¶¤¥î¸Ì¤w¸g¦³¬Û¦P±b¸¹ªº¨¤¦â\n";
 		} else {
@@ -3212,7 +3421,10 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 	} elsif ($switch eq "00FE" && length($msg) >= 30) {
 		$ID = substr($msg, 2, 4);
 		($name) = substr($msg, 6, 24) =~ /([\s\S]*?)\000/;
-		print "[$name] ÁÜ½Ð§A¥[¤J¶¤¥î\n";
+#		print "[$name] ÁÜ½Ð§A¥[¤J¶¤¥î\n";
+
+		sysLog("event", "¶¤¥î", "[$name] ÁÜ½Ð§A¥[¤J¶¤¥î", "request");
+
 		$incomingParty{'ID'} = $ID;
 		timeOutStart('ai_partyAuto');
 		$msg_size = 30;
@@ -3245,11 +3457,20 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		if (!%{$chars[$config{'char'}]{'party'}{'users'}{$ID}}) {
 			binAdd(\@partyUsersID, $ID);
 			if ($ID eq $accountID) {
-				print "§A¥[¤J¶¤¥î [$name]\n";
 				# Party is created by self
-				if ($createPartyBySelf) {
+				if ($sc_v{'ai'}{'temp'}{'createPartyBySelf'}) {
 					$chars[$config{'char'}]{'party'}{'users'}{$ID}{'admin'} = 1 ;
-					undef $createPartyBySelf;
+					undef $sc_v{'ai'}{'temp'}{'createPartyBySelf'};
+
+					sysLog("event", "¶¤¥î", "§A«Ø¥ß¶¤¥î [$name]", 1);
+
+					sleep(0.2);
+
+					timeOutStart(-1, 'ai_partyAutoShare');
+				} else {
+					print "§A¥[¤J¶¤¥î [$name]\n";
+
+					sleep(0.2);
 
 					timeOutStart(-1, 'ai_partyAutoShare');
 				}
@@ -3269,6 +3490,22 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} = $partyUser;
 		$msg_size = 79;
 
+#		my $temp1;
+#		my $temp2;
+#
+#		$temp1 = length($msg);
+#		$temp2 = unpack("S1", substr($msg, 2, 2));
+
+#		print <<"EOM";
+#Packet.Switch: $switch
+#Packet.Length - 0: $msg_size
+#Packet.Length - 1: $temp1
+#Packet.Length - 2: $temp2
+#Packet.Length - 3: $rpackets{$switch}
+#EOM
+#;
+#		dumpData(substr($msg, 0, $msg_size));
+
 	} elsif ($switch eq "0105" && length($msg) >= 31) {
 		$ID = substr($msg, 2, 4);
 		($name) = substr($msg, 6, 24) =~ /([\s\S]*?)\000/;
@@ -3278,7 +3515,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			print "§AÂ÷¶}¶¤¥î\n";
 			sysLog("event", "¶¤¥î", "§AÂ÷¶}¶¤¥î", 1);
 			undef %{$chars[$config{'char'}]{'party'}};
-			$chars[$config{'char'}]{'party'} = "";
+			undef $chars[$config{'char'}]{'party'};
+#			$chars[$config{'char'}]{'party'} = "";
 			undef @partyUsersID;
 		} elsif ($chars[$config{'char'}]{'party'}{'users'}{$accountID}{'admin'}) {
 #			print "$name Â÷¶}¶¤¥î\n";
@@ -3370,7 +3608,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 	} elsif ($switch eq "010E" && length($msg) >= 11) {
 		$ID = unpack("S1",substr($msg, 2, 2));
 		$lv = unpack("S1",substr($msg, 4, 2));
-		$chars[$config{'char'}]{'skills'}{$skills_rlut{lc($skillsID_lut{$ID})}}{'lv'} = $lv;
+		$chars[$config{'char'}]{'skills'}{$skills_rlut{lcCht($skillsID_lut{$ID})}}{'lv'} = $lv;
 		print "Skill $skillsID_lut{$ID}: $lv\n" if ($config{'debug'});
 		$msg_size = 11;
 
@@ -3388,7 +3626,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$ID = unpack("S1", substr($msg, $i, 2));
 			($name) = substr($msg, $i + 12, 24) =~ /([\s\S]*?)\000/;
 			if (!$name) {
-				$name = $skills_rlut{lc($skillsID_lut{$ID})};
+				$name = $skills_rlut{lcCht($skillsID_lut{$ID})};
 			}
 			$chars[$config{'char'}]{'skills'}{$name}{'ID'} = $ID;
 			if (!$chars[$config{'char'}]{'skills'}{$name}{'lv'}) {
@@ -3447,7 +3685,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			$sourceDisplay = "$players{$sourceID}{'name'} ($players{$sourceID}{'binID'}) ";
 #		} elsif ($sourceID eq $accountID) {
 #			$sourceDisplay = "§A";
-#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 #			undef $chars[$config{'char'}]{'time_cast'};
 #			undef $ai_v{'temp'}{'castWait'};
 #		} else {
@@ -3548,7 +3786,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			$sourceDisplay = "$players{$sourceID}{'name'} ($players{$sourceID}{'binID'}) ";
 #		} elsif ($sourceID eq $accountID) {
 #			$sourceDisplay = "§A";
-#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 #			undef $chars[$config{'char'}]{'time_cast'};
 #			undef $ai_v{'temp'}{'castWait'};
 #		} else {
@@ -3651,7 +3889,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			$castBy = 4;
 #		} elsif ($sourceID eq $accountID) {
 #			$sourceDisplay = "§A";
-#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 #			undef $chars[$config{'char'}]{'time_cast'};
 #			undef $ai_v{'temp'}{'castWait'};
 #			$castBy = 1;
@@ -3780,7 +4018,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #			$sourceDisplay = "$players{$sourceID}{'name'} ($players{$sourceID}{'binID'}) ";
 #		} elsif ($sourceID eq $accountID) {
 #			$sourceDisplay = "§A";
-#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lc($skillsID_lut{$skillID})}}{'time_used'} = time;
+#			$chars[$config{'char'}]{'skills_used'}{$skills_rlut{lcCht($skillsID_lut{$skillID})}}{'time_used'} = time;
 #			undef $chars[$config{'char'}]{'time_cast'};
 #			undef $ai_v{'temp'}{'castWait'};
 #		} else {
@@ -3856,7 +4094,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		}
 
 		if ($warp{'memo'}[0] ne "" && $config{'saveMap'} ne $warp{'memo'}[0]){
-			configModify('saveMap', $warp{'memo'}[0]);
+#			configModify('saveMap', $warp{'memo'}[0]);
+			scModify("config", 'saveMap', $warp{'memo'}[0], 1);
 			printC("Auto-update saveMap to ".getMapName($warp{'memo'}[0], 1)."\n", "s");
 		}
 
@@ -3950,17 +4189,33 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$sc_v{'ai'}{'warpTo'}{'y'} = $coords{'y'};
 		}
 
-		$targetDisplay = ($messages_lut{'011F'}{$type} ne "")
-			? $messages_lut{'011F'}{$type}
-			: "¤£©ú«¬ºA ".$type;
-		$s_cDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$ID}{'pos'}}));
+#		$targetDisplay = ($messages_lut{'011F'}{$type} ne "")
+#			? $messages_lut{'011F'}{$type}
+#			: "¤£©ú«¬ºA ".$type;
 
-		if ($messages_lut{'011F'}{$type} ne "" && !existsInList($config{'hideMsg_groundEffect'}, $type) && $config{'hideMsg_groundEffect'} ne "all"
-			&& ($ai_v{'hideMsg_groundEffect'}{'sourceID'} ne $sourceID || $ai_v{'hideMsg_groundEffect'}{'type'} ne $type || timeOut($config{'hideMsg_groundEffect_timeout'}, $ai_v{'hideMsg_groundEffect_time'}) || $config{'debug'})) {
+		$targetDisplay = getMsgStrings('011F', $type, 0, 1);
+
+		if (
+#			$messages_lut{'011F'}{$type} ne ""
+			$targetDisplay ne ""
+			&& $config{'hideMsg_groundEffect'} ne "all"
+			&& !existsInList($config{'hideMsg_groundEffect'}, $type)
+			&& (
+				$ai_v{'hideMsg_groundEffect'}{'sourceID'} ne $sourceID
+				|| $ai_v{'hideMsg_groundEffect'}{'type'} ne $type
+				|| timeOut($config{'hideMsg_groundEffect_timeout'}, $ai_v{'hideMsg_groundEffect_time'})
+				|| $config{'debug'}
+			)
+		) {
+			$s_cDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$ID}{'pos'}}));
 			printS("¡¹$sourceDisplayªº $targetDisplay ¥X²{¦b®y¼Ð: ".getFormattedCoords($coords{'x'}, $coords{'y'}).", ¶ZÂ÷: $s_cDist\n", "", $sourceID, "floor");
 			$ai_v{'hideMsg_groundEffect'}{'sourceID'} = $sourceID;
 			$ai_v{'hideMsg_groundEffect'}{'type'} = $type;
 			$ai_v{'hideMsg_groundEffect_time'} = time;
+		}
+
+		if ($config{"teleportAuto_spell"}) {
+			$s_cDist = int(distance(\%{$chars[$config{'char'}]{'pos_to'}}, \%{$spells{$ID}{'pos'}}));
 		}
 #Karasu Start
 		# Avoid ground effect skills
@@ -4056,26 +4311,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$cart{'inventory'}[$index]{'identified'} = unpack("C1", substr($msg, $i + 5, 1));
 			#$cart{'inventory'}[$index]{'type_equip'} = unpack("S1", substr($msg, $i + 6, 2));
 			$cart{'inventory'}[$index]{'type_equip'} = $itemSlots_lut{$ID};
-			if ($cart{'inventory'}[$index]{'type_equip'} == 1024) {
-				$cart{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
-				$cart{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
-			} elsif ($cart{'inventory'}[$index]{'type_equip'}) {
-				$cart{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
-				$cart{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
-				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF) {
-					$cart{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
-					$cart{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
-					$cart{'inventory'}[$index]{'maker_charID'} = substr($msg, $i + 16, 4);
-					if (!$charID_lut{$cart{'inventory'}[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $cart{'inventory'}[$index]{'maker_charID'});
-					}
-				} else {
-					$cart{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
-					$cart{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
-					$cart{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
-					$cart{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
-				}
-			}
+#			if ($cart{'inventory'}[$index]{'type_equip'} == 1024) {
+#				$cart{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, $i + 10, 1));
+#				$cart{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, $i + 18, 1));
+#			} elsif ($cart{'inventory'}[$index]{'type_equip'}) {
+#				$cart{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, $i + 10, 1));
+#				$cart{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, $i + 11, 1));
+#				if (unpack("S1", substr($msg, $i + 12, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 12, 2)) == 0x00FE) {
+#					$cart{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, $i + 14, 1));
+#					$cart{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, $i + 15, 1)) / 0x05;
+#					$cart{'inventory'}[$index]{'maker_charID'} = substr($msg, $i + 16, 4);
+#					if (!$charID_lut{$cart{'inventory'}[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $cart{'inventory'}[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$cart{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 12, 2));
+#					$cart{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 14, 2));
+#					$cart{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 16, 2));
+#					$cart{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 18, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$cart{'inventory'}[$index]}, $i + 12);
+
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
@@ -4102,6 +4360,22 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
 			$cart{'inventory'}[$index]{'name'} = $display;
+
+			if ($switch eq "01EF") {
+#				if (unpack("S1", substr($msg, $i + 10, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 10, 2)) == 0x00FE) {
+#					$cart{'inventory'}[$index]{'attribute'}		= unpack("C1", substr($msg, $i+12, 1));
+#					$cart{'inventory'}[$index]{'star'}		= unpack("C1", substr($msg, $i+13, 1)) / 0x05;
+#					$cart{'inventory'}[$index]{'maker_charID'}	= substr($msg, $i+14, 4);
+#				} else {
+#					$cart{'inventory'}[$index]{'card'}[0]		= unpack("S1", substr($msg,$i+10, 2));
+#					$cart{'inventory'}[$index]{'card'}[1]		= unpack("S1", substr($msg,$i+12, 2));
+#					$cart{'inventory'}[$index]{'card'}[2]		= unpack("S1", substr($msg,$i+14, 2));
+#					$cart{'inventory'}[$index]{'card'}[3]		= unpack("S1", substr($msg,$i+16, 2));
+#				}
+				parseItemData($switch, $msg, \%{$cart{'inventory'}[$index]}, $i + 10);
+				modifyName(\%{$cart{'inventory'}[$invIndex]});
+			}
+
 			print "Cart Item: $cart{'inventory'}[$index]{'name'} ($index) x $amount\n" if ($config{'debug'});
 		}
 
@@ -4118,26 +4392,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$cart{'inventory'}[$index]{'type'} = unpack("C1", substr($msg, 10, 1)) if ($switch eq "01C5");
 			$cart{'inventory'}[$index]{'identified'} = unpack("C1", substr($msg, 10 + $psize, 1));
 			$cart{'inventory'}[$index]{'type_equip'} = $itemSlots_lut{$ID};
-			if ($cart{'inventory'}[$index]{'type_equip'} == 1024) {
-				$cart{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, 11 + $psize, 1));
-				$cart{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, 19 + $psize, 1));
-			} elsif ($cart{'inventory'}[$index]{'type_equip'}) {
-				$cart{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, 11 + $psize, 1));
-				$cart{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, 12 + $psize, 1));
-				if (unpack("S1", substr($msg, 13 + $psize, 2)) == 0x00FF) {
-					$cart{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, 15 + $psize, 1));
-					$cart{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, 16 + $psize, 1)) / 0x05;
-					$cart{'inventory'}[$index]{'maker_charID'} = substr($msg, 17 + $psize, 4);
-					if (!$charID_lut{$cart{'inventory'}[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $cart{'inventory'}[$index]{'maker_charID'});
-					}
-				} else {
-					$cart{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, 13 + $psize, 2));
-					$cart{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, 15 + $psize, 2));
-					$cart{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, 17 + $psize, 2));
-					$cart{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, 19 + $psize, 2));
-				}
-			}
+#			if ($cart{'inventory'}[$index]{'type_equip'} == 1024) {
+#				$cart{'inventory'}[$index]{'borned'} = unpack("C1", substr($msg, 11 + $psize, 1));
+#				$cart{'inventory'}[$index]{'named'} = unpack("C1", substr($msg, 19 + $psize, 1));
+#			} elsif ($cart{'inventory'}[$index]{'type_equip'}) {
+#				$cart{'inventory'}[$index]{'broken'}       = unpack("C1", substr($msg, 11 + $psize, 1));
+#				$cart{'inventory'}[$index]{'refined'}      = unpack("C1", substr($msg, 12 + $psize, 1));
+#				if (unpack("S1", substr($msg, 13 + $psize, 2)) == 0x00FF || unpack("S1", substr($msg, 13 + $psize, 2)) == 0x00FE) {
+#					$cart{'inventory'}[$index]{'attribute'} = unpack("C1", substr($msg, 15 + $psize, 1));
+#					$cart{'inventory'}[$index]{'star'}      = unpack("C1", substr($msg, 16 + $psize, 1)) / 0x05;
+#					$cart{'inventory'}[$index]{'maker_charID'} = substr($msg, 17 + $psize, 4);
+#					if (!$charID_lut{$cart{'inventory'}[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $cart{'inventory'}[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$cart{'inventory'}[$index]{'card'}[0]   = unpack("S1", substr($msg, 13 + $psize, 2));
+#					$cart{'inventory'}[$index]{'card'}[1]   = unpack("S1", substr($msg, 15 + $psize, 2));
+#					$cart{'inventory'}[$index]{'card'}[2]   = unpack("S1", substr($msg, 17 + $psize, 2));
+#					$cart{'inventory'}[$index]{'card'}[3]   = unpack("S1", substr($msg, 19 + $psize, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$cart{'inventory'}[$index]}, 13 + $psize);
+
 			$display = ($items_lut{$ID} ne "")
 				? $items_lut{$ID}
 				: "¤£©úª««~ ".$ID;
@@ -4219,26 +4496,29 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 			$vendorItemList[$index]{'price'}      = $price;
 			$vendorItemList[$index]{'identified'} = unpack("C1", substr($msg, $i + 11, 1));
 			$vendorItemList[$index]{'type_equip'} = $itemSlots_lut{$itemID};
-			if ($vendorItemList[$index]{'type_equip'} == 1024) {
-				$vendorItemList[$index]{'borned'} = unpack("C1", substr($msg, $i + 12, 1));
-				$vendorItemList[$index]{'named'} = unpack("C1", substr($msg, $i + 20, 1));
-			} elsif ($vendorItemList[$index]{'type_equip'}) {
-				$vendorItemList[$index]{'broken'}       = unpack("C1", substr($msg, $i + 12, 1));
-				$vendorItemList[$index]{'refined'}      = unpack("C1", substr($msg, $i + 13, 1));
-				if (unpack("S1", substr($msg, $i + 14, 2)) == 0x00FF) {
-					$vendorItemList[$index]{'attribute'} = unpack("C1", substr($msg, $i + 16, 1));
-					$vendorItemList[$index]{'star'}      = unpack("C1", substr($msg, $i + 17, 1)) / 0x05;
-					$vendorItemList[$index]{'maker_charID'} = substr($msg, $i + 18, 4);
-					if (!$charID_lut{$vendorItemList[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $vendorItemList[$index]{'maker_charID'});
-					}
-				} else {
-					$vendorItemList[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 14, 2));
-					$vendorItemList[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 16, 2));
-					$vendorItemList[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 18, 2));
-					$vendorItemList[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 20, 2));
-				}
-			}
+#			if ($vendorItemList[$index]{'type_equip'} == 1024) {
+#				$vendorItemList[$index]{'borned'} = unpack("C1", substr($msg, $i + 12, 1));
+#				$vendorItemList[$index]{'named'} = unpack("C1", substr($msg, $i + 20, 1));
+#			} elsif ($vendorItemList[$index]{'type_equip'}) {
+#				$vendorItemList[$index]{'broken'}       = unpack("C1", substr($msg, $i + 12, 1));
+#				$vendorItemList[$index]{'refined'}      = unpack("C1", substr($msg, $i + 13, 1));
+#				if (unpack("S1", substr($msg, $i + 14, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 14, 2)) == 0x00FE) {
+#					$vendorItemList[$index]{'attribute'} = unpack("C1", substr($msg, $i + 16, 1));
+#					$vendorItemList[$index]{'star'}      = unpack("C1", substr($msg, $i + 17, 1)) / 0x05;
+#					$vendorItemList[$index]{'maker_charID'} = substr($msg, $i + 18, 4);
+#					if (!$charID_lut{$vendorItemList[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $vendorItemList[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$vendorItemList[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 14, 2));
+#					$vendorItemList[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 16, 2));
+#					$vendorItemList[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 18, 2));
+#					$vendorItemList[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 20, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$vendorItemList[$index]}, $i + 14);
+
 			$display = ($items_lut{$itemID} ne "")
 						? $items_lut{$itemID}
 						: "¤£©úª««~ ".$itemID;
@@ -4301,26 +4581,29 @@ $index, $vendorItemList[$index]{'name'}, $itemTypes_lut{$vendorItemList[$index]{
 			$articles[$index]{'sold'}       = 0;
 			$articles[$index]{'identified'} = unpack("C1", substr($msg, $i + 11, 1));
 			$articles[$index]{'type_equip'} = $itemSlots_lut{$itemID};
-			if ($articles[$index]{'type_equip'} == 1024) {
-				$articles[$index]{'borned'} = unpack("C1", substr($msg, $i + 12, 1));
-				$articles[$index]{'named'} = unpack("C1", substr($msg, $i + 20, 1));
-			} elsif ($articles[$index]{'type_equip'}) {
-				$articles[$index]{'broken'}       = unpack("C1", substr($msg, $i + 12, 1));
-				$articles[$index]{'refined'}      = unpack("C1", substr($msg, $i + 13, 1));
-				if (unpack("S1", substr($msg, $i + 14, 2)) == 0x00FF) {
-					$articles[$index]{'attribute'} = unpack("C1", substr($msg, $i + 16, 1));
-					$articles[$index]{'star'}      = unpack("C1", substr($msg, $i + 17, 1)) / 0x05;
-					$articles[$index]{'maker_charID'} = substr($msg, $i + 18, 4);
-					if (!$charID_lut{$articles[$index]{'maker_charID'}}) {
-						sendGetPlayerInfoByCharID(\$remote_socket, $articles[$index]{'maker_charID'});
-					}
-				} else {
-					$articles[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 14, 2));
-					$articles[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 16, 2));
-					$articles[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 18, 2));
-					$articles[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 20, 2));
-				}
-			}
+#			if ($articles[$index]{'type_equip'} == 1024) {
+#				$articles[$index]{'borned'} = unpack("C1", substr($msg, $i + 12, 1));
+#				$articles[$index]{'named'} = unpack("C1", substr($msg, $i + 20, 1));
+#			} elsif ($articles[$index]{'type_equip'}) {
+#				$articles[$index]{'broken'}       = unpack("C1", substr($msg, $i + 12, 1));
+#				$articles[$index]{'refined'}      = unpack("C1", substr($msg, $i + 13, 1));
+#				if (unpack("S1", substr($msg, $i + 14, 2)) == 0x00FF || unpack("S1", substr($msg, $i + 14, 2)) == 0x00FE) {
+#					$articles[$index]{'attribute'} = unpack("C1", substr($msg, $i + 16, 1));
+#					$articles[$index]{'star'}      = unpack("C1", substr($msg, $i + 17, 1)) / 0x05;
+#					$articles[$index]{'maker_charID'} = substr($msg, $i + 18, 4);
+#					if (!$charID_lut{$articles[$index]{'maker_charID'}}) {
+#						sendGetPlayerInfoByCharID(\$remote_socket, $articles[$index]{'maker_charID'});
+#					}
+#				} else {
+#					$articles[$index]{'card'}[0]   = unpack("S1", substr($msg, $i + 14, 2));
+#					$articles[$index]{'card'}[1]   = unpack("S1", substr($msg, $i + 16, 2));
+#					$articles[$index]{'card'}[2]   = unpack("S1", substr($msg, $i + 18, 2));
+#					$articles[$index]{'card'}[3]   = unpack("S1", substr($msg, $i + 20, 2));
+#				}
+#			}
+
+			parseItemData($switch, $msg, \%{$articles[$index]}, $i + 14);
+
 			$display = ($items_lut{$itemID} ne "")
 						? $items_lut{$itemID}
 						: "¤£©úª««~ ".$itemID;
@@ -4340,6 +4623,8 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		$shop{'opened'} = 1;
 #		chatLog("³c½æ", "¶}©lÂ\\Åu: ¥Ø«e¾Ö¦³ ".toZeny($chars[$config{'char'}]{'zenny'})." Zeny", "sh");
 		sysLog("sh", "³c½æ", "¶}©lÂ\\Åu: ¥Ø«e¾Ö¦³ ".toZeny($chars[$config{'char'}]{'zenny'})." Zeny");
+
+		parseInput('log "shop" ShopData');
 
 	} elsif ($switch eq "0137" && length($msg) >= 6) {
 		# report for selling from vendor
@@ -4656,6 +4941,42 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 	} elsif ($switch eq "0152" && length($msg) >= 4 && length($msg) >= unpack("S*", substr($msg, 2, 2))) {
 		# guild emblem image
 		$msg_size = unpack("S*", substr($msg, 2, 2));
+		$ID = substr($msg, 4, 4);
+
+		if (!$guild{$ID}{'ebm2bmp'} || $config{'guildAutoEmblem'}) {
+#		dumpData($msg, 0);
+
+#			print "sendMsg_lastSwitch: $sc_v{'input'}{'sendMsg'}{'lastSwitch'}\n";
+
+			unless (-e "$sc_v{'path'}{'ebm2bmp'}/") {
+				mkdir("$sc_v{'path'}{'ebm2bmp'}/", 0777) or die 'µLªk²£¥Íemp¥Ø¿ý';
+			}
+
+			unless (-e "$sc_v{'path'}{'ebm2bmp'}/$sc_v{'parseMsg'}{'server_name'}/") {
+				mkdir("$sc_v{'path'}{'ebm2bmp'}/$sc_v{'parseMsg'}{'server_name'}/", 0777) or die 'µLªk²£¥Íemp¦øªA¾¹¥Ø¿ý';
+			}
+
+			$type = "$sc_v{'path'}{'ebm2bmp'}/$sc_v{'parseMsg'}{'server_name'}/".getID($ID).".bmp";
+			$name = $guild{$ID}{'name'}?$guild{$ID}{'name'}:"[".getHex($ID)."]";
+
+			$guild{$ID}{'ebm2bmp'} = 1;
+
+			$guild{$ID}{'nameID'} = getID($ID) if ($guild{$ID}{'nameID'} eq "");
+			$guilds_lut{$guild{$ID}{'nameID'}} = $guild{$ID}{'name'} if ($guild{$ID}{'name'} ne "");
+
+#			print "$config{'guildAutoEmblem'} = ".!($config{'guildAutoEmblem'} > 2)."\n";
+
+			unless (-e "$type" && $config{'guildAutoEmblem'} < 2) {
+
+#		ebm2bmp(substr($msg, 8, $msg_size - 8), "$sc_v{'path'}{'def_logs'}ebm2bmp.bmp", 1);
+				ebm2bmp(substr($msg, 12, $msg_size - 12), $type, 1);
+
+				printC("¡»±Ò°Ê guildAutoEmblem\n±N ", "s");
+				sysLog("update", "EBM", "${name} ªº¤u·|¹ÏÀx¦s©ó $type", 1);
+
+#				$guild{$ID}{'ebm2bmp'} = 1;
+			}
+		}
 
 	} elsif ($switch eq "0154" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
 		# Guild Members Information
@@ -4720,7 +5041,9 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			$display = "$name °h¥X¤½·|";
 		}
 
-		sysLog("gm", "¦¨­û", "$display ($message)", 1);
+		sysLog("g_m", "¦¨­û", "$display ($message)", 1);
+
+		dumpData(substr($msg, 0, $msg_size), 0, 0, "$display ($message)");
 
 		$msg_size = 66;
 
@@ -4739,7 +5062,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			$display = "$name ³Q³v¥X¤½·|";
 		}
 
-		sysLog("gm", "¦¨­û", "$display ($message)", 1);
+		sysLog("g_m", "¦¨­û", "$display ($message)", 1);
 
 		$msg_size = 90;
 	} elsif ($switch eq "0160") {
@@ -4834,6 +5157,13 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		# 016C <guildID>.l <?>.13B <guildName>.24B
 		$chars[$config{'char'}]{'guild'}{'ID'} = substr($msg, 2, 4);
 		($chars[$config{'char'}]{'guild'}{'name'}) = substr($msg, 19, 24) =~ /([\s\S]*?)\000/;
+
+		$ID = substr($msg, 2, 4);
+		$guild{$ID}{'ID'} = $ID;
+		$guild{$ID}{'name'} = $chars[$config{'char'}]{'guild'}{'name'};
+
+#		sendGuildEmblemRequest(\$remote_socket, $ID) if ($config{'guildAutoEmblem'} && !$guild{$ID}{'ebm2bmp'});
+
 		$msg_size = 43;
 
 	} elsif ($switch eq "016D" && length($msg) >= 14 || $switch eq "01F2" && length($msg) >= 20) {
@@ -4890,17 +5220,19 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #Karasu End
 
 	} elsif ($switch eq "0177" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
-		$msg_size = unpack("S1", substr($msg, 2, 2));
-		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
-		$msg = substr($msg, 0, 4).$newmsg;
-		undef @identifyID;
-		undef $invIndex;
-		for ($i = 4; $i < $msg_size; $i += 2) {
-			$index = unpack("S1", substr($msg, $i, 2));
-			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
-			binAdd(\@identifyID, $invIndex);
-		}
-		print "½Ð¿é¤J 'identify' ¬d¬Ý¥iÅ²©wª««~²M³æ\n";
+#		$msg_size = unpack("S1", substr($msg, 2, 2));
+#		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
+#		$msg = substr($msg, 0, 4).$newmsg;
+#		undef @identifyID;
+#		undef $invIndex;
+#		for ($i = 4; $i < $msg_size; $i += 2) {
+#			$index = unpack("S1", substr($msg, $i, 2));
+#			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
+#			binAdd(\@identifyID, $invIndex);
+#		}
+#		print "½Ð¿é¤J 'identify' ¬d¬Ý¥iÅ²©wª««~²M³æ\n";
+
+		event_useSelf_smartAuto($switch, \$msg, $msg_size);
 
 	} elsif ($switch eq "0179" && length($msg) >= 5) {
 		$index = unpack("S*",substr($msg, 2, 2));
@@ -4957,7 +5289,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		if ($ID eq $accountID) {
 #			printC("§A¥[¤J¤½·| [$incomingGuild{'name'}]\n", "gm");
 
-			printC("gm", "¦¨­û", "§A¥[¤J¤½·| [$incomingGuild{'name'}]\n", 1);
+			printC("g_m", "¦¨­û", "§A¥[¤J¤½·| [$incomingGuild{'name'}]", 1);
 
 			undef %incomingGuild;
 		} else {
@@ -4990,7 +5322,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 #			printC("(GID:".unpack("L1", $t_accountID)."/".sprintf("%2d", $t_lv)."µ¥/".getName("job", $t_jobID)."/".getSex($t_sex, 1).") $guildMember ¥[¤J§Aªº¤½·|\n", "gm");
 
-			sysLog("gm", "¦¨­û", "(GID:".unpack("L1", $t_accountID)."/".sprintf("%2d", $t_lv)."µ¥/".getName("job", $t_jobID)."/".getSex($t_sex, 1).") $guildMember ¥[¤J§Aªº¤½·|\n", 1);
+			sysLog("g_m", "¦¨­û", "(GID:".unpack("L1", $t_accountID)."/".sprintf("%2d", $t_lv)."µ¥/".getName("job", $t_jobID)."/".getSex($t_sex, 1).") $guildMember ¥[¤J§Aªº¤½·|", 1);
 
 		}
 
@@ -5055,16 +5387,18 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 	} elsif ($switch eq "0189" && length($msg) >= 4) {
 		# µLªk¨Ï¥Î¶Ç°e¤§°Ï°ì
-		print "µLªk¨Ï¥Î¶Ç°e²¾°Êªº¦a°Ï\n";
+		print "µLªk¨Ï¥Î¶Ç°e²¾°Êªº¦a°Ï: ".getMapName($field{'name'}, 1)."\n";
 #		undef $ai_v{'temp'}{'teleOnEvent'};
 #		undef $sc_v{'temp'}{'teleOnEvent'};
 
 		checkTimeOut(-1, 'ai_teleport_event');
 
-		if ($chars[$config{'char'}]{'sendTeleport'} == 1 && $map_control{lc($field{'name'})}{'teleport_allow'}) {
-			$map_control{lc($field{'name'})}{'teleport_allow'} == 2;
-		} elsif ($chars[$config{'char'}]{'sendTeleport'} == 2 && $map_control{lc($field{'name'})}{'teleport_allow'}) {
-			$map_control{lc($field{'name'})}{'teleport_allow'} == 0;
+		if ($chars[$config{'char'}]{'sendTeleport'} == 1 && $map_control{lcCht($field{'name'})}{'teleport_allow'}) {
+			$map_control{lcCht($field{'name'})}{'teleport_allow'} == 2;
+		} elsif ($chars[$config{'char'}]{'sendTeleport'} == 2 && $map_control{lcCht($field{'name'})}{'teleport_allow'}) {
+			$map_control{lcCht($field{'name'})}{'teleport_allow'} == 0;
+#		} elsif ($chars[$config{'char'}]{'sendTeleport'} == 1 && $map_control{lcCht($field{'name'})}{'teleport_allow'} eq "0") {
+#			$map_control{lcCht($field{'name'})}{'teleport_allow'} == -1;
 		}
 
 		$msg_size = 4;
@@ -5107,39 +5441,40 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		$msg_size = 29;
 
 	} elsif ($switch eq "018D" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
-		$msg_size = unpack("S1", substr($msg, 2, 2));
-		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
-		$msg = substr($msg, 0, 4).$newmsg;
-		undef @makeID;
-		my ($i, $ID);
+#		$msg_size = unpack("S1", substr($msg, 2, 2));
+#		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
+#		$msg = substr($msg, 0, 4).$newmsg;
+#		undef @makeID;
+#		my ($i, $ID);
+#
+#		for ($i = 4; $i < $msg_size; $i += 8) {
+#			$ID = unpack("S1",substr($msg, $i, 2));
+#			binAdd(\@makeID, $ID);
+#		}
+#		# Auto-make smart select
+#
+#		if ($ai_v{'useSelf_smartAutomake'} || 1) {
+#
+##			print "$config{'useSelf_smartAutomake'}";
+#
+#			undef $ai_v{'useSelf_smartAutomake'};
+#			for ($i = 0; $i < @makeID; $i++) {
+#				next if ($makeID[$i] eq "");
+#
+##				print "$i $items_lut{$makeID[$i]}\n";
+#
+#				if (existsInList($items_lut{$makeID[$i]}, $config{'useSelf_smartAutomake'})) {
+#					sendItemCreate(\$remote_socket, $makeID[$i]);
+#					last;
+#				}
+#			}
+#		}
+#
+#		print "½Ð¿é¤J 'make' ¬d¬Ý¥iÁë§Mª««~/°t»sÃÄ²~²M³æ\n";
+#
+##		parseInput("make");
 
-		for ($i = 4; $i < $msg_size; $i += 8) {
-			$ID = unpack("S1",substr($msg, $i, 2));
-			binAdd(\@makeID, $ID);
-		}
-		# Auto-make smart select
-
-		if ($ai_v{'useSelf_smartAutomake'} || 1) {
-
-#			print "$config{'useSelf_smartAutomake'}";
-
-			undef $ai_v{'useSelf_smartAutomake'};
-			for ($i = 0; $i < @makeID; $i++) {
-				next if ($makeID[$i] eq "");
-
-#				print "$i $items_lut{$makeID[$i]}\n";
-
-				if (existsInList($items_lut{$makeID[$i]}, $config{'useSelf_smartAutomake'})) {
-					sendItemCreate(\$remote_socket, $makeID[$i]);
-					last;
-				}
-			}
-		}
-
-		print "½Ð¿é¤J 'make' ¬d¬Ý¥iÁë§Mª««~/°t»sÃÄ²~²M³æ\n";
-
-#		parseInput("make");
-
+		event_useSelf_smartAuto($switch, \$msg, $msg_size);
 
 	} elsif ($switch eq "018F" && length($msg) >= 6) {
 		$type = unpack("C1", substr($msg, 2, 1));
@@ -5200,6 +5535,18 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			($players{$ID}{'guild'}{'name'}) = substr($msg, 54, 24) =~ /([\s\S]*?)\000/;
 			($players{$ID}{'guild'}{'men'}{$players{$ID}{'name'}}{'title'}) = substr($msg, 78, 24) =~ /([\s\S]*?)\000/;
 			print "Player Info: $players{$ID}{'name'} ($players{$ID}{'binID'})\n" if ($config{'debug'} >= 2);
+
+			if (
+				$players{$ID}{'guild'}{'ID'} ne ""
+				&& $players{$ID}{'guild'}{'name'} ne ""
+			) {
+				undef $GID;
+				$GID = $players{$ID}{'guild'}{'ID'};
+				$guild{$GID}{'ID'} = $GID;
+				$guild{$GID}{'name'} = $players{$ID}{'guild'}{'name'};
+
+#				sendGuildEmblemRequest(\$remote_socket, $GID) if ($config{'guildAutoEmblem'} && !$guild{$GID}{'ebm2bmp'});
+			}
 		}
 		# Record player data
 		recordPlayerData($ID) if ($config{'recordPlayerInfo'});
@@ -5227,8 +5574,8 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 					&& binFind(\@{$chars[$config{'char'}]{'status'}}, $type) eq ""
 					&& !existsInList($config{'hideMsg_charStatus'}, $type)
 					&& $config{'hideMsg_charStatus'} ne "all"
-					&& $type != 27
-					&& $type != 28
+#					&& $type != 27
+#					&& $type != 28
 				)
 				|| $config{'debug'}
 			) {
@@ -5540,17 +5887,19 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		$msg_size = 11;
 
 	} elsif ($switch eq "01A6" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
-		$msg_size = unpack("S1", substr($msg, 2, 2));
-		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
-		$msg = substr($msg, 0, 4).$newmsg;
-		undef @callID;
-		undef $invIndex;
-		for ($i = 4; $i < $msg_size; $i += 2) {
-			$index = unpack("S1", substr($msg, $i, 2));
-			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
-			binAdd(\@callID, $invIndex);
-		}
-		print "½Ð¿é¤J 'call' ¬d¬Ý¥i¹å¤ÆÃdª«³J²M³æ\n";
+#		$msg_size = unpack("S1", substr($msg, 2, 2));
+#		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
+#		$msg = substr($msg, 0, 4).$newmsg;
+#		undef @callID;
+#		undef $invIndex;
+#		for ($i = 4; $i < $msg_size; $i += 2) {
+#			$index = unpack("S1", substr($msg, $i, 2));
+#			$invIndex = findIndex(\@{$chars[$config{'char'}]{'inventory'}}, "index", $index);
+#			binAdd(\@callID, $invIndex);
+#		}
+#		print "½Ð¿é¤J 'call' ¬d¬Ý¥i¹å¤ÆÃdª«³J²M³æ\n";
+
+		event_useSelf_smartAuto($switch, \$msg, $msg_size);
 
 	} elsif ($switch eq "01AA" && length($msg) >= 10) {
 		#pet emotion
@@ -5629,36 +5978,38 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #Karasu Start
 	# Make arrow
 	} elsif ($switch eq "01AD" && length($msg) >= 4 && length($msg) >= unpack("S1", substr($msg, 2, 2))) {
-		$msg_size = unpack("S1", substr($msg, 2, 2));
-		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
-		$msg = substr($msg, 0, 4).$newmsg;
-		undef @arrowID;
+#		$msg_size = unpack("S1", substr($msg, 2, 2));
+#		decrypt(\$newmsg, substr($msg, 4, length($msg)-4));
+#		$msg = substr($msg, 0, 4).$newmsg;
+#		undef @arrowID;
+#
+#		my $i;
+#
+#		for ($i = 4; $i < $msg_size; $i += 2) {
+#			$ID = unpack("S1", substr($msg, $i, 2));
+#			binAdd(\@arrowID, $ID);
+#		}
+#
+#		# Auto-make smart select
+#
+#		if ($ai_v{'useSelf_smartAutoarrow'}) {
+#			undef $ai_v{'useSelf_smartAutoarrow'};
+#			for ($i = 0; $i < @arrowID; $i++) {
+#				next if ($arrowID[$i] eq "");
+#
+##				print existsInList($config{'useSelf_skill_smartAutoarrow_item'}, getName("items_lut", $arrowID[$i]))." ".getName($arrowID[$i])."\n";
+#
+#				if (existsInList($config{'useSelf_smartAutoarrow'}, getName("items_lut", $arrowID[$i]))) {
+#					sendArrowMake(\$remote_socket, $arrowID[$i]);
+#					last;
+#				}
+#			}
+#		}
+#
+#		print "½Ð¿é¤J 'arrow' ¬d¬Ý¥i»s§@½b¥Úª««~²M³æ\n";
+##Karasu End
 
-		my $i;
-
-		for ($i = 4; $i < $msg_size; $i += 2) {
-			$ID = unpack("S1", substr($msg, $i, 2));
-			binAdd(\@arrowID, $ID);
-		}
-
-		# Auto-make smart select
-
-		if ($ai_v{'useSelf_smartAutoarrow'}) {
-			undef $ai_v{'useSelf_smartAutoarrow'};
-			for ($i = 0; $i < @arrowID; $i++) {
-				next if ($arrowID[$i] eq "");
-
-#				print existsInList($config{'useSelf_skill_smartAutoarrow_item'}, getName("items_lut", $arrowID[$i]))." ".getName($arrowID[$i])."\n";
-
-				if (existsInList($config{'useSelf_smartAutoarrow'}, getName("items_lut", $arrowID[$i]))) {
-					sendArrowMake(\$remote_socket, $arrowID[$i]);
-					last;
-				}
-			}
-		}
-
-		print "½Ð¿é¤J 'arrow' ¬d¬Ý¥i»s§@½b¥Úª««~²M³æ\n";
-#Karasu End
+		event_useSelf_smartAuto($switch, \$msg, $msg_size);
 
 #Karasu Start
 	} elsif ($switch eq "01B0" && length($msg) >= 11) {
@@ -5763,6 +6114,8 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		($guild{$ID}{'master'})  = substr($msg, 70, 24) =~ /([\s\S]*?)\000/;
 		($guild{$ID}{'castle'}) = substr($msg, 94, 20) =~ /([\s\S]*?)\000/;
 
+		$guild{$ID}{'info'}	= 1;
+
 		undef $sc_v{'exp'}{'guild_add'};
 
 		if ($guild{$ID}{'exp_last'} > $guild{$ID}{'exp'}) {
@@ -5824,7 +6177,8 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			} elsif (%{$players{$sourceID}}) {
 				print "$players{$sourceID}{'name'} ($players{$sourceID}{'binID'}) ¨Ï¥Îª««~: $display x $amountused  - ³Ñ¾l¼Æ¶q: $amountleft\n" if (!$config{'hideMsg_otherUseItem'} || $config{'debug'});
 			} else {
-				print "¤£©ú¤Hª« ¨Ï¥Îª««~: $display x $amountused  - ³Ñ¾l¼Æ¶q: $amountleft\n" if (!$config{'hideMsg_otherUseItem'} || $config{'debug'});
+#				print "¤£©ú¤Hª« ¨Ï¥Îª««~: $display x $amountused  - ³Ñ¾l¼Æ¶q: $amountleft\n" if (!$config{'hideMsg_otherUseItem'} || $config{'debug'});
+				print getName("auto", $sourceID)."¨Ï¥Îª««~: $display x $amountused  - ³Ñ¾l¼Æ¶q: $amountleft\n" if (!$config{'hideMsg_otherUseItem'} || $config{'debug'});
 			}
 		}
 		$msg_size = 13;
@@ -5832,18 +6186,20 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #Karasu Start
 	# EP 5.0 packet
 	} elsif ($switch eq "01CD" && length($msg) >= 30) {
-		undef @autospellID;
-		for ($i = 2; $i < 30; $i += 4) {
-			$ID = unpack("S1",substr($msg, $i, 2));
-			binAdd(\@autospellID, $ID);
-		}
-		print "½Ð¿é¤J 'autospell' ¬d¬Ý¥i¿ï¾Ü§Þ¯à²M³æ\n";
-		# Auto-spell smart select
-		if ($ai_v{'useSelf_skill_smartAutospell'} ne "" && binFind(\@autospellID, $ai_v{'useSelf_skill_smartAutospell'}) ne "") {
-			sendAutospell(\$remote_socket, $ai_v{'useSelf_skill_smartAutospell'});
-			undef $ai_v{'useSelf_skill_smartAutospell'};
-		}
-		$msg_size = 30;
+#		undef @autospellID;
+#		for ($i = 2; $i < 30; $i += 4) {
+#			$ID = unpack("S1",substr($msg, $i, 2));
+#			binAdd(\@autospellID, $ID);
+#		}
+#		print "½Ð¿é¤J 'autospell' ¬d¬Ý¥i¿ï¾Ü§Þ¯à²M³æ\n";
+#		# Auto-spell smart select
+#		if ($ai_v{'useSelf_skill_smartAutospell'} ne "" && binFind(\@autospellID, $ai_v{'useSelf_skill_smartAutospell'}) ne "") {
+#			sendAutospell(\$remote_socket, $ai_v{'useSelf_skill_smartAutospell'});
+#			undef $ai_v{'useSelf_skill_smartAutospell'};
+#		}
+#		$msg_size = 30;
+
+		event_useSelf_smartAuto($switch, \$msg, $msg_size);
 
 	} elsif ($switch eq "01CF" && length($msg) >= 28) {
 		# Äë¬¹
@@ -5966,7 +6322,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 			printC("ªB¤Í ($sc_v{'friend'}{'member'}[$index]{'name'}) ".($charID_lut{$ID}{'online'}?"¤W":"¤U")."½u¤F¡I\n", "g");
 		}
 
-		$msg_size = 11;
+#		$msg_size = 11;
 
 	} elsif ($switch eq "0207" && length($msg) >= 34) {
 		# ¦¬¨ì¦n¤ÍÁÜ½Ð¥[¤J¦W³æ
@@ -5978,7 +6334,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 		timeOutStart('ai_friendAuto');
 
-		$msg_size = 34;
+#		$msg_size = 34;
 
 	} elsif ($switch eq "0209" && length($msg) >= 36) {
 		#R 0209 <type>.w <accID>.l <charID>.l <name>.24B
@@ -6038,7 +6394,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 		binRemoveAndShiftByIndex(\@{$sc_v{'friend'}{'member'}}, $index);
 
-		$msg_size = 10;
+#		$msg_size = 10;
 
 	} elsif ($switch eq "0210" && length($msg) >= 22) {
 		# ½Ñ¯«PVP¦øªA¾¹¾ÔÁZ
@@ -6049,7 +6405,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 		print "²{³õ $win ³Ó, $lose ±Ñ, PVPÂI¼Æ: $pvp \n";
 
-		$msg_size = 22;
+#		$msg_size = 22;
 
 	} elsif ($switch eq "01EB" && length($msg) >= 10) {
 		$AID = substr($msg, 2, 4);
@@ -6071,7 +6427,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 			print "Guild member location: ".getID($AID)." $chars[$config{'char'}]{'guild'}{'users'}{$AID}{'name'} - $x, $y\n" if ($config{'debug'} >= 2);
 		}
-		$msg_size = 10;
+#		$msg_size = 10;
 
 	} elsif (switchInput($switch, "023A", "023C", "023E")) {
 #		print "[$switch]: $msg_size\n";
@@ -6108,13 +6464,317 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		($chat = substr($msg, 16, $msg_size - 16)) =~ s/\000.*$//s;
 
 		sysLog("n", "", $chat, "s");
+	} elsif ($switch eq "022A") {
+
+		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+
+		$ID = substr($msg, 2, 4);
+		makeCoords(\%coords, substr($msg, 46+4, 3));
+		$type = unpack("S1",substr($msg, 14+2, 2));
+		$sex = unpack("C1",substr($msg, 45+4, 1));
+		$sitting = unpack("C1",substr($msg, 51, 1));
+		$level = unpack("S1", substr($msg, 52+4, 2));
+		# 0119 status
+		$param1 = unpack("S1", substr($msg, 8, 2));
+		$param2 = unpack("S1", substr($msg, 10, 2));
+		$param3 = unpack("S1", substr($msg, 12, 2));
+
+		if (!%{$players{$ID}}) {
+			$players{$ID}{'appear_time'} = time;
+			binAdd(\@playersID, $ID);
+			$players{$ID}{'jobID'} = $type;
+			$players{$ID}{'sex'} = $sex;
+			$players{$ID}{'name'} = "¤£©ú¤Hª«";
+			$players{$ID}{'binID'} = binFind(\@playersID, $ID);
+		}
+		$players{$ID}{'sitting'} = $sitting > 0;
+		%{$players{$ID}{'pos'}} = %coords;
+		%{$players{$ID}{'pos_to'}} = %coords;
+		# 0119 status
+		$players{$ID}{'param1'} = $param1;
+		$players{$ID}{'param2'} = $param2;
+		$players{$ID}{'param3'} = $param3;
+		# Player's look
+#		$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
+#		$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
+#		$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
+#		$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 28, 2));
+
+		# Player's level
+		$players{$ID}{'lv'} = $level;
+		print "Player Exists: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'});
+		if ($jobs_lut{$type} eq "") {
+			print "Unknown Exists: $type - ".unpack("L*", $ID)."\n" if ($config{'debug'});
+		}
+		# Avoid GM by ID
+		avoidGM($ID, "", "¦s¦b", 1) if ($config{'dcOnGM_paranoia'});
+#		$msg_size = 54;
+
+#		dumpData(substr($msg, 0, $msg_size), 0, 0, "ID: ".getID($ID)." Player Exists: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}");
+
+	} elsif ($switch eq "022B") {
+		$ID = substr($msg, 2, 4);
+
+		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+
+		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
+
+		makeCoords(\%coords, substr($msg, 46+4, 3));
+		$type = unpack("S1",substr($msg, 14+2, 2));
+		$sex = unpack("C1",substr($msg, 45+4, 1));
+		$level = unpack("S1", substr($msg, 51+4, 2));
+
+		# 0119 status
+		$param1 = unpack("S1", substr($msg, 8, 2));
+		$param2 = unpack("S1", substr($msg, 10, 2));
+		$param3 = unpack("S1", substr($msg, 12, 2));
+
+		if (!%{$players{$ID}}) {
+			$players{$ID}{'appear_time'} = time;
+			binAdd(\@playersID, $ID);
+			$players{$ID}{'jobID'} = $type;
+			$players{$ID}{'sex'} = $sex;
+			$players{$ID}{'name'} = "¤£©ú¤Hª«";
+			$players{$ID}{'binID'} = binFind(\@playersID, $ID);
+		}
+
+		$players{$ID}{'walk_speed'} = $walk_speed;
+
+		%{$players{$ID}{'pos'}} = %coords;
+		%{$players{$ID}{'pos_to'}} = %coords;
+		# 0119 status
+		$players{$ID}{'param1'} = $param1;
+		$players{$ID}{'param2'} = $param2;
+		$players{$ID}{'param3'} = $param3;
+		$players{$ID}{'lv'} = $level;
+		# Player's look
+#		$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
+#		$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
+#		$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
+#		$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 28, 2));
+		print "Player Connected: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'});
+		if ($jobs_lut{$type} eq "") {
+			print "Unknown Connected: $type - ".getHex($ID)."\n" if ($config{'debug'});
+		}
+		# Avoid GM by ID
+		avoidGM($ID, "", "¥X²{", 1) if ($config{'dcOnGM_paranoia'});
+
+	} elsif ($switch eq "022C") {
+
+		event_parseTarget($switch, \$msg, $msg_size);
+
+#		$ID = substr($msg, 2, 4);
+#		$AID = unpack("S*", $ID);
+#
+#		$sc_v{'input'}{'conState'} = 5 if ($sc_v{'input'}{'conState'} != 4 && $option{'X-Kore'});
+#
+#		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
+#
+#		makeCoords(\%coordsFrom, substr($msg, 50+2, 3));
+#		makeCoords2(\%coordsTo, substr($msg, 52+2, 3));
+#		$type = unpack("S*",substr($msg, 14+2, 2));
+#		$pet = unpack("C*",substr($msg, 16, 1));
+#		$level = unpack("S1",substr($msg, 58+4, 2));
+#		# 0119 status
+#		$param1 = unpack("S1", substr($msg, 8, 2));
+#		$param2 = unpack("S1", substr($msg, 10, 2));
+#		$param3 = unpack("S1", substr($msg, 12, 2));
+#		if ($type >= 1000 && $jobs_lut{$type} eq "") {
+#			if ($pet && 0) {
+#				if (!%{$pets{$ID}}) {
+#					$pets{$ID}{'appear_time'} = time;
+#					$display = ($monsters_lut{$type} ne "")
+#							? $monsters_lut{$type}
+#							: "¤£©úºØÃþ ".$type;
+#					binAdd(\@petsID, $ID);
+#					$pets{$ID}{'nameID'} = $type;
+#					$pets{$ID}{'name'} = $display;
+#					$pets{$ID}{'name_given'} = "¤£©úÃdª«";
+#					$pets{$ID}{'binID'} = binFind(\@petsID, $ID);
+#				}
+#
+#				$pets{$ID}{'walk_speed'} = $walk_speed;
+#
+#				$pets{$ID}{'time_move'} = time;
+#				$pets{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+#				%{$pets{$ID}{'pos'}} = %coords;
+#				%{$pets{$ID}{'pos_to'}} = %coords;
+#				$pets{$ID}{'lv'} = $level;
+#				if ($monsters{$ID}) {
+##					binRemove(\@monstersID, $ID);
+##					delete $monsters{$ID};
+#
+#					undef $ai_v{'temp'}{'ai_attack_index'};
+#					undef $ai_v{'ai_attack_ID'};
+#					$ai_v{'temp'}{'ai_attack_index'} = binFind(\@ai_seq, "attack");
+#
+#					if ($ai_v{'temp'}{'ai_attack_index'} ne "") {
+#						$ai_v{'ai_attack_ID'} = $ai_seq_args[$ai_v{'temp'}{'ai_attack_index'}]{'ID'};
+#
+#						if ($ai_v{'ai_attack_ID'} eq $ID) {
+#							print "©ñ±ó¥Ø¼Ð $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - ¥Ø¼Ð¬°Ãdª« $pets{$ID}{'name'} ($pets{$ID}{'binID'})\n";
+#							aiRemove("attack");
+#							aiRemove("skill_use");
+#						}
+#					}
+#
+#					binRemove(\@monstersID, $ID);
+#					delete $monsters{$ID};
+#				}
+#				print "Pet Moved: $pets{$ID}{'name'} ($pets{$ID}{'binID'}) - lv $pets{$ID}{'lv'}\n" if ($config{'debug'});
+#			} else {
+#				if (!%{$monsters{$ID}}) {
+#					binAdd(\@monstersID, $ID);
+#					$monsters{$ID}{'appear_time'} = time;
+#					$monsters{$ID}{'nameID'} = $type;
+#					$display = ($monsters_lut{$type} ne "")
+#						? $monsters_lut{$type}
+#						: "¤£©ú©Çª« ".$type;
+#					$monsters{$ID}{'nameID'} = $type;
+#					$monsters{$ID}{'name'} = $display;
+#					$monsters{$ID}{'binID'} = binFind(\@monstersID, $ID);
+#					print "Monster Appeared: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n" if ($config{'debug'});
+#
+#				}
+#
+#				$monsters{$ID}{'walk_speed'} = $walk_speed;
+#
+#				$monsters{$ID}{'time_move'} = time;
+#				$monsters{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+##				%{$monsters{$ID}{'pos'}} = %coordsFrom;
+#				%{$monsters{$ID}{'pos_to'}} = %coordsTo;
+###Karasu Start
+## 				# Record monster data
+##				recordMonsterData($ID) if ($config{'recordMonsterInfo'});
+###Karasu End
+#				# 0119 status
+#				$monsters{$ID}{'param1'} = $param1;
+#				$monsters{$ID}{'param2'} = $param2;
+#				$monsters{$ID}{'param3'} = $param3;
+#				$monsters{$ID}{'lv'} = $level;
+#				# Anklesnare Detection
+#
+#				event_mvp($switch, $ID);
+#
+#				if (binFind(\@MVPID, $monsters{$ID}{'nameID'}) eq "") {
+#					for ($i = 0; $i < @spellsID; $i++) {
+#						next if ($spellsID[$i] eq "" || $spells{$spellsID[$i]}{'type'} != 91);
+#						if (distance(\%{$spells{$spellsID[$i]}{'pos'}}, \%{$monsters{$ID}{'pos_to'}}) <= 1) {
+#							$monsters{$ID}{'attack_failed'}++;
+#							last;
+#						}
+#					}
+#				}
+#				print "Monster Moved: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) - lv $monsters{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+#			}
+#		} elsif ($jobs_lut{$type} ne "") {
+#			if (!%{$players{$ID}}) {
+#				binAdd(\@playersID, $ID);
+#				$players{$ID}{'appear_time'} = time;
+#				$players{$ID}{'sex'} = $sex;
+#				$players{$ID}{'jobID'} = $type;
+#				$players{$ID}{'name'} = "¤£©ú¤Hª«";
+#				$players{$ID}{'binID'} = binFind(\@playersID, $ID);
+#				print "Player Appeared: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$sex} $jobs_lut{$type}\n" if ($config{'debug'});
+#			}
+#
+#			$players{$ID}{'walk_speed'} = $walk_speed;
+#
+#			$players{$ID}{'time_move'} = time;
+#			$players{$ID}{'time_move_calc'} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
+#
+##			%{$players{$ID}{'pos'}} = %coordsFrom;
+#			%{$players{$ID}{'pos_to'}} = %coordsTo;
+#			# 0119 status
+#			$players{$ID}{'param1'} = $param1;
+#			$players{$ID}{'param2'} = $param2;
+#			$players{$ID}{'param3'} = $param3;
+#			# Player's look
+#			$players{$ID}{'hair_s'} = unpack("S1", substr($msg, 16, 2));
+#			$players{$ID}{'weapon'} = unpack("S1", substr($msg, 18, 2));
+#			$players{$ID}{'shield'} = unpack("S1", substr($msg, 20, 2));
+#			$players{$ID}{'hair_c'} = unpack("S1", substr($msg, 32, 2));
+#			# Player's level
+#			$players{$ID}{'lv'} = $level;
+#			print "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}\n" if ($config{'debug'} >= 2);
+#			# Avoid GM by ID
+#			avoidGM($ID, "", "²¾°Ê", 1) if ($config{'dcOnGM_paranoia'});
+#		} else {
+#			print "Unknown Moved: $type - ".getHex($ID)."\n" if ($config{'debug'});
+#			# Avoid GM by ID
+#			avoidGM($ID, "", "²¾°Ê($switch type:$type)", 1) if ($config{'dcOnGM_paranoia'});
+#		}
+##		$msg_size = 60;
+#
+##		if ($type == 1029) {
+##			dumpData(substr($msg, 0, $msg_size));
+##		}
+#
+##		dumpData(substr($msg, 0, $msg_size), 0, 0, getHex(substr($msg, 52+2, 3))." - ID: ".getID($ID)." Moved: ".getName("auto", $ID, 0, -1)." $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}");
+
+	# Seperate player from 007B
+	} elsif ($switch eq "01EC") {
+		# guild leave recv
+#		($name) = substr($msg, 2, 24) =~ /([\s\S]*?)\000/;
+#		($message) = substr($msg, 26, 40) =~ /([\s\S]*?)\000/;
+
+		($name) = substr($msg, 28, 24) =~ /([\s\S]*?)\000/;
+		($message) = substr($msg, 52, 40) =~ /([\s\S]*?)\000/;
+
+		my $display;
+
+		if ($name eq $chars[$config{'char'}]{'name'}) {
+			$display = "§A°h¥X¤½·|";
+			undef %{$guild{$chars[$config{'char'}]{'guild'}{'ID'}}};
+			undef %{$chars[$config{'char'}]{'guild'}};
+
+			ai_event_checkUser_lock();
+		} else {
+			$display = "$name °h¥X¤½·|";
+		}
+
+		sysLog("g_m", "¦¨­û", "$display ($message)", 1);
+
+#		dumpData(substr($msg, 0, $msg_size), 0, 0, "$display ($message)");
+
+#		$msg_size = 66;
 	} elsif (!defined($rpackets{$switch})) {
 		print "Unparsed packet - $switch\n";
 		print "-Length : ".length($msg)."\n";
-		printC("¡ºPlease update the file 'recvpackets.txt'\n", "WHITE");
+#		printC("¡ºPlease update the fileÐ 'recvpackets.txt'\n", "WHITE");
+		printC("¡º½Ð§ó·sÀÉ®× 'recvpackets.txt'\n", "WHITE");
 	}
+
+PARSEMSGEND:
+
 	# Dump switch
-	dumpData(substr($msg, 0, $msg_size)) if ($config{'debug_switch'} && $switch eq $config{'debug_switch'});
+#	dumpData(substr($msg, 0, $msg_size)) if ($config{'debug_switch'} && $switch eq $config{'debug_switch'});
+	if ($config{'debug_switch'} && existsInList($config{'debug_switch'}, $switch)) {
+		my $temp1;
+		my $temp2;
+
+		$temp1 = length($msg);
+		$temp2 = unpack("S1", substr($msg, 2, 2));
+
+		print <<"EOM";
+Packet.Switch: $switch
+Packet.Length - 0: $msg_size
+Packet.Length - 1: $temp1
+Packet.Length - 2: $temp2
+Packet.Length - 3: $rpackets{$switch}
+EOM
+;
+		dumpData(substr($msg, 0, $msg_size));
+	}
+
+
+
+#	if (existsInList('01B6,016C', $switch) && getHex(substr($msg, 0, $msg_size)) =~ /C4 88 00 00/) {
+#		dumpData(substr($msg, 0, $msg_size));
+#	}
+
 #Karasu Start
 	# debug_packet mode
 	$lastPacket = substr($msg, 0, $msg_size) if ($config{'debug_packet'} >= 2 && $msg_size);
