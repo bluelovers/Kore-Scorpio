@@ -32,6 +32,8 @@ sub initConnectVars {
 	undef %{$chars[$config{'char'}]{'guild'}{'users'}};
 
 	undef %{$sc_v{'ai'}{'temp'}};
+	
+	undef @ai_cmdQue;
 
 	$sc_v{'ai'}{'first'} = 1;
 
@@ -64,8 +66,11 @@ sub initMapChangeVars {
 	undef $chars[$config{'char'}]{'sitting'};
 	undef $chars[$config{'char'}]{'dead'};
 	undef $chars[$config{'char'}]{'autoSwitch'};
+	undef $sc_v{'ai'}{'temp'}{'respawnAuto_undef'};
 
 	undef %{$ai_v{'temp'}{'npcData'}};
+	
+	undef %{$chars[$config{'char'}]{'look'}};
 
 	timeOutStart(
 		'play',
@@ -74,8 +79,8 @@ sub initMapChangeVars {
 		'ai_teleport_idle',
 		'ai_teleport_search',
 		'ai_teleport_safe_force',
-		'ai_useSelf_skill_auto',
-		'ai_item_use_auto',
+#		'ai_useSelf_skill_auto',
+#		'ai_item_use_auto',
 		'ai_route_npcTalk',
 		'ai_event_onHit',
 		'ai_teleport_search_portal'
@@ -329,9 +334,9 @@ sub auth {
 	my $user = shift;
 	my $flag = shift;
 	if ($flag) {
-		printC("『结ぉ產 '$user' 环狠北甭舦\n", "s");
+		printC("『结ぉ產 '$user' 环狠北甭舦\n", "s", 1);
 	} else {
-		printC("『篗綪產 '$user' 环狠北甭舦\n", "s");
+		printC("『篗綪產 '$user' 环狠北甭舦\n", "s", 1);
 	}
 	$overallAuth{$user} = $flag;
 	writeDataFile("$sc_v{'path'}{'control'}/overallAuth.txt", \%overallAuth);
@@ -873,12 +878,17 @@ sub compilePortals_getRoute {
 }
 
 sub getTickCount {
+#	my $time = int(time()*1000);
+#	if (length($time) > 9) {
+#		return substr($time, length($time) - 8, length($time));
+#	} else {
+#		return $time;
+#	}
+
+#	mKore-2.06.02
+
 	my $time = int(time()*1000);
-	if (length($time) > 9) {
-		return substr($time, length($time) - 8, length($time));
-	} else {
-		return $time;
-	}
+	return $time % 4294967296;
 }
 
 sub portalExists {
@@ -1058,7 +1068,7 @@ sub getImportantItems {
 			ai_attack_clear();
 
 			take($ID, $found);
-			sendTake(\$remote_socket, $ID);
+#			sendTake(\$remote_socket, $ID);
 
 			my $why;
 
@@ -1089,7 +1099,7 @@ sub getImportantItems {
 #		aiRemove("skill_use");
 		ai_attack_clear();
 		take($ID, $found);
-		sendTake(\$remote_socket, $ID);
+#		sendTake(\$remote_socket, $ID);
 
 		my $why = ("keyword", "record", "pickup")[$found-1];
 
@@ -1353,7 +1363,7 @@ sub relogWait {
 		undef %ai_v;
 		undef @ai_seq;
 		undef @ai_seq_args;
-		parseReload("config") if (!$sc_v{'kore'}{'lock'});
+		parseReload("config npcs") if (!$sc_v{'kore'}{'lock'});
 		importDynaLib();
 	}
 	$sc_v{'input'}{'conState'} = 1;
