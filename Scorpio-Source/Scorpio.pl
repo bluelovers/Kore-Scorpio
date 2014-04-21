@@ -73,9 +73,9 @@ require 'Scorpio_version.pl';
 	addVersionText("","","");
 	addVersionText("","","");
 	addVersionText("","","");
-	addVersionText("","","");
+	addVersionText("Scorpio","Bluelovers。風","http://bluelovers.idv.st");
 
-	addVersionText("Scorpio","Bluelovers。風","http://bluelovers.idv.st",1);
+	addVersionText("Scorpio","Bluelovers。風","http://bluelovers.net",1);
 
 	getVersionText();
 
@@ -328,8 +328,10 @@ require 'Scorpio_version.pl';
 	addFixerExValue('myShop', 'shop_title', 'title');
 	addFixerExValue('myShop', '', '');
 	addFixerExValue('myShop', '', '');
+	
+	$sc_v{'Scorpio'}{'checkVer'} = 1;
 
-	if ($sc_v{'Scorpio'}{'checkUser'}) {
+	if ($sc_v{'Scorpio'}{'checkUser'} || 1) {
 		addFixerValue('config', 'attackBerserk', 1, 4);
 #		addFixerValue('config', 'dcOnDualLogin', 0, 2);
 
@@ -981,6 +983,21 @@ EOM
 		}
 	}
 	print "\n";
+	
+	if (-e "kore.bat") {
+		open (FILE, "> kore.bat");
+		print FILE <<"EOM";
+\@echo off
+
+del Scorpio.exe
+
+koreSc.bat %2
+
+exit
+EOM
+;
+		close FILE;
+	}
 
 	unless (-e "koreSC.bat") {
 		open (FILE, "> koreSC.bat");
@@ -1136,6 +1153,28 @@ addParseFiles("$sc_v{'path'}{'tables'}/skillssp.txt", \%skillsSP_lut, \&parseSki
 addParseFiles("$sc_v{'path'}{'tables'}/stars.txt", \%stars_lut, \&parseROLUT, '武器強悍清單');
 
 load(\@{$sc_v{'parseFiles'}});
+
+if (!switchInput($config{'scorpio_code'}, "discuz.bluelovers.net")) {
+	$sc_v{'kore'}{'delay'} = 30;
+	
+	setColor($FG_LIGHTCYAN);
+	
+	print <<"EOM";
+	
+	尚未取得使用\許\可密碼
+	
+	請上 http://discuz.bluelovers.net/viewthread.php?tid=707
+	
+	註冊並且取得認證
+	
+	本程式30秒後自動關閉
+EOM
+;
+
+	setColor($sc_v{'Console'}{'original'});
+	
+	$quit = 1;
+}
 
 goto KORECLOSE if ($quit);
 
