@@ -92,7 +92,7 @@ sub parseMsg {
 			$msg_size = $rpackets{$switch};
 		} else {
 			print "Packet Switch: $lastswitch + $switch\n";
-			dumpData($last_know_msg.$msg, "$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
+			dumpData($last_know_msg.$msg, 0, 0, "$lastswitch + $switch") if ($config{'debug'} || $config{'debug_packet'});
 		}
 		$last_know_msg = substr($msg, 0, $msg_size);
 		$last_know_switch = $switch;
@@ -2042,7 +2042,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #Karasu Start
 			if ($config{'itemsDropAuto'} && $tmp_pick < 0 && (binFind(\@ai_seq, "storageAuto") eq "" && binFind(\@ai_seq, "buyAuto") eq "")) {
 				sendDrop(\$remote_socket, $chars[$config{'char'}]{'inventory'}[$invIndex]{'index'}, $amount);
-				printC("Auto-Drop Item : $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} ($invIndex) x $amount \n", "event");
+#				printC("Auto-Drop Item : $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} ($invIndex) x $amount \n", "event");
+				sysLog("event", "丟棄", "Auto-Drop Item : $chars[$config{'char'}]{'inventory'}[$invIndex]{'name'} ($invIndex) x $amount", 1);
 				$record{'Auto-Drop'}{$ID} += $amount;
 			}
 			# Auto cart add (When cart is avaliable)
@@ -2844,11 +2845,22 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$ID = substr($msg, 2, 4);
 		$type = unpack("C*", substr($msg, 6, 1));
 		if ($ID eq $accountID && (!existsInList2($config{'hideMsg_emotion'}, 1, "and") || $config{'debug'})) {
-			printC("[表情] 你作了個表情 : $emotions_lut{$type}\n", "e");
-		} elsif (%{$players{$ID}} && (!existsInList2($config{'hideMsg_emotion'}, 4, "and") || $config{'debug'})) {
-			printC("[表情] 玩家 $players{$ID}{'name'} ($players{$ID}{'binID'}) : $emotions_lut{$type}\n", "e");
+#			printC("[表情] 你作了個表情 : $emotions_lut{$type}\n", "e");
+			printC("[表情] 你作了個表情 : ".getName("emotions_lut", $type)."\n", "e");
+		} elsif (%{$players{$ID}}) {
+			printC("[表情] 玩家 $players{$ID}{'name'} ($players{$ID}{'binID'}) : ".getName("emotions_lut", $type)."\n", "e") if (!existsInList2($config{'hideMsg_emotion'}, 4, "and") || $config{'debug'});
+			
+			if ($config{'autoAdmin'}) {
+				$ai_cmdQue[$ai_cmdQue]{'type'}	= "e";
+				$ai_cmdQue[$ai_cmdQue]{'ID'}	= $ID;
+				$ai_cmdQue[$ai_cmdQue]{'user'}	= $players{$ID}{'name'};
+#				$ai_cmdQue[$ai_cmdQue]{'msg'}	= $emotions_lut{$type};
+				$ai_cmdQue[$ai_cmdQue]{'msg'}	= getName("emotions_lut", $type);
+				$ai_cmdQue[$ai_cmdQue]{'time'}	= time;
+				$ai_cmdQue++;
+			}
 		} elsif (%{$monsters{$ID}} && (!existsInList2($config{'hideMsg_emotion'}, 2, "and") || $config{'debug'})) {
-			printC("[表情] 怪物 $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) : $emotions_lut{$type}\n", "e");
+			printC("[表情] 怪物 $monsters{$ID}{'name'} ($monsters{$ID}{'binID'}) : ".getName("emotions_lut", $type)."\n", "e");
 		}
 		$msg_size = 7;
 
@@ -3446,14 +3458,35 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 		$msg_size = 6;
 
-	} elsif ($switch eq "0104" && length($msg) >= 79) {
-		$ID = substr($msg, 2, 4);
-		$x = unpack("S1", substr($msg,10, 2));
-		$y = unpack("S1", substr($msg,12, 2));
-		$type = unpack("C1",substr($msg, 14, 1));
-		($name) = substr($msg, 15, 24) =~ /([\s\S]*?)\000/;
-		($partyUser) = substr($msg, 39, 24) =~ /([\s\S]*?)\000/;
-		($map) = substr($msg, 63, 16) =~ /([\s\S]*?)\000/;
+#	} elsif ($switch eq "0104" && length($msg) >= 79) {
+	} elsif ($switch eq "0104" || $switch eq "01E9") {
+		# R 0104 <ID>.l ?.l <X>.w <Y>.w <offline>.B <party name>.24B <nick>.24B <map name>.16B
+		# R 01E9 <id>.l <master>.w <online>.w <x>.w <y>.w <?>.b<party_name>.24b <char_name>.24b <map_name>.16b <道具蒐集方式>.b <物品分配方式>.b
+		# R E9 01 C5 D6 1A 00 00 00 00 00 92 00 3B 00 00 6A 68 75 79 68 75 00 15 00 00 00 00 00 00 00 00 00 00 00 00 38 8A 00 00 C0 59 B4 DF AC 51 A4 D1 AD D7 A6 6E A4 46 00 00 00 00 00 00 00 00 00 00 70 72 6F 6E 74 65 72 61 2E 67 61 74 00 D4 60 00 00 00
+		#
+
+		my ($ID, $x, $y, $type, $name, $partyUser, $map, $e9_0, $e9_1, $displayEx);
+
+		if ($switch eq "01E9") {
+			($ID, $x, $y, $type, $name, $partyUser, $map, $e9_0, $e9_1) = unpack("x2 a4 x4 S2 C Z24 Z24 Z16 C C", $msg);
+			$map =~ s/\.gat$//;
+
+			$displayEx = " - 物品分享: ".($e9_0?"On":"Off")." - 物品分配: ".($e9_1?"On":"Off");
+
+			undef @{$chars[$config{'char'}]{'party'}{'param'}};
+
+			$chars[$config{'char'}]{'party'}{'param'}[0] = $e9_0;
+			$chars[$config{'char'}]{'party'}{'param'}[1] = $e9_1;
+		} else {
+			$ID = substr($msg, 2, 4);
+			$x = unpack("S1", substr($msg,10, 2));
+			$y = unpack("S1", substr($msg,12, 2));
+			$type = unpack("C1",substr($msg, 14, 1));
+			($name) = substr($msg, 15, 24) =~ /([\s\S]*?)\000/;
+			($partyUser) = substr($msg, 39, 24) =~ /([\s\S]*?)\000/;
+			($map) = substr($msg, 63, 16) =~ /([\s\S]*?)\000/;
+		}
+
 		if (!%{$chars[$config{'char'}]{'party'}{'users'}{$ID}}) {
 			binAdd(\@partyUsersID, $ID);
 			if ($ID eq $accountID) {
@@ -3462,13 +3495,13 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 					$chars[$config{'char'}]{'party'}{'users'}{$ID}{'admin'} = 1 ;
 					undef $sc_v{'ai'}{'temp'}{'createPartyBySelf'};
 
-					sysLog("event", "隊伍", "你建立隊伍 [$name]", 1);
+					sysLog("event", "隊伍", "你建立隊伍 [$name]$displayEx", 1);
 
 					sleep(0.2);
 
 					timeOutStart(-1, 'ai_partyAutoShare');
 				} else {
-					print "你加入隊伍 [$name]\n";
+					print "你加入隊伍 [$name]$displayEx\n";
 
 					sleep(0.2);
 
@@ -3488,23 +3521,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$chars[$config{'char'}]{'party'}{'users'}{$ID}{'pos'}{'y'} = $y;
 		$chars[$config{'char'}]{'party'}{'users'}{$ID}{'map'} = $map;
 		$chars[$config{'char'}]{'party'}{'users'}{$ID}{'name'} = $partyUser;
-		$msg_size = 79;
-
-#		my $temp1;
-#		my $temp2;
-#
-#		$temp1 = length($msg);
-#		$temp2 = unpack("S1", substr($msg, 2, 2));
-
-#		print <<"EOM";
-#Packet.Switch: $switch
-#Packet.Length - 0: $msg_size
-#Packet.Length - 1: $temp1
-#Packet.Length - 2: $temp2
-#Packet.Length - 3: $rpackets{$switch}
-#EOM
-#;
-#		dumpData(substr($msg, 0, $msg_size));
+#		$msg_size = 79;
 
 	} elsif ($switch eq "0105" && length($msg) >= 31) {
 		$ID = substr($msg, 2, 4);
@@ -3645,7 +3662,12 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		$type = unpack("C1", substr($msg, 9, 1));
 		if (!$fail) {
 			aiRemove("skill_use");
-			printC("★$messages_lut{'0110'}{$type}: $skillsID_lut{$skillID}\n", "alert") if (!$config{'hideMsg_skillFail'} || $config{'debug'});
+			undef $chars[$config{'char'}]{'time_cast'};
+			if (!$config{'hideMsg_skillFail'} || $config{'debug'}) {
+#				printC("★$messages_lut{'0110'}{$type}: $skillsID_lut{$skillID}\n", "alert");
+				printC("★".getMsgStrings($switch, $type, 0, 2).": ".getName("skillsID_lut", $skillID)."\n", "alert");
+			}
+			timeOutStart('ai_skill_use_send');
 		}
 #Karasu End
 		$msg_size = 10;
@@ -3951,7 +3973,8 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 #		}
 		$msg_size = 18;
 
-	} elsif ($switch eq "0119" && length($msg) >= 13) {
+#	} elsif ($switch eq "0119" && length($msg) >= 13) {
+	} elsif ($switch eq "0119" || $switch eq "0229") {
 #Karasu Start
 		# Character status
 		$ID = substr($msg, 2, 4);
@@ -3981,20 +4004,31 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 		my $ai_index = binFind(\@ai_seq, "attack");
 		if (($ai_index ne "" && $ID eq $ai_seq_args[$ai_index]{'ID'})
 			|| $ID eq $accountID || $config{'debug'}) {
-			printC("[特殊狀態Ａ] $targetDisplay".$messages_lut{$switch."_A"}{$param1}."\n", "status") if ($param1);
+#			printC("[特殊狀態Ａ] $targetDisplay".$messages_lut{$switch."_A"}{$param1}."\n", "status") if ($param1);
+#			foreach (keys %{$messages_lut{'0119_B'}}) {
+#				printC("[特殊狀態Ｂ] $targetDisplay".$messages_lut{$switch."_B"}{$_}."\n", "status") if ($_ & $param2);
+#			}
+#			if ($ID eq $accountID) {
+#				printC("[特殊狀態Ｃ] $targetDisplay".$messages_lut{$switch."_C"}{$_}."\n", "status") if (1 & $param3);
+#			} else {
+#				foreach (keys %{$messages_lut{'0119_C'}}) {
+#					printC("[特殊狀態Ｃ] $targetDisplay".$messages_lut{$switch."_C"}{$_}."\n", "status") if ($_ & $param3);
+#				}
+#			}
+			printC("[特殊狀態Ａ] $targetDisplay".getMsgStrings('0119_A', $param1)."\n", "status") if ($param1);
 			foreach (keys %{$messages_lut{'0119_B'}}) {
-				printC("[特殊狀態Ｂ] $targetDisplay".$messages_lut{$switch."_B"}{$_}."\n", "status") if ($_ & $param2);
+				printC("[特殊狀態Ｂ] $targetDisplay".getMsgStrings('0119_B', $_)."\n", "status") if ($_ & $param2);
 			}
 			if ($ID eq $accountID) {
-				printC("[特殊狀態Ｃ] $targetDisplay".$messages_lut{$switch."_C"}{$_}."\n", "status") if (1 & $param3);
+				printC("[特殊狀態Ｃ] $targetDisplay".getMsgStrings('0119_C', $_)."\n", "status") if (1 & $param3);
 			} else {
 				foreach (keys %{$messages_lut{'0119_C'}}) {
-					printC("[特殊狀態Ｃ] $targetDisplay".$messages_lut{$switch."_C"}{$_}."\n", "status") if ($_ & $param3);
+					printC("[特殊狀態Ｃ] $targetDisplay".getMsgStrings('0119_C', $_)."\n", "status") if ($_ & $param3);
 				}
 			}
 		}
 #Karasu End
-		$msg_size = 13;
+#		$msg_size = 13;
 
 	} elsif ($switch eq "011A" && length($msg) >= 15) {
 		$skillID = unpack("S1",substr($msg, 2, 2));
@@ -4113,9 +4147,11 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 
 #			parseInput("move $sc_v{'ai'}{'warpTo'}{'x'} $sc_v{'ai'}{'warpTo'}{'y'}");
 
-			print "計算路徑進入傳送之陣\n";
+			if (!$sc_v{'ai'}{'warpTo'}{'stop'}) {
+				print "計算路徑進入傳送之陣\n";
 
-			move($sc_v{'ai'}{'warpTo'}{'x'}, $sc_v{'ai'}{'warpTo'}{'y'});
+				move($sc_v{'ai'}{'warpTo'}{'x'}, $sc_v{'ai'}{'warpTo'}{'y'});
+			}
 #			ai_clientSuspend(0, $timeout{'ai_warpTo_wait'}{'timeout'});
 		} elsif (@{$warp{'memo'}}) {
 			parseInput("warp list");
@@ -4245,7 +4281,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 						."◆啟動 teleportAuto_spell - 隨機移動！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只剩 $s_cDist格, 隨機移動！", 0, !$config{'recordEvent_escape'});
 
 					last;
 				} else {
@@ -4260,7 +4296,7 @@ $num, $servers[$num]{'name'}, $servers[$num]{'users'}, $servers[$num]{'ip'}, $se
 						."◆啟動 teleportAuto_spell - 瞬間移動！\n"
 						, "tele"
 					);
-					sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只有 $s_cDist格, 瞬間移動！");
+					sysLog("tele", "迴避", "發現技能: $sourceDisplay施放的 $targetDisplay 距離你只有 $s_cDist格, 瞬間移動！", 0, !$config{'recordEvent_escape'});
 
 				}
 			}
@@ -4873,9 +4909,13 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #s4u End - Ayon 20030429(回應npc要求輸入數量)
 
 	} elsif ($switch eq "0144" && length($msg) >= 23) {
+#		0144 <ID>.l <type>.l <X>.l <Y>.l <point ID>.B <color>.3B ?.B
 		$msg_size = 23;
 
 	} elsif ($switch eq "0145" && length($msg) >= 19) {
+#		0145 <file name>.16B <type>.B
+#		Kapra cut-In indication
+
 		$msg_size = 19;
 
 	} elsif ($switch eq "0147" && length($msg) >= 39) {
@@ -5043,7 +5083,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 		sysLog("g_m", "成員", "$display ($message)", 1);
 
-		dumpData(substr($msg, 0, $msg_size), 0, 0, "$display ($message)");
+#		dumpData(substr($msg, 0, $msg_size), 0, 0, "$display ($message)");
 
 		$msg_size = 66;
 
@@ -5657,14 +5697,41 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		undef $display;
 		if ($mode == 1) {
 			$display = "PVP 模式";
+			
+			$mode = 1;
 		} elsif ($mode == 3) {
 			$display = "GVG 模式";
+			
+			$mode = 2;
 		} else {
 			$display = "不明模式 $mode";
+			undef $display;
 		}
-		printC("你進入 $display！\n", "s");
+		printC("[$switch] 你進入 $display！\n", "s") if ($display ne "");
 		$chars[$config{'char'}]{'pvp'}{'start'} = $mode;
-		$msg_size = 4;
+#		$msg_size = 4;
+
+	} elsif ($switch eq "01D6" && length($msg) >= 4) {
+		
+		# PVP mode start(PVP=6, GVG=8)
+		$mode = unpack("S1", substr($msg, 2, 2));
+		undef $display;
+		if ($mode == 6) {
+			$display = "PVP 模式";
+			
+			$mode = 1;
+		} elsif ($mode == 8) {
+			$display = "GVG 模式";
+			
+			$mode = 2;
+		} else {
+			$display = "不明模式 $mode";
+			undef $display;
+		}
+		printC("[$switch] 你進入 $display！\n", "s") if ($display ne "");
+		$chars[$config{'char'}]{'pvp'}{'start'} = $mode;
+		
+#		$msg_size = 4;
 
 	} elsif ($switch eq "019A" && length($msg) >= 14) {
 		# PVP rank
@@ -5961,13 +6028,13 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #		print getHex($ID)." - ".$time."\n";
 #		print "01AC: LONG $time, NAME ".Name($ID)."\n";
 
-		if (binFind(\@monstersID, $ai_seq_args[0]{'ID'}) ne "") {
-			$monsters{$ai_seq_args[0]{'ID'}}{'StoporSnare'} = 1;
-#			PrintMessage($monsters{$ai_seq_args[0]{'ID'}}{'name'}." Stop or Snare.", "green");
-		} elsif (binFind(\@playersID, $ai_seq_args[0]{'ID'}) ne "") {
-			$players{$ai_seq_args[0]{'ID'}}{'StoporSnare'} = 1;
-#			PrintMessage($players{$ai_seq_args[0]{'ID'}}{'name'}." Stop or Snare.", "green");
-		}
+#		if (binFind(\@monstersID, $ai_seq_args[0]{'ID'}) ne "") {
+#			$monsters{$ai_seq_args[0]{'ID'}}{'StoporSnare'} = 1;
+##			PrintMessage($monsters{$ai_seq_args[0]{'ID'}}{'name'}." Stop or Snare.", "green");
+#		} elsif (binFind(\@playersID, $ai_seq_args[0]{'ID'}) ne "") {
+#			$players{$ai_seq_args[0]{'ID'}}{'StoporSnare'} = 1;
+##			PrintMessage($players{$ai_seq_args[0]{'ID'}}{'name'}." Stop or Snare.", "green");
+#		}
 
 #		print "01AC: LONG $time, NAME ".Name($ID)."\n";
 #		// MessyKoreXP
@@ -6051,6 +6118,9 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #		($npc_image) = $npc_image =~ /(\S+)/;
 
 		getString(\$npc_image);
+		
+#		($npc_image) = $npc_image =~ s/[\r]//g;
+#		($npc_image) = $npc_image =~ s/[\n]//g;
 
 		print "NPC image: $npc_image\n" if ($config{'debug'});
 
@@ -6234,9 +6304,6 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		$ID = substr($msg, 2, 4);
 		print qq~$npcs{$ID}{'name'}: 請輸入 'talk answer "<文字>"' 輸入欲回應文字, 或輸入 'talk no' 取消對話\n~;
 		$msg_size = 6;
-
-	} elsif ($switch eq "01D6" && length($msg) >= 4) {
-		$msg_size = 4;
 
 #HaMBo Start
 	} elsif ($switch eq "01D7" && length($msg) >= 11) {
@@ -6433,14 +6500,56 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 #		print "[$switch]: $msg_size\n";
 
 		if ($switch eq "023A") {
-			print "請輸入倉庫密碼\n";
+			$type = unpack("x2 S1", $msg);
+
+			print getMsgStrings($switch, $type, 0, 2)."\n";
+
+#			print "請輸入倉庫密碼\n";
 			if ($config{'storageAuto_password'} ne "" && $sc_v{'input'}{'conState'} >= 5) {
 #				my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . toHex($config{'storageAuto_password'}) . toHex('EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8');
 #				encrypt(\$remote_socket, $newmsg);
 				sendPasswordEp10(1, $config{'storageAuto_password'});
+			} elsif ($config{'storageAuto_password'} eq "" && $sc_v{'input'}{'conState'} >= 5) {
+				undef $sc_v{'ai'}{'temp'}{'input'};
+				
+				$timeout{'ai_parseInput'}{'timeout'} = 20;
+				print "立即輸入倉庫密碼？, $timeout{'ai_parseInput'}{'timeout'}秒後自動取消輸入...\n";
+				
+				timeOutStart('ai_parseInput');
+				while (!checkTimeOut('ai_parseInput')) {
+					if (dataWaiting(\$input_socket)) {
+						$sc_v{'ai'}{'temp'}{'input'} = input_readLine();
+						getString(\$sc_v{'ai'}{'temp'}{'input'}, 1);
+					}
+					last if $sc_v{'ai'}{'temp'}{'input'};
+				}
+				
+				if ($sc_v{'ai'}{'temp'}{'input'} && isNum($sc_v{'ai'}{'temp'}{'input'})) {
+					undef @{$sc_v{'ai'}{'temp'}{'key'}};
+					
+					@{$sc_v{'ai'}{'temp'}{'key'}} = split /[, ]+/, $config{storageAuto_encryptKey};
+
+					if (!@{$sc_v{'ai'}{'temp'}{'key'}}) {
+						@{$sc_v{'ai'}{'temp'}{'key'}} = ('0x050B6F79', '0x0202C179', '0x00E20120', '0x04FA43E3', '0x0179B6C8', '0x05973DF2', '0x07D8D6B', '0x08CB9ED9');
+					}
+					
+					my $crypton = new Utils::Crypton(pack("V*", @{$sc_v{'ai'}{'temp'}{'key'}}), 32);
+					$sc_v{'ai'}{'temp'}{'input'} = sprintf("%d%08d", length($sc_v{'ai'}{'temp'}{'input'}), $sc_v{'ai'}{'temp'}{'input'});
+					$sc_v{'ai'}{'temp'}{'ciphertextBlock'} = $crypton->encrypt(pack("V*", $sc_v{'ai'}{'temp'}{'input'}, 0, 0, 0));
+					
+					scModify("config", "storageAuto_password", getHex($sc_v{'ai'}{'temp'}{'ciphertextBlock'}, 0), 2);
+					
+					sendPasswordEp10(1, $config{'storageAuto_password'});
+				} else {
+					scModify("config", "storageAuto", 0, 1);
+				}
 			}
 		} elsif ($switch eq "023E") {
-			print "請輸入角色密碼\n";
+#			print "請輸入角色密碼\n";
+
+			$type = unpack("x2 S1", $msg);
+
+			print getMsgStrings($switch, $type, 0, 2)."\n";
 
 #			dumpData($msg);
 
@@ -6450,8 +6559,14 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 
 #			dumpData($msg, 1);
 		} else {
-			print "密碼輸入完成\n";
+#			print "密碼輸入完成\n";
+
+			($type, $fail) = unpack("x2 S2", $msg);
+
+			print getMsgStrings($switch, $type, 0, 2)."\n";
 		}
+		
+		timeOutStart('ai_storageAuto');
 
 #		dumpData($msg, 1);
 	} elsif ($switch eq "01C3") {
@@ -6472,7 +6587,7 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 		makeCoords(\%coords, substr($msg, 46+4, 3));
 		$type = unpack("S1",substr($msg, 14+2, 2));
 		$sex = unpack("C1",substr($msg, 45+4, 1));
-		$sitting = unpack("C1",substr($msg, 51, 1));
+		$sitting = unpack("C1",substr($msg, 51+4, 1));
 		$level = unpack("S1", substr($msg, 52+4, 2));
 		# 0119 status
 		$param1 = unpack("S1", substr($msg, 8, 2));
@@ -6715,31 +6830,6 @@ $index, $articles[$index]{'name'}, $itemTypes_lut{$articles[$index]{'type'}}, $a
 ##		dumpData(substr($msg, 0, $msg_size), 0, 0, getHex(substr($msg, 52+2, 3))." - ID: ".getID($ID)." Moved: ".getName("auto", $ID, 0, -1)." $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}} - lv $players{$ID}{'lv'}");
 
 	# Seperate player from 007B
-	} elsif ($switch eq "01EC") {
-		# guild leave recv
-#		($name) = substr($msg, 2, 24) =~ /([\s\S]*?)\000/;
-#		($message) = substr($msg, 26, 40) =~ /([\s\S]*?)\000/;
-
-		($name) = substr($msg, 28, 24) =~ /([\s\S]*?)\000/;
-		($message) = substr($msg, 52, 40) =~ /([\s\S]*?)\000/;
-
-		my $display;
-
-		if ($name eq $chars[$config{'char'}]{'name'}) {
-			$display = "你退出公會";
-			undef %{$guild{$chars[$config{'char'}]{'guild'}{'ID'}}};
-			undef %{$chars[$config{'char'}]{'guild'}};
-
-			ai_event_checkUser_lock();
-		} else {
-			$display = "$name 退出公會";
-		}
-
-		sysLog("g_m", "成員", "$display ($message)", 1);
-
-#		dumpData(substr($msg, 0, $msg_size), 0, 0, "$display ($message)");
-
-#		$msg_size = 66;
 	} elsif (!defined($rpackets{$switch})) {
 		print "Unparsed packet - $switch\n";
 		print "-Length : ".length($msg)."\n";
@@ -6760,10 +6850,10 @@ PARSEMSGEND:
 
 		print <<"EOM";
 Packet.Switch: $switch
-Packet.Length - 0: $msg_size
-Packet.Length - 1: $temp1
-Packet.Length - 2: $temp2
-Packet.Length - 3: $rpackets{$switch}
+Packet.Length - msg_size:\t$msg_size
+Packet.Length - length\(msg):\t$temp1
+Packet.Length - unpack\(\"S1\", \substr\(msg, 2, 2)):\t$temp2
+Packet.Length - rpackets\{switch\}:\t$rpackets{$switch}
 EOM
 ;
 		dumpData(substr($msg, 0, $msg_size));
