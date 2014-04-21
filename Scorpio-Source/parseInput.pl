@@ -3343,22 +3343,22 @@ $spells{$spellsID[$i]}{'type'}, $messages_lut{'011F'}{$spells{$spellsID[$i]}{'ty
 #			, $tmpVal{'line'}, ["level: $sc_v{'sense'}{'level'}", "size: $sc_v{'sense'}{'size'}"]
 #
 #		);
-#	} elsif (switchInput($switch, "test")) {
-##		print "¶Ç°e±K½X : $inputparam\n";
-##		print "¶Ç°e±K½X : ".getHex(pack("L1", $params[1]))." - ".getHex(pack("L1", $params[2]))."\n";
-##		print "¶Ç°e±K½X : ".getHexEx($params[1])." - ".getHexEx($params[2])."\n";
-##		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . pack("C*", $params[1]) . pack("C*", $params[2]);
-##		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . toHex($inputparam) . toHex('EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8');
-##		encrypt(\$remote_socket, $newmsg);
-#
-#		my $newmsg = pack("C*", 0x3B, 0x02)
-#			. pack("C*", 0x02, 0x00)
-#			. toHex('A6 98 AE 8A 3E 9D B7 92 4F FB AC A4 67 01 C5 4F')
-#			. toHex('50 FC 2E BC FB A1 CA 9C F7 AB 45 AA F9 D8 0E 54')
-#		;
+	} elsif (switchInput($switch, "test")) {
+#		print "¶Ç°e±K½X : $inputparam\n";
+#		print "¶Ç°e±K½X : ".getHex(pack("L1", $params[1]))." - ".getHex(pack("L1", $params[2]))."\n";
+#		print "¶Ç°e±K½X : ".getHexEx($params[1])." - ".getHexEx($params[2])."\n";
+#		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . pack("C*", $params[1]) . pack("C*", $params[2]);
+#		my $newmsg = pack("C*", 0x3B, 0x02) . pack("C*", 0x03, 0x00) . toHex($inputparam) . toHex('EC 62 E5 39 BB 6B BC 81 1A 60 C0 6F AC CB 7E C8');
 #		encrypt(\$remote_socket, $newmsg);
-#
-#		dumpData($newmsg, 1);
+
+		my $newmsg = pack("C*", 0x3B, 0x02)
+			. pack("C*", 0x02, 0x00)
+			. toHex('A6 98 AE 8A 3E 9D B7 92 4F FB AC A4 67 01 C5 4F')
+			. toHex('50 FC 2E BC FB A1 CA 9C F7 AB 45 AA F9 D8 0E 54')
+		;
+		encrypt(\$remote_socket, $newmsg);
+
+		dumpData($newmsg, 1);
 	} else {
 		print "¿ù»~ªº«ü¥O : $switch \n";
 	}
